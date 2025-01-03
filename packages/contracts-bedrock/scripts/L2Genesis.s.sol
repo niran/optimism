@@ -15,12 +15,8 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 // Libraries
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
-import { Types } from "src/libraries/Types.sol";
 
 // Interfaces
-import { ISequencerFeeVault } from "interfaces/L2/ISequencerFeeVault.sol";
-import { IBaseFeeVault } from "interfaces/L2/IBaseFeeVault.sol";
-import { IL1FeeVault } from "interfaces/L2/IL1FeeVault.sol";
 import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableERC721Factory.sol";
 import { IGovernanceToken } from "interfaces/governance/IGovernanceToken.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
@@ -340,29 +336,7 @@ contract L2Genesis is Deployer {
 
     /// @notice This predeploy is following the safety invariant #2,
     function setSequencerFeeVault() public {
-        ISequencerFeeVault vault = ISequencerFeeVault(
-            DeployUtils.create1(
-                "SequencerFeeVault",
-                DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        ISequencerFeeVault.__constructor__,
-                        (
-                            cfg.sequencerFeeVaultRecipient(),
-                            cfg.sequencerFeeVaultMinimumWithdrawalAmount(),
-                            Types.WithdrawalNetwork(cfg.sequencerFeeVaultWithdrawalNetwork())
-                        )
-                    )
-                )
-            )
-        );
-
-        address impl = Predeploys.predeployToCodeNamespace(Predeploys.SEQUENCER_FEE_WALLET);
-        console.log("Setting %s implementation at: %s", "SequencerFeeVault", impl);
-        vm.etch(impl, address(vault).code);
-
-        /// Reset so its not included state dump
-        vm.etch(address(vault), "");
-        vm.resetNonce(address(vault));
+        _setImplementationCode(Predeploys.SEQUENCER_FEE_WALLET);
     }
 
     /// @notice This predeploy is following the safety invariant #1.
@@ -442,56 +416,12 @@ contract L2Genesis is Deployer {
 
     /// @notice This predeploy is following the safety invariant #2.
     function setBaseFeeVault() public {
-        IBaseFeeVault vault = IBaseFeeVault(
-            DeployUtils.create1(
-                "BaseFeeVault",
-                DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IBaseFeeVault.__constructor__,
-                        (
-                            cfg.baseFeeVaultRecipient(),
-                            cfg.baseFeeVaultMinimumWithdrawalAmount(),
-                            Types.WithdrawalNetwork(cfg.baseFeeVaultWithdrawalNetwork())
-                        )
-                    )
-                )
-            )
-        );
-
-        address impl = Predeploys.predeployToCodeNamespace(Predeploys.BASE_FEE_VAULT);
-        console.log("Setting %s implementation at: %s", "BaseFeeVault", impl);
-        vm.etch(impl, address(vault).code);
-
-        /// Reset so its not included state dump
-        vm.etch(address(vault), "");
-        vm.resetNonce(address(vault));
+        _setImplementationCode(Predeploys.BASE_FEE_VAULT);
     }
 
     /// @notice This predeploy is following the safety invariant #2.
     function setL1FeeVault() public {
-        IL1FeeVault vault = IL1FeeVault(
-            DeployUtils.create1(
-                "L1FeeVault",
-                DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IL1FeeVault.__constructor__,
-                        (
-                            cfg.l1FeeVaultRecipient(),
-                            cfg.l1FeeVaultMinimumWithdrawalAmount(),
-                            Types.WithdrawalNetwork(cfg.l1FeeVaultWithdrawalNetwork())
-                        )
-                    )
-                )
-            )
-        );
-
-        address impl = Predeploys.predeployToCodeNamespace(Predeploys.L1_FEE_VAULT);
-        console.log("Setting %s implementation at: %s", "L1FeeVault", impl);
-        vm.etch(impl, address(vault).code);
-
-        /// Reset so its not included state dump
-        vm.etch(address(vault), "");
-        vm.resetNonce(address(vault));
+        _setImplementationCode(Predeploys.L1_FEE_VAULT);
     }
 
     /// @notice This predeploy is following the safety invariant #2.

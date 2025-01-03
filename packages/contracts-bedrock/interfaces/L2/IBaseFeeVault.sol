@@ -17,13 +17,12 @@ interface IBaseFeeVault {
     function totalProcessed() external view returns (uint256);
     function withdraw() external;
     function withdrawalNetwork() external view returns (Types.WithdrawalNetwork network_);
+    function config()
+        external
+        view
+        returns (address recipient_, uint256 minWithdrawalAmount_, Types.WithdrawalNetwork withdrawalNetwork_);
 
     function version() external view returns (string memory);
 
-    function __constructor__(
-        address _recipient,
-        uint256 _minWithdrawalAmount,
-        Types.WithdrawalNetwork _withdrawalNetwork
-    )
-        external;
+    function __constructor__() external;
 }

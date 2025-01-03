@@ -4,7 +4,10 @@ pragma solidity 0.8.15;
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
 import { GasPayingToken, IGasToken } from "src/libraries/GasPayingToken.sol";
+import { StaticConfig } from "src/libraries/StaticConfig.sol";
 import { NotDepositor } from "src/libraries/L1BlockErrors.sol";
+import { Storage } from "src/libraries/Storage.sol";
+import { Types } from "src/libraries/Types.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -19,6 +22,16 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 contract L1Block is ISemver, IGasToken {
     /// @notice Event emitted when the gas paying token is set.
     event GasPayingTokenSet(address indexed token, uint8 indexed decimals, bytes32 name, bytes32 symbol);
+
+    /// @notice Storage slot for the base fee vault configuration
+    bytes32 internal constant BASE_FEE_VAULT_CONFIG_SLOT = bytes32(uint256(keccak256("opstack.basefeevaultconfig")) - 1);
+
+    /// @notice Storage slot for the L1 fee vault configuration
+    bytes32 internal constant L1_FEE_VAULT_CONFIG_SLOT = bytes32(uint256(keccak256("opstack.l1feevaultconfig")) - 1);
+
+    /// @notice Storage slot for the sequencer fee vault configuration
+    bytes32 internal constant SEQUENCER_FEE_VAULT_CONFIG_SLOT =
+        bytes32(uint256(keccak256("opstack.sequencerfeevaultconfig")) - 1);
 
     /// @notice Address of the special depositor account.
     function DEPOSITOR_ACCOUNT() public pure returns (address addr_) {
@@ -60,9 +73,9 @@ contract L1Block is ISemver, IGasToken {
     /// @notice The latest L1 blob base fee.
     uint256 public blobBaseFee;
 
-    /// @custom:semver 1.5.1-beta.5
+    /// @custom:semver 1.5.1-beta.6
     function version() public pure virtual returns (string memory) {
-        return "1.5.1-beta.5";
+        return "1.5.1-beta.6";
     }
 
     /// @notice Returns the gas paying token, its decimals, name and symbol.
@@ -177,6 +190,59 @@ contract L1Block is ISemver, IGasToken {
     function setGasPayingToken(address _token, uint8 _decimals, bytes32 _name, bytes32 _symbol) external {
         if (msg.sender != DEPOSITOR_ACCOUNT()) revert NotDepositor();
 
+        _setGasPayingToken(_token, _decimals, _name, _symbol);
+    }
+
+    /// @notice Sets static configuration options for the L2 system. Can only be called by the special
+    ///         depositor account.
+    /// @param _type  The type of configuration to set.
+    /// @param _value The encoded value with which to set the configuration.
+    function setConfig(Types.ConfigType _type, bytes calldata _value) public virtual {
+        if (msg.sender != DEPOSITOR_ACCOUNT()) revert NotDepositor();
+
+        if (_type == Types.ConfigType.GAS_PAYING_TOKEN) {
+            _setGasPayingToken(_value);
+        } else if (_type == Types.ConfigType.BASE_FEE_VAULT_CONFIG) {
+            Storage.setBytes32(BASE_FEE_VAULT_CONFIG_SLOT, abi.decode(_value, (bytes32)));
+        } else if (_type == Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG) {
+            Storage.setBytes32(SEQUENCER_FEE_VAULT_CONFIG_SLOT, abi.decode(_value, (bytes32)));
+        } else if (_type == Types.ConfigType.L1_FEE_VAULT_CONFIG) {
+            Storage.setBytes32(L1_FEE_VAULT_CONFIG_SLOT, abi.decode(_value, (bytes32)));
+        }
+    }
+
+    /// @notice Returns the configuration for the given config type.
+    /// @param _type The type of configuration to return.
+    /// @return config_ The encoded configuration value.
+    function getConfig(Types.ConfigType _type) external view returns (bytes memory config_) {
+        if (_type == Types.ConfigType.BASE_FEE_VAULT_CONFIG) {
+            config_ = abi.encode(Storage.getBytes32(BASE_FEE_VAULT_CONFIG_SLOT));
+        } else if (_type == Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG) {
+            config_ = abi.encode(Storage.getBytes32(SEQUENCER_FEE_VAULT_CONFIG_SLOT));
+        } else if (_type == Types.ConfigType.L1_FEE_VAULT_CONFIG) {
+            config_ = abi.encode(Storage.getBytes32(L1_FEE_VAULT_CONFIG_SLOT));
+        } else if (_type == Types.ConfigType.GAS_PAYING_TOKEN) {
+            (address token, uint8 decimals) = gasPayingToken();
+            string memory name = gasPayingTokenName();
+            string memory symbol = gasPayingTokenSymbol();
+            config_ = abi.encode(token, decimals, GasPayingToken.sanitize(name), GasPayingToken.sanitize(symbol));
+        }
+    }
+
+    /// @notice Internal method to set the gas paying token.
+    /// @param _value The ABI-encoded value containing the token address, decimals, name, and symbol.
+    ///               The expected order is: [token address, decimals, name, symbol].
+    function _setGasPayingToken(bytes memory _value) internal {
+        (address token, uint8 decimals, bytes32 name, bytes32 symbol) = StaticConfig.decodeSetGasPayingToken(_value);
+        _setGasPayingToken(token, decimals, name, symbol);
+    }
+
+    /// @notice Internal method to set the gas paying token.
+    /// @param _token    The address of the gas paying token.
+    /// @param _decimals The number of decimals for the gas paying token.
+    /// @param _name     The name of the gas paying token.
+    /// @param _symbol   The symbol of the gas paying token.
+    function _setGasPayingToken(address _token, uint8 _decimals, bytes32 _name, bytes32 _symbol) internal {
         GasPayingToken.set({ _token: _token, _decimals: _decimals, _name: _name, _symbol: _symbol });
 
         emit GasPayingTokenSet({ token: _token, decimals: _decimals, name: _name, symbol: _symbol });

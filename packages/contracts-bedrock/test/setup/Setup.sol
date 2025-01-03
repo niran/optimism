@@ -17,6 +17,9 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
+import { Constants } from "src/libraries/Constants.sol";
+import { Encoding } from "src/libraries/Encoding.sol";
+import { Types } from "src/libraries/Types.sol";
 
 // Interfaces
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
@@ -307,7 +310,40 @@ contract Setup {
         labelPreinstall(Preinstalls.BeaconBlockRoots);
         labelPreinstall(Preinstalls.CreateX);
 
+        configureFeeVaults();
+
         console.log("Setup: completed L2 genesis");
+    }
+
+    function configureFeeVaults() internal {
+        // These calls by the depositor account simulate the SystemConfig setting the
+        // network specific configuration into L2. Ideally there is a library that automatically
+        // translates TransactionDeposited and ConfigUpdate events into the appropriate calls
+        vm.startPrank(Constants.DEPOSITOR_ACCOUNT);
+
+        bytes32 sequencerFeeVaultConfig = Encoding.encodeFeeVaultConfig({
+            _recipient: deploy.cfg().sequencerFeeVaultRecipient(),
+            _amount: deploy.cfg().sequencerFeeVaultMinimumWithdrawalAmount(),
+            _network: Types.WithdrawalNetwork(deploy.cfg().sequencerFeeVaultWithdrawalNetwork())
+        });
+        l1Block.setConfig(Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG, abi.encode(sequencerFeeVaultConfig));
+
+        bytes32 baseFeeVaultConfig = Encoding.encodeFeeVaultConfig({
+            _recipient: deploy.cfg().baseFeeVaultRecipient(),
+            _amount: deploy.cfg().baseFeeVaultMinimumWithdrawalAmount(),
+            _network: Types.WithdrawalNetwork(deploy.cfg().baseFeeVaultWithdrawalNetwork())
+        });
+        l1Block.setConfig(Types.ConfigType.BASE_FEE_VAULT_CONFIG, abi.encode(baseFeeVaultConfig));
+
+        bytes32 l1FeeVaultConfig = Encoding.encodeFeeVaultConfig({
+            _recipient: deploy.cfg().l1FeeVaultRecipient(),
+            _amount: deploy.cfg().l1FeeVaultMinimumWithdrawalAmount(),
+            _network: Types.WithdrawalNetwork(deploy.cfg().l1FeeVaultWithdrawalNetwork())
+        });
+        l1Block.setConfig(Types.ConfigType.L1_FEE_VAULT_CONFIG, abi.encode(l1FeeVaultConfig));
+        vm.stopPrank();
+
+        console.log("Setup: configured fee vaults");
     }
 
     function labelPredeploy(address _addr) internal {

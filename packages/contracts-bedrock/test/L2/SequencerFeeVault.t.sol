@@ -4,16 +4,15 @@ pragma solidity 0.8.15;
 // Testing
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { Reverter } from "test/mocks/Callers.sol";
-import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 // Contracts
-import { ISequencerFeeVault } from "interfaces/L2/ISequencerFeeVault.sol";
+import { Constants } from "src/libraries/Constants.sol";
 
 // Libraries
 import { Hashing } from "src/libraries/Hashing.sol";
 import { Types } from "src/libraries/Types.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
-import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
+import { Encoding } from "src/libraries/Encoding.sol";
 
 contract SequencerFeeVault_Test is CommonTest {
     address recipient;
@@ -99,6 +98,23 @@ contract SequencerFeeVault_Test is CommonTest {
         assertEq(address(sequencerFeeVault).balance, 0);
         assertEq(Predeploys.L2_TO_L1_MESSAGE_PASSER.balance, amount);
     }
+
+    /// @dev Tests that the setConfig function in l1Block  sets the correct values.
+    function test_setConfig_succeeds(address _recipient, uint88 _amount, uint8 _networkSeed) external {
+        Types.WithdrawalNetwork _network = Types.WithdrawalNetwork(bound(_networkSeed, 0, 1));
+        bytes32 sequencerFeeVaultConfig = Encoding.encodeFeeVaultConfig(_recipient, _amount, _network);
+
+        vm.startPrank(Constants.DEPOSITOR_ACCOUNT);
+        l1Block.setConfig(Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG, abi.encode(sequencerFeeVaultConfig));
+        vm.stopPrank();
+
+        assertEq(sequencerFeeVault.RECIPIENT(), _recipient);
+        assertEq(sequencerFeeVault.recipient(), _recipient);
+        assertEq(sequencerFeeVault.MIN_WITHDRAWAL_AMOUNT(), _amount);
+        assertEq(sequencerFeeVault.minWithdrawalAmount(), _amount);
+        assertEq(uint8(sequencerFeeVault.WITHDRAWAL_NETWORK()), uint8(_network));
+        assertEq(uint8(sequencerFeeVault.withdrawalNetwork()), uint8(_network));
+    }
 }
 
 contract SequencerFeeVault_L2Withdrawal_Test is CommonTest {
@@ -109,27 +125,14 @@ contract SequencerFeeVault_L2Withdrawal_Test is CommonTest {
     function setUp() public override {
         super.setUp();
 
-        // Alter the deployment to use WithdrawalNetwork.L2
-        vm.etch(
-            EIP1967Helper.getImplementation(Predeploys.SEQUENCER_FEE_WALLET),
-            address(
-                DeployUtils.create1({
-                    _name: "SequencerFeeVault",
-                    _args: DeployUtils.encodeConstructor(
-                        abi.encodeCall(
-                            ISequencerFeeVault.__constructor__,
-                            (
-                                deploy.cfg().sequencerFeeVaultRecipient(),
-                                deploy.cfg().sequencerFeeVaultMinimumWithdrawalAmount(),
-                                Types.WithdrawalNetwork.L2
-                            )
-                        )
-                    )
-                })
-            ).code
-        );
-
         recipient = deploy.cfg().sequencerFeeVaultRecipient();
+
+        // Alter the L1Block to use WithdrawalNetwork.L2
+        vm.prank(Constants.DEPOSITOR_ACCOUNT);
+        l1Block.setConfig(
+            Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG,
+            abi.encode(Encoding.encodeFeeVaultConfig(recipient, 1, Types.WithdrawalNetwork.L2))
+        );
     }
 
     /// @dev Tests that `withdraw` successfully initiates a withdrawal to L2.

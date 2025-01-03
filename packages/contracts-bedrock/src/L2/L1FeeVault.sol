@@ -6,6 +6,7 @@ import { FeeVault } from "src/L2/FeeVault.sol";
 
 // Libraries
 import { Types } from "src/libraries/Types.sol";
+import { Encoding } from "src/libraries/Encoding.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -16,18 +17,19 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 /// @notice The L1FeeVault accumulates the L1 portion of the transaction fees.
 contract L1FeeVault is FeeVault, ISemver {
     /// @notice Semantic version.
-    /// @custom:semver 1.5.0-beta.5
-    string public constant version = "1.5.0-beta.5";
+    /// @custom:semver 1.5.0-beta.6
+    string public constant version = "1.5.0-beta.6";
 
-    /// @notice Constructs the L1FeeVault contract.
-    /// @param _recipient           Wallet that will receive the fees.
-    /// @param _minWithdrawalAmount Minimum balance for withdrawals.
-    /// @param _withdrawalNetwork   Network which the recipient will receive fees on.
-    constructor(
-        address _recipient,
-        uint256 _minWithdrawalAmount,
-        Types.WithdrawalNetwork _withdrawalNetwork
-    )
-        FeeVault(_recipient, _minWithdrawalAmount, _withdrawalNetwork)
-    { }
+    /// @inheritdoc FeeVault
+    function config()
+        public
+        view
+        virtual
+        override
+        returns (address recipient_, uint256 minWithdrawalAmount_, Types.WithdrawalNetwork withdrawalNetwork_)
+    {
+        bytes memory vaultConfig = L1_BLOCK().getConfig(Types.ConfigType.L1_FEE_VAULT_CONFIG);
+        (recipient_, minWithdrawalAmount_, withdrawalNetwork_) =
+            Encoding.decodeFeeVaultConfig(abi.decode(vaultConfig, (bytes32)));
+    }
 }
