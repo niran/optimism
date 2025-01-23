@@ -82,6 +82,7 @@ library Types {
     /// @custom:value L1_FEE_VAULT_CONFIG  Represents the config type for setting the L1 fee vault configuration.
     /// @custom:value SEQUENCER_FEE_VAULT_CONFIG Represents the config type for setting the sequencer fee vault
     ///               configuration.
+    /// @custom:value REMOTE_CHAIN_ID  Represents the config type for setting the remote chain id.
     /// @custom:value L1_STANDARD_BRIDGE_ADDRESS Represents the config type for setting the standard bridge address.
     /// @custom:value L1_CROSS_DOMAIN_MESSENGER_ADDRESS Represents the config type for setting the L1 Cross Domain
     ///               Messenger address.
@@ -93,6 +94,7 @@ library Types {
         BASE_FEE_VAULT_CONFIG,
         L1_FEE_VAULT_CONFIG,
         SEQUENCER_FEE_VAULT_CONFIG,
+        REMOTE_CHAIN_ID,
         L1_STANDARD_BRIDGE_ADDRESS,
         L1_CROSS_DOMAIN_MESSENGER_ADDRESS,
         ADD_DEPENDENCY,

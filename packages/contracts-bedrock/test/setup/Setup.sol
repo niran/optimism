@@ -312,16 +312,27 @@ contract Setup {
         labelPreinstall(Preinstalls.CreateX);
 
         configureFeeVaults();
+        configureRemoteChainId();
         configureBridges();
         configureCrossDomainMessenger();
 
         console.log("Setup: completed L2 genesis");
     }
 
+    /// @dev Sets the remote chain id in the L1Block contract.
+    function configureRemoteChainId() internal {
+        uint256 remoteChainId = deploy.cfg().l1ChainID();
+        console.log("Remote chain ID: %d", remoteChainId);
+        vm.prank(Constants.DEPOSITOR_ACCOUNT);
+        l1Block.setConfig(Types.ConfigType.REMOTE_CHAIN_ID, abi.encode(remoteChainId));
+        console.log("Setup: configured remote chain id");
+    }
+
     /// @dev Sets the standard bridge address in the L1Block contract.
     function configureBridges() internal {
         vm.prank(Constants.DEPOSITOR_ACCOUNT);
         l1Block.setConfig(Types.ConfigType.L1_STANDARD_BRIDGE_ADDRESS, abi.encode(address(l2StandardBridge)));
+        console.log("Setup: configured L1StandardBridge address");
     }
 
     /// @dev Sets the L1CrossDomainMessenger address in the L1Block contract.

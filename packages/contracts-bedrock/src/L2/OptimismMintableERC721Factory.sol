@@ -4,22 +4,19 @@ pragma solidity 0.8.15;
 // Contracts
 import { OptimismMintableERC721 } from "src/L2/OptimismMintableERC721.sol";
 
+// Libraries
+import { Predeploys } from "src/libraries/Predeploys.sol";
+import { Types } from "src/libraries/Types.sol";
+
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
+import { IL1Block } from "interfaces/l2/IL1Block.sol";
 
 /// @custom:proxied true
 /// @custom:predeploy 0x4200000000000000000000000000000000000017
 /// @title OptimismMintableERC721Factory
 /// @notice Factory contract for creating OptimismMintableERC721 contracts.
 contract OptimismMintableERC721Factory is ISemver {
-    /// @custom:legacy true
-    /// @notice Address of the ERC721 bridge on this network.
-    address public immutable BRIDGE;
-
-    /// @custom:legacy true
-    /// @notice Chain ID for the remote network.
-    uint256 public immutable REMOTE_CHAIN_ID;
-
     /// @notice Tracks addresses created by this factory.
     mapping(address => bool) public isOptimismMintableERC721;
 
@@ -29,29 +26,11 @@ contract OptimismMintableERC721Factory is ISemver {
     /// @param deployer    Address of the initiator of the deployment
     event OptimismMintableERC721Created(address indexed localToken, address indexed remoteToken, address deployer);
 
-    /// @notice Semantic version.
-    /// @custom:semver 1.4.1-beta.7
-    string public constant version = "1.4.1-beta.7";
-
     /// @notice The semver MUST be bumped any time that there is a change in
     ///         the OptimismMintableERC721 token contract since this contract
     ///         is responsible for deploying OptimismMintableERC721 contracts.
-    /// @param _bridge Address of the ERC721 bridge on this network.
-    /// @param _remoteChainId Chain ID for the remote network.
-    constructor(address _bridge, uint256 _remoteChainId) {
-        BRIDGE = _bridge;
-        REMOTE_CHAIN_ID = _remoteChainId;
-    }
-
-    /// @notice Address of the ERC721 bridge on this network.
-    function bridge() external view returns (address) {
-        return BRIDGE;
-    }
-
-    /// @notice Chain ID for the remote network.
-    function remoteChainID() external view returns (uint256) {
-        return REMOTE_CHAIN_ID;
-    }
+    /// @custom:semver 1.4.1-beta.8
+    string public constant version = "1.4.1-beta.8";
 
     /// @notice Creates an instance of the standard ERC721.
     /// @param _remoteToken Address of the corresponding token on the other domain.
@@ -69,11 +48,37 @@ contract OptimismMintableERC721Factory is ISemver {
 
         bytes32 salt = keccak256(abi.encode(_remoteToken, _name, _symbol));
         address localToken =
-            address(new OptimismMintableERC721{ salt: salt }(BRIDGE, REMOTE_CHAIN_ID, _remoteToken, _name, _symbol));
+            address(new OptimismMintableERC721{ salt: salt }(bridge(), remoteChainID(), _remoteToken, _name, _symbol));
 
         isOptimismMintableERC721[localToken] = true;
         emit OptimismMintableERC721Created(localToken, _remoteToken, msg.sender);
 
         return localToken;
+    }
+
+    /// @notice Getter function for the bridge contract.
+    ///         Public getter is legacy and will be removed in the future. Use `bridge()` instead.
+    /// @return Bridge contract on this domain.
+    /// @custom:legacy
+    function BRIDGE() external pure returns (address) {
+        return bridge();
+    }
+
+    /// @notice Returns the ERC721 bridge contract.
+    function bridge() public pure returns (address) {
+        return Predeploys.L2_ERC721_BRIDGE;
+    }
+
+    /// @notice Returns the remote chain id
+    ///         Public getter is legacy and will be removed in the future. Use `remoteChainID()` instead.
+    /// @custom:legacy
+    function REMOTE_CHAIN_ID() external view returns (uint256) {
+        return remoteChainID();
+    }
+
+    /// @notice Getter function for the remote chain id.
+    function remoteChainID() public view returns (uint256) {
+        bytes memory data = IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).getConfig(Types.ConfigType.REMOTE_CHAIN_ID);
+        return abi.decode(data, (uint256));
     }
 }
