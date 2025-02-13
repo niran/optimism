@@ -22,7 +22,8 @@ import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 import { StaticConfig } from "src/libraries/StaticConfig.sol";
 import "src/dispute/lib/Types.sol";
 import "src/libraries/PortalErrors.sol";
-
+import { StaticConfig } from "src/libraries/StaticConfig.sol";
+import { Encoding } from "src/libraries/Encoding.sol";
 // Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IL1Block } from "interfaces/L2/IL1Block.sol";
@@ -325,7 +326,7 @@ contract OptimismPortal2_Test is CommonTest {
         bytes memory data = StaticConfig.encodeSetGasPayingToken(_token, _decimals, _name, _symbol);
         vm.expectEmit(address(optimismPortal2));
         emit TransactionDeposited(
-            0xDeaDDEaDDeAdDeAdDEAdDEaddeAddEAdDEAd0001,
+            Constants.DEPOSITOR_ACCOUNT,
             Predeploys.L1_BLOCK_ATTRIBUTES,
             0,
             abi.encodePacked(
@@ -339,6 +340,45 @@ contract OptimismPortal2_Test is CommonTest {
 
         vm.prank(address(systemConfig));
         optimismPortal2.setConfig(Types.ConfigType.GAS_PAYING_TOKEN, data);
+    }
+
+    /// @dev Tests that `setFeeVaultConfig` succeeds for a valid config type.
+    function testFuzz_setFeeVaultConfig_succeeds(
+        uint8 _configTypeSeed,
+        address _recipient,
+        uint88 _min,
+        uint8 _networkSeed
+    )
+        external
+    {
+        Types.WithdrawalNetwork network = Types.WithdrawalNetwork(_networkSeed % 2);
+
+        Types.ConfigType[] memory types = new Types.ConfigType[](3);
+        types[0] = Types.ConfigType.BASE_FEE_VAULT_CONFIG;
+        types[1] = Types.ConfigType.L1_FEE_VAULT_CONFIG;
+        types[2] = Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG;
+
+        Types.ConfigType configType = types[_configTypeSeed % types.length];
+
+        vm.expectEmit(address(optimismPortal2));
+        emit TransactionDeposited(
+            Constants.DEPOSITOR_ACCOUNT,
+            Predeploys.L1_BLOCK_ATTRIBUTES,
+            0,
+            abi.encodePacked(
+                uint256(0), // mint
+                uint256(0), // value
+                uint64(200_000), // gasLimit
+                false, // isCreation,
+                abi.encodeCall(
+                    IL1Block.setConfig,
+                    (configType, abi.encode(Encoding.encodeFeeVaultConfig(_recipient, _min, network)))
+                )
+            )
+        );
+
+        vm.prank(address(systemConfig));
+        optimismPortal2.setConfig(configType, abi.encode(Encoding.encodeFeeVaultConfig(_recipient, _min, network)));
     }
 
     /// @notice Ensures that the deposit event is correct for the `setGasPayingToken`

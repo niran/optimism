@@ -9,8 +9,9 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Storage } from "src/libraries/Storage.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { GasPayingToken, IGasToken } from "src/libraries/GasPayingToken.sol";
-import { StaticConfig } from "src/libraries/StaticConfig.sol";
 import { Types } from "src/libraries/Types.sol";
+import { Encoding } from "src/libraries/Encoding.sol";
+import { StaticConfig } from "src/libraries/StaticConfig.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -29,12 +30,14 @@ contract SystemConfig is OwnableUpgradeable, ISemver, IGasToken {
     /// @custom:value GAS_LIMIT            Represents an update to gas limit on L2.
     /// @custom:value UNSAFE_BLOCK_SIGNER  Represents an update to the signer key for unsafe
     ///                                    block distrubution.
+    /// @custom:value FEE_VAULT_ADMIN      Represents an update to the fee vault admin.
     enum UpdateType {
         BATCHER,
         FEE_SCALARS,
         GAS_LIMIT,
         UNSAFE_BLOCK_SIGNER,
-        EIP_1559_PARAMS
+        EIP_1559_PARAMS,
+        FEE_VAULT_ADMIN
     }
 
     /// @notice Struct representing the addresses of L1 system contracts. These should be the
@@ -89,6 +92,9 @@ contract SystemConfig is OwnableUpgradeable, ISemver, IGasToken {
     /// @notice Storage slot for the DisputeGameFactory address.
     bytes32 public constant DISPUTE_GAME_FACTORY_SLOT =
         bytes32(uint256(keccak256("systemconfig.disputegamefactory")) - 1);
+
+    /// @notice Storage slot that the feeAdmin address is stored at.
+    bytes32 internal constant FEE_VAULT_ADMIN_SLOT = bytes32(uint256(keccak256("systemconfig.feeVaultAdmin")) - 1);
 
     /// @notice The number of decimals that the gas paying token has.
     uint8 internal constant GAS_PAYING_TOKEN_DECIMALS = 18;
@@ -160,6 +166,7 @@ contract SystemConfig is OwnableUpgradeable, ISemver, IGasToken {
     /// @param _batcherHash       Initial batcher hash.
     /// @param _gasLimit          Initial gas limit.
     /// @param _unsafeBlockSigner Initial unsafe block signer address.
+    /// @param _feeVaultAdmin     Initial fee vault admin address.
     /// @param _config            Initial ResourceConfig.
     /// @param _batchInbox        Batch inbox address. An identifier for the op-node to find
     ///                           canonical data.
@@ -171,6 +178,7 @@ contract SystemConfig is OwnableUpgradeable, ISemver, IGasToken {
         bytes32 _batcherHash,
         uint64 _gasLimit,
         address _unsafeBlockSigner,
+        address _feeVaultAdmin,
         IResourceMetering.ResourceConfig memory _config,
         address _batchInbox,
         SystemConfig.Addresses memory _addresses
@@ -187,6 +195,7 @@ contract SystemConfig is OwnableUpgradeable, ISemver, IGasToken {
         _setGasLimit(_gasLimit);
 
         Storage.setAddress(UNSAFE_BLOCK_SIGNER_SLOT, _unsafeBlockSigner);
+        Storage.setAddress(FEE_VAULT_ADMIN_SLOT, _feeVaultAdmin);
         Storage.setAddress(BATCH_INBOX_SLOT, _batchInbox);
         Storage.setAddress(L1_CROSS_DOMAIN_MESSENGER_SLOT, _addresses.l1CrossDomainMessenger);
         Storage.setAddress(L1_ERC_721_BRIDGE_SLOT, _addresses.l1ERC721Bridge);
@@ -267,6 +276,11 @@ contract SystemConfig is OwnableUpgradeable, ISemver, IGasToken {
         startBlock_ = Storage.getUint(START_BLOCK_SLOT);
     }
 
+    /// @notice Getter for the fee admin address.
+    function feeVaultAdmin() public view returns (address addr_) {
+        addr_ = Storage.getAddress(FEE_VAULT_ADMIN_SLOT);
+    }
+
     /// @notice Getter for the gas paying asset address.
     function gasPayingToken() public view returns (address addr_, uint8 decimals_) {
         (addr_, decimals_) = GasPayingToken.getToken();
@@ -309,6 +323,47 @@ contract SystemConfig is OwnableUpgradeable, ISemver, IGasToken {
                 StaticConfig.encodeSetGasPayingToken(_token, GAS_PAYING_TOKEN_DECIMALS, name, symbol)
             );
         }
+    }
+
+    /// @notice Setter for the FeeVault predeploy configuration.
+    /// @param _type The FeeVault type.
+    /// @param _recipient Address that should receive the funds.
+    /// @param _min Minimum withdrawal amount allowed to be processed.
+    /// @param _network The network in which the fees should be withdrawn to.
+    function setFeeVaultConfig(
+        Types.ConfigType _type,
+        address _recipient,
+        uint256 _min,
+        Types.WithdrawalNetwork _network
+    )
+        external
+    {
+        require(msg.sender == feeVaultAdmin(), "SystemConfig: caller is not the fee admin");
+        _setFeeVaultConfig(_type, _recipient, _min, _network);
+    }
+
+    /// @notice Internal function for setting the FeeVault config by type.
+    /// @param _type The FeeVault type
+    /// @param _recipient Address that should receive the funds.
+    /// @param _min Minimum withdrawal amount allowed to be processed.
+    /// @param _network The network in which the fees should be withdrawn to.
+    function _setFeeVaultConfig(
+        Types.ConfigType _type,
+        address _recipient,
+        uint256 _min,
+        Types.WithdrawalNetwork _network
+    )
+        internal
+    {
+        require(
+            _type == Types.ConfigType.BASE_FEE_VAULT_CONFIG || _type == Types.ConfigType.L1_FEE_VAULT_CONFIG
+                || _type == Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG,
+            "SystemConfig: ConfigType is is not a Fee Vault Config type"
+        );
+        IOptimismPortal2(payable(optimismPortal())).setConfig({
+            _type: _type,
+            _value: abi.encode(Encoding.encodeFeeVaultConfig(_recipient, _min, _network))
+        });
     }
 
     /// @notice Updates the unsafe block signer address. Can only be called by the owner.
@@ -416,6 +471,21 @@ contract SystemConfig is OwnableUpgradeable, ISemver, IGasToken {
 
         bytes memory data = abi.encode(uint256(_denominator) << 32 | uint64(_elasticity));
         emit ConfigUpdate(VERSION, UpdateType.EIP_1559_PARAMS, data);
+    }
+
+    /// @notice Updates the fee admin address. Can only be called by the owner.
+    /// @param _feeVaultAdmin New fee admin address.
+    function setFeeVaultAdmin(address _feeVaultAdmin) external onlyOwner {
+        _setFeeVaultAdmin(_feeVaultAdmin);
+    }
+
+    /// @notice Internal function for updating the fee admin address.
+    /// @param _feeVaultAdmin New fee admin address.
+    function _setFeeVaultAdmin(address _feeVaultAdmin) internal {
+        Storage.setAddress(FEE_VAULT_ADMIN_SLOT, _feeVaultAdmin);
+
+        bytes memory data = abi.encode(_feeVaultAdmin);
+        emit ConfigUpdate(VERSION, UpdateType.FEE_VAULT_ADMIN, data);
     }
 
     /// @notice Sets the start block in a backwards compatible way. Proxies

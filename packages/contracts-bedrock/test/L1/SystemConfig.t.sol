@@ -11,9 +11,9 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { GasPayingToken } from "src/libraries/GasPayingToken.sol";
-import { Types } from "src/libraries/Types.sol";
 import { StaticConfig } from "src/libraries/StaticConfig.sol";
-
+import { Types } from "src/libraries/Types.sol";
+import { Encoding } from "src/libraries/Encoding.sol";
 // Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
@@ -33,6 +33,7 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
     address optimismMintableERC20Factory;
     uint32 basefeeScalar;
     uint32 blobbasefeeScalar;
+    address feeVaultAdmin;
 
     function setUp() public virtual override {
         super.setUp();
@@ -46,6 +47,7 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
         unsafeBlockSigner = deploy.cfg().p2pSequencerAddress();
         systemConfigImpl = deploy.mustGetAddress("SystemConfig");
         optimismMintableERC20Factory = deploy.mustGetAddress("OptimismMintableERC20FactoryProxy");
+        feeVaultAdmin = deploy.cfg().systemConfigFeeVaultAdmin();
     }
 
     /// @dev Tests that constructor sets the correct values.
@@ -57,6 +59,7 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
         assertEq(impl.batcherHash(), bytes32(0));
         assertEq(impl.gasLimit(), 0);
         assertEq(impl.unsafeBlockSigner(), address(0));
+        assertEq(impl.feeVaultAdmin(), address(0));
         assertEq(impl.basefeeScalar(), 0);
         assertEq(impl.blobbasefeeScalar(), 0);
         IResourceMetering.ResourceConfig memory actual = impl.resourceConfig();
@@ -91,6 +94,7 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
         assertEq(systemConfig.unsafeBlockSigner(), unsafeBlockSigner);
         assertEq(systemConfig.basefeeScalar(), basefeeScalar);
         assertEq(systemConfig.blobbasefeeScalar(), blobbasefeeScalar);
+        assertEq(systemConfig.feeVaultAdmin(), feeVaultAdmin);
         // Depends on `initialize` being called with defaults
         IResourceMetering.ResourceConfig memory rcfg = Constants.DEFAULT_RESOURCE_CONFIG();
         IResourceMetering.ResourceConfig memory actual = systemConfig.resourceConfig();
@@ -137,6 +141,7 @@ contract SystemConfig_Initialize_TestFail is SystemConfig_Initialize_Test {
             _batcherHash: bytes32(hex"abcd"),
             _gasLimit: minimumGasLimit - 1,
             _unsafeBlockSigner: address(1),
+            _feeVaultAdmin: address(1),
             _config: Constants.DEFAULT_RESOURCE_CONFIG(),
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -167,6 +172,7 @@ contract SystemConfig_Initialize_TestFail is SystemConfig_Initialize_Test {
             _batcherHash: bytes32(hex"abcd"),
             _gasLimit: gasLimit,
             _unsafeBlockSigner: address(1),
+            _feeVaultAdmin: address(1),
             _config: Constants.DEFAULT_RESOURCE_CONFIG(),
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -198,6 +204,7 @@ contract SystemConfig_Initialize_TestFail is SystemConfig_Initialize_Test {
             _batcherHash: bytes32(hex"abcd"),
             _gasLimit: gasLimit,
             _unsafeBlockSigner: address(1),
+            _feeVaultAdmin: address(1),
             _config: Constants.DEFAULT_RESOURCE_CONFIG(),
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -308,6 +315,7 @@ contract SystemConfig_Init_ResourceConfig is SystemConfig_Init {
             _batcherHash: bytes32(0),
             _gasLimit: gasLimit,
             _unsafeBlockSigner: address(0),
+            _feeVaultAdmin: address(0),
             _config: config,
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -347,6 +355,7 @@ contract SystemConfig_Init_CustomGasToken is SystemConfig_Init {
             _batcherHash: bytes32(hex"abcd"),
             _gasLimit: 30_000_000,
             _unsafeBlockSigner: address(1),
+            _feeVaultAdmin: address(1),
             _config: Constants.DEFAULT_RESOURCE_CONFIG(),
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -504,14 +513,20 @@ contract SystemConfig_Init_CustomGasToken is SystemConfig_Init {
 
 contract SystemConfig_Setters_TestFail is SystemConfig_Init {
     /// @dev Tests that `setBatcherHash` reverts if the caller is not the owner.
-    function test_setBatcherHash_notOwner_reverts() external {
+    function test_setBatcherHash_notOwner_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.owner());
+
         vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(_caller);
         systemConfig.setBatcherHash(bytes32(hex""));
     }
 
     /// @dev Tests that `setGasConfig` reverts if the caller is not the owner.
-    function test_setGasConfig_notOwner_reverts() external {
+    function test_setGasConfig_notOwner_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.owner());
+
         vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(_caller);
         systemConfig.setGasConfig(0, 0);
     }
 
@@ -524,22 +539,31 @@ contract SystemConfig_Setters_TestFail is SystemConfig_Init {
         systemConfig.setGasConfig({ _overhead: 0, _scalar: type(uint256).max });
     }
 
-    function test_setGasConfigEcotone_notOwner_reverts() external {
+    function test_setGasConfigEcotone_notOwner_reverts(address _caller) external {
         // TODO(opcm upgrades): remove skip once upgrade is implemented
         skipIfForkTest("SystemConfig_Setters_TestFail: 'setGasConfigEcotone' method DNE on op mainnet");
+        vm.assume(_caller != systemConfig.owner());
+
         vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(_caller);
         systemConfig.setGasConfigEcotone({ _basefeeScalar: 0, _blobbasefeeScalar: 0 });
     }
 
     /// @dev Tests that `setGasLimit` reverts if the caller is not the owner.
-    function test_setGasLimit_notOwner_reverts() external {
+    function test_setGasLimit_notOwner_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.owner());
+
         vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(_caller);
         systemConfig.setGasLimit(0);
     }
 
     /// @dev Tests that `setUnsafeBlockSigner` reverts if the caller is not the owner.
-    function test_setUnsafeBlockSigner_notOwner_reverts() external {
+    function test_setUnsafeBlockSigner_notOwner_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.owner());
+
         vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(_caller);
         systemConfig.setUnsafeBlockSigner(address(0x20));
     }
 
@@ -560,10 +584,19 @@ contract SystemConfig_Setters_TestFail is SystemConfig_Init {
     }
 
     /// @dev Tests that `setEIP1559Params` reverts if the caller is not the owner.
-    function test_setEIP1559Params_notOwner_reverts(uint32 _denominator, uint32 _elasticity) external {
+    function test_setEIP1559Params_notOwner_reverts(
+        uint32 _denominator,
+        uint32 _elasticity,
+        address _caller
+    )
+        external
+    {
         // TODO(opcm upgrades): remove skip once upgrade is implemented
         skipIfForkTest("SystemConfig_Setters_TestFail: 'setEIP1559Params' method DNE on op mainnet");
+        vm.assume(_caller != systemConfig.owner());
+
         vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(_caller);
         systemConfig.setEIP1559Params({ _denominator: _denominator, _elasticity: _elasticity });
     }
 
@@ -584,6 +617,25 @@ contract SystemConfig_Setters_TestFail is SystemConfig_Init {
         vm.prank(systemConfig.owner());
         vm.expectRevert("SystemConfig: elasticity must be >= 1");
         systemConfig.setEIP1559Params({ _denominator: _denominator, _elasticity: 0 });
+    }
+
+    /// @dev Tests that `setFeeVaultAdmin` reverts if the caller is not the owner.
+    function test_setFeeVaultAdmin_notOwner_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.owner());
+
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(_caller);
+        systemConfig.setFeeVaultAdmin(address(0x20));
+    }
+
+    function test_setFeeVaultConfig_notOwner_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.feeVaultAdmin());
+
+        vm.expectRevert("SystemConfig: caller is not the fee admin");
+        vm.prank(_caller);
+        systemConfig.setFeeVaultConfig(
+            Types.ConfigType.BASE_FEE_VAULT_CONFIG, address(0x20), 0, Types.WithdrawalNetwork.L1
+        );
     }
 }
 
@@ -671,5 +723,43 @@ contract SystemConfig_Setters_Test is SystemConfig_Init {
         systemConfig.setEIP1559Params(_denominator, _elasticity);
         assertEq(systemConfig.eip1559Denominator(), _denominator);
         assertEq(systemConfig.eip1559Elasticity(), _elasticity);
+    }
+
+    /// @dev Tests that `setFeeVaultAdmin` updates the fee vault admin successfully.
+    function testFuzz_setFeeVaultAdmin_succeeds(address _newFeeVaultAdmin) external {
+        vm.expectEmit(address(systemConfig));
+        emit ConfigUpdate(0, ISystemConfig.UpdateType.FEE_VAULT_ADMIN, abi.encode(_newFeeVaultAdmin));
+
+        vm.prank(systemConfig.owner());
+        systemConfig.setFeeVaultAdmin(_newFeeVaultAdmin);
+        assertEq(systemConfig.feeVaultAdmin(), _newFeeVaultAdmin);
+    }
+
+    /// @dev Tests that `setFeeVaultConfig` updates the fee vault config successfully.
+    function testFuzz_setFeeVaultConfig_succeeds(
+        uint8 _configTypeSeed,
+        address _recipient,
+        uint88 _min,
+        bool _isL2
+    )
+        external
+    {
+        Types.WithdrawalNetwork network = _isL2 ? Types.WithdrawalNetwork.L2 : Types.WithdrawalNetwork.L1;
+
+        Types.ConfigType[] memory types = new Types.ConfigType[](3);
+        types[0] = Types.ConfigType.BASE_FEE_VAULT_CONFIG;
+        types[1] = Types.ConfigType.L1_FEE_VAULT_CONFIG;
+        types[2] = Types.ConfigType.SEQUENCER_FEE_VAULT_CONFIG;
+
+        Types.ConfigType configType = types[_configTypeSeed % 3];
+        bytes memory data = abi.encodeCall(
+            optimismPortal2.setConfig,
+            (configType, abi.encode(Encoding.encodeFeeVaultConfig(_recipient, _min, network)))
+        );
+        vm.expectCall(address(optimismPortal2), data);
+        vm.mockCall(address(optimismPortal2), data, abi.encode(true));
+
+        vm.prank(systemConfig.feeVaultAdmin());
+        systemConfig.setFeeVaultConfig(configType, _recipient, _min, network);
     }
 }

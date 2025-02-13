@@ -501,13 +501,6 @@ contract Deploy is Deployer {
         address systemConfigProxy = mustGetAddress("SystemConfigProxy");
         address systemConfig = mustGetAddress("SystemConfig");
 
-        bytes32 batcherHash = bytes32(uint256(uint160(cfg.batchSenderAddress())));
-
-        address customGasTokenAddress = Constants.ETHER;
-        if (cfg.useCustomGasToken()) {
-            customGasTokenAddress = cfg.customGasTokenAddress();
-        }
-
         IProxyAdmin proxyAdmin = IProxyAdmin(payable(mustGetAddress("ProxyAdmin")));
         proxyAdmin.upgradeAndCall({
             _proxy: payable(systemConfigProxy),
@@ -518,9 +511,10 @@ contract Deploy is Deployer {
                     cfg.finalSystemOwner(),
                     cfg.basefeeScalar(),
                     cfg.blobbasefeeScalar(),
-                    batcherHash,
+                    bytes32(uint256(uint160(cfg.batchSenderAddress()))),
                     uint64(cfg.l2GenesisBlockGasLimit()),
                     cfg.p2pSequencerAddress(),
+                    cfg.systemConfigFeeVaultAdmin(),
                     Constants.DEFAULT_RESOURCE_CONFIG(),
                     cfg.batchInboxAddress(),
                     ISystemConfig.Addresses({
@@ -530,7 +524,7 @@ contract Deploy is Deployer {
                         disputeGameFactory: mustGetAddress("DisputeGameFactoryProxy"),
                         optimismPortal: mustGetAddress("OptimismPortalProxy"),
                         optimismMintableERC20Factory: mustGetAddress("OptimismMintableERC20FactoryProxy"),
-                        gasPayingToken: customGasTokenAddress
+                        gasPayingToken: cfg.useCustomGasToken() ? cfg.customGasTokenAddress() : Constants.ETHER
                     })
                 )
             )
@@ -872,7 +866,8 @@ contract Deploy is Deployer {
                 batcher: cfg.batchSenderAddress(),
                 unsafeBlockSigner: cfg.p2pSequencerAddress(),
                 proposer: cfg.l2OutputOracleProposer(),
-                challenger: cfg.l2OutputOracleChallenger()
+                challenger: cfg.l2OutputOracleChallenger(),
+                feeVaultAdmin: cfg.systemConfigFeeVaultAdmin()
             }),
             basefeeScalar: cfg.basefeeScalar(),
             blobBasefeeScalar: cfg.blobbasefeeScalar(),

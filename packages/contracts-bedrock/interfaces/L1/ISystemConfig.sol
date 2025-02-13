@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
+import { Types } from "src/libraries/Types.sol";
 
 /// @notice This interface corresponds to the Custom Gas Token version of the SystemConfig contract.
 interface ISystemConfig {
@@ -10,7 +11,8 @@ interface ISystemConfig {
         FEE_SCALARS,
         GAS_LIMIT,
         UNSAFE_BLOCK_SIGNER,
-        EIP_1559_PARAMS
+        EIP_1559_PARAMS,
+        FEE_VAULT_ADMIN
     }
 
     struct Addresses {
@@ -26,6 +28,8 @@ interface ISystemConfig {
     event ConfigUpdate(uint256 indexed version, UpdateType indexed updateType, bytes data);
     event Initialized(uint8 version);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    error UnsafeCast();
 
     function BATCH_INBOX_SLOT() external view returns (bytes32);
     function DISPUTE_GAME_FACTORY_SLOT() external view returns (bytes32);
@@ -55,6 +59,7 @@ interface ISystemConfig {
         bytes32 _batcherHash,
         uint64 _gasLimit,
         address _unsafeBlockSigner,
+        address _feeVaultAdmin,
         IResourceMetering.ResourceConfig memory _config,
         address _batchInbox,
         Addresses memory _addresses
@@ -78,10 +83,19 @@ interface ISystemConfig {
     function setGasConfigEcotone(uint32 _basefeeScalar, uint32 _blobbasefeeScalar) external;
     function setGasLimit(uint64 _gasLimit) external;
     function setUnsafeBlockSigner(address _unsafeBlockSigner) external;
+    function setFeeVaultAdmin(address _feeVaultAdmin) external;
+    function setFeeVaultConfig(
+        Types.ConfigType _type,
+        address _recipient,
+        uint256 _min,
+        Types.WithdrawalNetwork _network
+    )
+        external;
     function setEIP1559Params(uint32 _denominator, uint32 _elasticity) external;
     function startBlock() external view returns (uint256 startBlock_);
     function transferOwnership(address newOwner) external; // nosemgrep
     function unsafeBlockSigner() external view returns (address addr_);
+    function feeVaultAdmin() external view returns (address addr_);
     function version() external pure returns (string memory);
 
     function __constructor__() external;

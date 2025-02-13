@@ -383,6 +383,9 @@ contract Specification_Test is CommonTest {
             _sel: ISystemConfig.setUnsafeBlockSigner.selector,
             _auth: Role.SYSTEMCONFIGOWNER
         });
+        _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.setFeeVaultAdmin.selector, _auth: Role.SYSTEMCONFIGOWNER });
+        _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.feeVaultAdmin.selector });
+        _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.setFeeVaultConfig.selector, _auth: Role.SYSTEMCONFIGOWNER });
         _addSpec({ _name: "SystemConfig", _sel: _getSel("transferOwnership(address)"), _auth: Role.SYSTEMCONFIGOWNER });
         _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.unsafeBlockSigner.selector });
         _addSpec({ _name: "SystemConfig", _sel: _getSel("version()") });
@@ -453,6 +456,17 @@ contract Specification_Test is CommonTest {
         _addSpec({
             _name: "SystemConfigInterop",
             _sel: ISystemConfigInterop.setUnsafeBlockSigner.selector,
+            _auth: Role.SYSTEMCONFIGOWNER
+        });
+        _addSpec({
+            _name: "SystemConfigInterop",
+            _sel: ISystemConfigInterop.setFeeVaultAdmin.selector,
+            _auth: Role.SYSTEMCONFIGOWNER
+        });
+        _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfigInterop.feeVaultAdmin.selector });
+        _addSpec({
+            _name: "SystemConfigInterop",
+            _sel: ISystemConfigInterop.setFeeVaultConfig.selector,
             _auth: Role.SYSTEMCONFIGOWNER
         });
         _addSpec({
