@@ -20,16 +20,16 @@
     "sourceCodeHash": "0x0f0df0ec72082453c747c12715c6bb14f8e05070d2c68189972ca71cf41c80f8"
   },
   "src/L1/OPContractsManager.sol": {
-    "initCodeHash": "0xfcd7f96493447a464600a9f38d6d30789f28bc05ad36043e1851aab20bffd202",
-    "sourceCodeHash": "0xa4f8c226105474df0c4733673f83d0dd2ebdf63623544b01426073340b7e6025"
+    "initCodeHash": "0x2c429ff1835a2c928487a2fb639556c3fc3eed4e72acfa59c2d87db983b2f6ec",
+    "sourceCodeHash": "0xf563720cd5d8e9fabf19dfa0d001c61dd5264e2384cffc57e650fa12057e50e5"
   },
   "src/L1/OPContractsManagerInterop.sol": {
-    "initCodeHash": "0xab3589d3777b9de7ef00dd5fbd8985f324719329bac6fef3a0d7d984177fbfe5",
-    "sourceCodeHash": "0xf8692ad22f0df4b45664d17eef38717dcbe05bf612257e4bb3c205322ddd585a"
+    "initCodeHash": "0xd805f56c3fbd8506815adc6290573bee26c8a44d4f908874d3e7936fe0792f0d",
+    "sourceCodeHash": "0xca9b26bbaaeb691d2d47dd0fae8d32092aafa20183237a186fc651a9570a8eaa"
   },
   "src/L1/OPPrestateUpdater.sol": {
-    "initCodeHash": "0x7b50157543f6234a7a0d3cd08fd7bb16322bbd12c7e77d80afcdbd98b7c05dc9",
-    "sourceCodeHash": "0x8e3082457c03d764157a5a33e6a5ae383a1d3ecdc9a49cd0230b60a9960e9e8e"
+    "initCodeHash": "0xae834f6a87dfd13dab1ab0efa021d639cfc2c0a4112e45c759b7dc8198078200",
+    "sourceCodeHash": "0x21119938c1191d1fe20b659cd805871ac68c94032d8e95a57a49e365146d80a7"
   },
   "src/L1/OptimismPortal2.sol": {
     "initCodeHash": "0xf3cc07b73ecaae0b2ee8218d8b9dd97499f995e1561082e676271c66e6782cd0",
@@ -92,7 +92,7 @@
     "sourceCodeHash": "0x0bfc5fc182277c17b33d47b30fa40521e03a43a4a4ccd85cd27402c08fb2a027"
   },
   "src/L2/L2OptimismMintableERC20Factory.sol": {
-    "initCodeHash": "0x658ed76e55bbee39f6059fa6e40dab9917f19096e6ccab315c401f3291424e64",
+    "initCodeHash": "0x260e9c69a9c2d3618f43e0a05daaae92177498ba832bda07e4394a7e329a52f0",
     "sourceCodeHash": "0x22160e378f7eef2f1d335606c36886bb9db5d61d5096930458f3447488eb0d03"
   },
   "src/L2/L2StandardBridge.sol": {
@@ -116,7 +116,7 @@
     "sourceCodeHash": "0xe452c81fc4de39956328fbcccc1a0633e239a8f86fe23e4bfcd8987ac40aa407"
   },
   "src/L2/OptimismMintableERC721Factory.sol": {
-    "initCodeHash": "0x368ffa380cb497fd55a44df9c1ee15f1a0ebf17a7f7ed06c86bea4edeb7d0093",
+    "initCodeHash": "0x803f7eace84b284a04725731912d5759dec791def3a3306111db751b92b01c36",
     "sourceCodeHash": "0x9b9f6911cc09f8e3e1650dba212f6fbaf461ebf11fbff30352c3d09eeb038fb6"
   },
   "src/L2/OptimismSuperchainERC20.sol": {
@@ -168,8 +168,8 @@
     "sourceCodeHash": "0xb7b0a06cd971c4647247dc19ce997d0c64a73e87c81d30731da9cf9efa1b952a"
   },
   "src/dispute/AnchorStateRegistry.sol": {
-    "initCodeHash": "0x378970d3613b8cf0202cc660afd8b0447988a22c18fdb9e7096a5dedbb389ad8",
-    "sourceCodeHash": "0x95cd2860ee20ed54615da02f53c87ca836aa15af20e3164ae6ef5a9b9cfd3983"
+    "initCodeHash": "0x08cc5a5e41eadb6c411fa6387ddc0cf12be360855599dd622cce84c0ba081e77",
+    "sourceCodeHash": "0xe0aaa79f7184724ff0fba2e92e85f652f936fecd099288edb0a0f6b0e0240f34"
   },
   "src/dispute/DelayedWETH.sol": {
     "initCodeHash": "0xdd0b5e523f3b53563fe0b6e6165fb73605b14910ffa32a7cbed855cdebab47c6",
@@ -186,6 +186,14 @@
   "src/dispute/PermissionedDisputeGame.sol": {
     "initCodeHash": "0x63ab07ca14b77da770de1814b112e1a21ea984c5132b8ff3beaab2cf88018c19",
     "sourceCodeHash": "0xba32e6f35777426839a60e5556c09844e805eaabc14b9d3732cc64f2a99ce7fc"
+  },
+  "src/dispute/SuperFaultDisputeGame.sol": {
+    "initCodeHash": "0xb8973b07e62acb901b231de2eceb9056372250b9d9f185202343b7cef44e3baf",
+    "sourceCodeHash": "0x9d7dec4a22d1d1ca49d3906d8391ec1607e1d22ec52251a418cc87672e92a45c"
+  },
+  "src/dispute/SuperPermissionedDisputeGame.sol": {
+    "initCodeHash": "0xb3155c34a2a8dc700e70cf7f2a0a2fb3e495dc3a0f744ce5f8e01e3a018e3fee",
+    "sourceCodeHash": "0xd9683e93743e995f70a589169d700cf994aee7011112c8a8f2c3fce93372065f"
   },
   "src/legacy/DeployerWhitelist.sol": {
     "initCodeHash": "0x53099379ed48b87f027d55712dbdd1da7d7099925426eb0531da9c0012e02c29",
@@ -216,7 +224,7 @@
     "sourceCodeHash": "0xa4db246a1f69a678470aacfd1b974b82ba9324ab78ed18e17a1377230fea8d0f"
   },
   "src/universal/OptimismMintableERC20.sol": {
-    "initCodeHash": "0x721078e525d50cc1bab7081c2f335608d65c49aa5aa9fc3753a3dd692b92c65c",
+    "initCodeHash": "0x2cea3da2ec50db8014b71e7c60b23853719438328012b214ddc354c8c76e2404",
     "sourceCodeHash": "0xf51a59ea794568ffbfe02cd22e9028589c1f611a67f5e6a8a57621d041fa69a6"
   },
   "src/universal/StorageSetter.sol": {

@@ -429,12 +429,14 @@ abstract contract StandardValidatorTest is Test {
     /// validated for each PDG and so are included here.
     function test_validate_permissionedDisputeGame_succeeds() public {
         _testDisputeGame(
-            permissionedDisputeGame, permissionedASR, permissionedDelayedWETH, GameTypes.PERMISSIONED_CANNON
+            "PDDG", permissionedDisputeGame, permissionedASR, permissionedDelayedWETH, GameTypes.PERMISSIONED_CANNON
         );
     }
 
     function test_validate_permissionlessDisputeGame_succeeds() public {
-        _testDisputeGame(permissionlessDisputeGame, permissionlessASR, permissionlessDelayedWETH, GameTypes.CANNON);
+        _testDisputeGame(
+            "PLDG", permissionlessDisputeGame, permissionlessASR, permissionlessDelayedWETH, GameTypes.CANNON
+        );
     }
 
     /// @notice Tests validation of L1StandardBridge
@@ -482,14 +484,16 @@ abstract contract StandardValidatorTest is Test {
         assertEq("L1SB-70", validate(true));
     }
 
-    function _testDisputeGame(address _disputeGame, address _asr, address _weth, GameType _gameType) public {
-        string memory errorPrefix;
-        if (_gameType.raw() == GameTypes.PERMISSIONED_CANNON.raw()) {
-            errorPrefix = string.concat(errorPrefix, "PDDG");
-        } else {
-            errorPrefix = string.concat(errorPrefix, "PLDG");
-        }
-
+    function _testDisputeGame(
+        string memory errorPrefix,
+        address _disputeGame,
+        address _asr,
+        address _weth,
+        GameType _gameType
+    )
+        public
+        virtual
+    {
         // Test null implementation
         _mockValidationCalls();
         vm.mockCall(
@@ -575,15 +579,6 @@ abstract contract StandardValidatorTest is Test {
         _mockValidationCalls();
         vm.mockCall(address(_asr), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
         assertEq(string.concat(errorPrefix, "-ANCHORP-10"), validate(true));
-
-        // Test invalid anchor state registry implementation
-        _mockValidationCalls();
-        vm.mockCall(
-            address(proxyAdmin),
-            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(_asr))),
-            abi.encode(address(0xbad))
-        );
-        assertEq(string.concat(errorPrefix, "-ANCHORP-20"), validate(true));
 
         // Test invalid anchor state registry factory
         _mockValidationCalls();
@@ -1002,7 +997,7 @@ abstract contract StandardValidatorTest is Test {
 
     function _mockDelayedWETH(address _weth) public {
         vm.mockCall(address(_weth), abi.encodeCall(ISemver.version, ()), abi.encode("1.1.0"));
-        vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.owner, ()), abi.encode(challenger));
+        vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.owner, ()), abi.encode(l1PAOMultisig));
         vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.delay, ()), abi.encode(1 weeks));
     }
 }
@@ -1089,8 +1084,9 @@ contract StandardValidatorV180_Test is StandardValidatorTest {
         });
 
         // OP Mainnet has a different expected root than the default one, so we expect to see ANCHORP-40.
+        // OP Mainnet also has an incorrect delayed WETH owner, so we expect to see DWETH-30.
         string memory errors = mainnetValidator.validate(input, true);
-        assertEq(errors, "PDDG-ANCHORP-40,PLDG-ANCHORP-40");
+        assertEq(errors, "PDDG-DWETH-30,PDDG-ANCHORP-40,PLDG-DWETH-30,PLDG-ANCHORP-40");
     }
 
     /// @notice Tests that validation reverts with error message when allowFailure is false
@@ -1170,6 +1166,28 @@ contract StandardValidatorV200_Test is StandardValidatorTest {
         // Expect revert with PDDG-10 error message
         vm.expectRevert("StandardValidatorV200: PDDG-10");
         validate(false);
+    }
+
+    function _testDisputeGame(
+        string memory errorPrefix,
+        address _disputeGame,
+        address _asr,
+        address _weth,
+        GameType _gameType
+    )
+        public
+        override
+    {
+        super._testDisputeGame(errorPrefix, _disputeGame, _asr, _weth, _gameType);
+
+        // Test invalid anchor state registry implementation
+        _mockValidationCalls();
+        vm.mockCall(
+            address(proxyAdmin),
+            abi.encodeCall(IProxyAdmin.getProxyImplementation, (address(_asr))),
+            abi.encode(address(0xbad))
+        );
+        assertEq(string.concat(errorPrefix, "-ANCHORP-20"), validate(true));
     }
 
     function _mockValidationCalls() internal virtual override {
