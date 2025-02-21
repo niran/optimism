@@ -21,7 +21,7 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
-import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
+import { IL1OptimismMintableERC20Factory } from "interfaces/L1/IL1OptimismMintableERC20Factory.sol";
 
 interface IOPContractsManager {
     // -------- Structs --------
@@ -63,7 +63,7 @@ interface IOPContractsManager {
         IAddressManager addressManager;
         IL1ERC721Bridge l1ERC721BridgeProxy;
         ISystemConfig systemConfigProxy;
-        IOptimismMintableERC20Factory optimismMintableERC20FactoryProxy;
+        IL1OptimismMintableERC20Factory optimismMintableERC20FactoryProxy;
         IL1StandardBridge l1StandardBridgeProxy;
         IL1CrossDomainMessenger l1CrossDomainMessengerProxy;
         // Fault proof contracts below.

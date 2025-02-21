@@ -125,7 +125,7 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
     }
 
     /// @dev Tests that the gas usage of `initialize` does not exceed the max resource limit.
-    function test_initialize_gasUsage() external {
+    function test_initialize_gasUsage_succeeds() external {
         // Wipe out the initialized slot so the proxy can be initialized again
         vm.store(address(systemConfig), bytes32(0), bytes32(0));
 

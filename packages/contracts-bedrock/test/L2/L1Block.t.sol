@@ -310,7 +310,7 @@ contract L1BlockSetConfig_Test is L1BlockTest {
     }
 
     /// @dev Tests that `setIsthmus` reverts if sender address is not the depositor account.
-    function test_setIsthmus_notDepositorReverts(address _caller) external {
+    function test_setIsthmus_notDepositor_reverts(address _caller) external {
         vm.assume(_caller != Constants.DEPOSITOR_ACCOUNT);
 
         vm.prank(_caller);
