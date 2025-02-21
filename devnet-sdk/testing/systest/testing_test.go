@@ -7,12 +7,17 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ethereum-optimism/optimism/devnet-sdk/constraints"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/interfaces"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/shell/env"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/system"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/types"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	_ system.Chain = (*mockChain)(nil)
 )
 
 // mockTB implements a minimal testing.TB for testing
@@ -74,24 +79,37 @@ func (m *mockTBRecorder) Skipped() bool { return m.skipped }
 type mockChain struct{}
 
 func (m *mockChain) RPCURL() string                                  { return "http://localhost:8545" }
+func (m *mockChain) Client() (*ethclient.Client, error)              { return ethclient.Dial(m.RPCURL()) }
 func (m *mockChain) ID() types.ChainID                               { return types.ChainID(big.NewInt(1)) }
 func (m *mockChain) ContractsRegistry() interfaces.ContractsRegistry { return nil }
-func (m *mockChain) Wallet(ctx context.Context, constraints ...constraints.WalletConstraint) (types.Wallet, error) {
+func (m *mockChain) Wallets(ctx context.Context) ([]system.Wallet, error) {
 	return nil, nil
+}
+func (m *mockChain) GasPrice(ctx context.Context) (*big.Int, error) {
+	return big.NewInt(1), nil
+}
+func (m *mockChain) GasLimit(ctx context.Context, tx system.TransactionData) (uint64, error) {
+	return 1000000, nil
+}
+func (m *mockChain) PendingNonceAt(ctx context.Context, address common.Address) (uint64, error) {
+	return 0, nil
+}
+func (m *mockChain) SupportsEIP(ctx context.Context, eip uint64) bool {
+	return true
 }
 
 // mockSystem implements a minimal system.System for testing
 type mockSystem struct{}
 
-func (m *mockSystem) Identifier() string     { return "mock" }
-func (m *mockSystem) L1() system.Chain       { return &mockChain{} }
-func (m *mockSystem) L2(uint64) system.Chain { return &mockChain{} }
-func (m *mockSystem) Close() error           { return nil }
+func (m *mockSystem) Identifier() string  { return "mock" }
+func (m *mockSystem) L1() system.Chain    { return &mockChain{} }
+func (m *mockSystem) L2s() []system.Chain { return []system.Chain{&mockChain{}} }
+func (m *mockSystem) Close() error        { return nil }
 
 // mockInteropSet implements a minimal system.InteropSet for testing
 type mockInteropSet struct{}
 
-func (m *mockInteropSet) L2(uint64) system.Chain { return &mockChain{} }
+func (m *mockInteropSet) L2s() []system.Chain { return []system.Chain{&mockChain{}} }
 
 // mockInteropSystem implements a minimal system.InteropSystem for testing
 type mockInteropSystem struct {

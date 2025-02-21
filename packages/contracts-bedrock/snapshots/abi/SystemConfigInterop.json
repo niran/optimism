@@ -320,9 +320,21 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "_owner",
-        "type": "address"
+        "components": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "feeVaultAdmin",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct SystemConfig.Roles",
+        "name": "_roles",
+        "type": "tuple"
       },
       {
         "internalType": "uint32",
@@ -347,11 +359,6 @@
       {
         "internalType": "address",
         "name": "_unsafeBlockSigner",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_feeVaultAdmin",
         "type": "address"
       },
       {
@@ -447,9 +454,21 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "_owner",
-        "type": "address"
+        "components": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "feeVaultAdmin",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct SystemConfig.Roles",
+        "name": "_roles",
+        "type": "tuple"
       },
       {
         "internalType": "uint32",
@@ -474,11 +493,6 @@
       {
         "internalType": "address",
         "name": "_unsafeBlockSigner",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "_feeVaultAdmin",
         "type": "address"
       },
       {
@@ -788,19 +802,6 @@
       }
     ],
     "name": "setEIP1559Params",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_feeVaultAdmin",
-        "type": "address"
-      }
-    ],
-    "name": "setFeeVaultAdmin",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

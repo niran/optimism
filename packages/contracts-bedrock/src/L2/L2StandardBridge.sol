@@ -60,9 +60,9 @@ contract L2StandardBridge is StandardBridge, ISemver {
     );
 
     /// @notice Semantic version.
-    /// @custom:semver 1.11.1-beta.8
+    /// @custom:semver 1.11.1-beta.9
     function version() public pure virtual returns (string memory) {
-        return "1.11.1-beta.8";
+        return "1.11.1-beta.9";
     }
 
     /// @notice Allows EOAs to bridge ETH by sending directly to the bridge.

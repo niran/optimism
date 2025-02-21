@@ -93,9 +93,9 @@ contract L1Block is ISemver {
     /// @notice Whether the L1Block is an Isthmus upgraded chain.
     bool public isIsthmus;
 
-    /// @custom:semver 1.5.1-beta.6
+    /// @custom:semver 1.5.1-beta.7
     function version() public pure virtual returns (string memory) {
-        return "1.5.1-beta.6";
+        return "1.5.1-beta.7";
     }
 
     /// @notice Returns the gas paying token, its decimals, name and symbol.
