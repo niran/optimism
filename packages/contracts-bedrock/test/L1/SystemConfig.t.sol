@@ -35,6 +35,7 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
         super.setUp();
         skipIfForkTest("SystemConfig_Initialize_Test: cannot test initialization on forked network");
         batchInbox = deploy.cfg().batchInboxAddress();
+        feeVaultAdmin = deploy.cfg().systemConfigFeeVaultAdmin();
         owner = deploy.cfg().finalSystemOwner();
         basefeeScalar = deploy.cfg().basefeeScalar();
         blobbasefeeScalar = deploy.cfg().blobbasefeeScalar();
@@ -129,13 +130,12 @@ contract SystemConfig_Initialize_Test is SystemConfig_Init {
 
         vm.recordLogs();
         systemConfig.initialize({
-            _owner: alice,
+            _roles: ISystemConfig.Roles({ owner: alice, feeVaultAdmin: bob }),
             _basefeeScalar: basefeeScalar,
             _blobbasefeeScalar: blobbasefeeScalar,
             _batcherHash: bytes32(hex"abcd"),
             _gasLimit: gasLimit,
             _unsafeBlockSigner: address(1),
-            _feeVaultAdmin: bob,
             _config: Constants.DEFAULT_RESOURCE_CONFIG(),
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -185,13 +185,12 @@ contract SystemConfig_Initialize_TestFail is SystemConfig_Initialize_Test {
 
         vm.expectRevert("SystemConfig: gas limit too low");
         systemConfig.initialize({
-            _owner: alice,
+            _roles: ISystemConfig.Roles({ owner: alice, feeVaultAdmin: address(1) }),
             _basefeeScalar: basefeeScalar,
             _blobbasefeeScalar: blobbasefeeScalar,
             _batcherHash: bytes32(hex"abcd"),
             _gasLimit: minimumGasLimit - 1,
             _unsafeBlockSigner: address(1),
-            _feeVaultAdmin: address(1),
             _config: Constants.DEFAULT_RESOURCE_CONFIG(),
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -215,13 +214,12 @@ contract SystemConfig_Initialize_TestFail is SystemConfig_Initialize_Test {
         // Initialize and check that StartBlock updates to current block number
         vm.prank(systemConfig.owner());
         systemConfig.initialize({
-            _owner: alice,
+            _roles: ISystemConfig.Roles({ owner: alice, feeVaultAdmin: address(1) }),
             _basefeeScalar: basefeeScalar,
             _blobbasefeeScalar: blobbasefeeScalar,
             _batcherHash: bytes32(hex"abcd"),
             _gasLimit: gasLimit,
             _unsafeBlockSigner: address(1),
-            _feeVaultAdmin: address(1),
             _config: Constants.DEFAULT_RESOURCE_CONFIG(),
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -246,13 +244,12 @@ contract SystemConfig_Initialize_TestFail is SystemConfig_Initialize_Test {
         // Initialize and check that StartBlock doesn't update
         vm.prank(systemConfig.owner());
         systemConfig.initialize({
-            _owner: alice,
+            _roles: ISystemConfig.Roles({ owner: alice, feeVaultAdmin: address(1) }),
             _basefeeScalar: basefeeScalar,
             _blobbasefeeScalar: blobbasefeeScalar,
             _batcherHash: bytes32(hex"abcd"),
             _gasLimit: gasLimit,
             _unsafeBlockSigner: address(1),
-            _feeVaultAdmin: address(1),
             _config: Constants.DEFAULT_RESOURCE_CONFIG(),
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -361,13 +358,12 @@ contract SystemConfig_Init_ResourceConfig is SystemConfig_Init {
 
         vm.expectRevert(bytes(revertMessage));
         systemConfig.initialize({
-            _owner: address(0xdEaD),
+            _roles: ISystemConfig.Roles({ owner: address(0xdEaD), feeVaultAdmin: address(0) }),
             _basefeeScalar: 0,
             _blobbasefeeScalar: 0,
             _batcherHash: bytes32(0),
             _gasLimit: gasLimit,
             _unsafeBlockSigner: address(0),
-            _feeVaultAdmin: address(0),
             _config: config,
             _batchInbox: address(0),
             _addresses: ISystemConfig.Addresses({
@@ -484,15 +480,6 @@ contract SystemConfig_Setters_TestFail is SystemConfig_Init {
         systemConfig.setEIP1559Params({ _denominator: _denominator, _elasticity: 0 });
     }
 
-    /// @dev Tests that `setFeeVaultAdmin` reverts if the caller is not the owner.
-    function test_setFeeVaultAdmin_notOwner_reverts(address _caller) external {
-        vm.assume(_caller != systemConfig.owner());
-
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(_caller);
-        systemConfig.setFeeVaultAdmin(address(0x20));
-    }
-
     function test_setFeeVaultConfig_notOwner_reverts(address _caller) external {
         vm.assume(_caller != systemConfig.feeVaultAdmin());
 
@@ -584,16 +571,6 @@ contract SystemConfig_Setters_Test is SystemConfig_Init {
         systemConfig.setEIP1559Params(_denominator, _elasticity);
         assertEq(systemConfig.eip1559Denominator(), _denominator);
         assertEq(systemConfig.eip1559Elasticity(), _elasticity);
-    }
-
-    /// @dev Tests that `setFeeVaultAdmin` updates the fee vault admin successfully.
-    function testFuzz_setFeeVaultAdmin_succeeds(address _newFeeVaultAdmin) external {
-        vm.expectEmit(address(systemConfig));
-        emit ConfigUpdate(0, ISystemConfig.UpdateType.FEE_VAULT_ADMIN, abi.encode(_newFeeVaultAdmin));
-
-        vm.prank(systemConfig.owner());
-        systemConfig.setFeeVaultAdmin(_newFeeVaultAdmin);
-        assertEq(systemConfig.feeVaultAdmin(), _newFeeVaultAdmin);
     }
 
     /// @dev Tests that `setFeeVaultConfig` updates the fee vault config successfully.

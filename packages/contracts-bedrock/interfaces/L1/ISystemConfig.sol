@@ -10,8 +10,7 @@ interface ISystemConfig {
         FEE_SCALARS,
         GAS_LIMIT,
         UNSAFE_BLOCK_SIGNER,
-        EIP_1559_PARAMS,
-        FEE_VAULT_ADMIN
+        EIP_1559_PARAMS
     }
 
     struct Addresses {
@@ -21,6 +20,11 @@ interface ISystemConfig {
         address disputeGameFactory;
         address optimismPortal;
         address optimismMintableERC20Factory;
+    }
+
+    struct Roles {
+        address owner;
+        address feeVaultAdmin;
     }
 
     event ConfigUpdate(uint256 indexed version, UpdateType indexed updateType, bytes data);
@@ -49,13 +53,12 @@ interface ISystemConfig {
     function eip1559Elasticity() external view returns (uint32);
     function getAddresses() external view returns (Addresses memory);
     function initialize(
-        address _owner,
+        Roles memory _roles,
         uint32 _basefeeScalar,
         uint32 _blobbasefeeScalar,
         bytes32 _batcherHash,
         uint64 _gasLimit,
         address _unsafeBlockSigner,
-        address _feeVaultAdmin,
         IResourceMetering.ResourceConfig memory _config,
         address _batchInbox,
         Addresses memory _addresses
@@ -78,7 +81,6 @@ interface ISystemConfig {
     function setGasConfigEcotone(uint32 _basefeeScalar, uint32 _blobbasefeeScalar) external;
     function setGasLimit(uint64 _gasLimit) external;
     function setUnsafeBlockSigner(address _unsafeBlockSigner) external;
-    function setFeeVaultAdmin(address _feeVaultAdmin) external;
     function setFeeVaultConfig(
         Types.ConfigType _type,
         address _recipient,
