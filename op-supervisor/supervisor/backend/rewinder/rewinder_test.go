@@ -1685,7 +1685,7 @@ func (m *mockL1Node) L1BlockRefByNumber(ctx context.Context, number uint64) (eth
 	return eth.L1BlockRef(block), nil
 }
 
-func (m *mockL1Node) reorg(t *testing.T, newBlock eth.BlockRef) error {
+func (m *mockL1Node) reorg(t *testing.T, newBlock eth.BlockRef) {
 	if newBlock.Number > 0 {
 		parent := m.blocks[newBlock.Number-1]
 		if parent.Hash != newBlock.ParentHash {
@@ -1702,6 +1702,4 @@ func (m *mockL1Node) reorg(t *testing.T, newBlock eth.BlockRef) error {
 
 	// Add the new block
 	m.blocks[newBlock.Number] = newBlock
-
-	return nil
 }
