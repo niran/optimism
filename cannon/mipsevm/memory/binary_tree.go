@@ -14,8 +14,7 @@ type BinaryTreeIndex struct {
 
 func NewBinaryTreeMemory() *Memory {
 	pages := make(map[Word]*CachedPage)
-	index := NewBinaryTreeIndex()
-	index.setPageBacking(pages)
+	index := NewBinaryTreeIndex(pages)
 	return &Memory{
 		merkleIndex:  index,
 		pageTable:    pages,
@@ -23,17 +22,15 @@ func NewBinaryTreeMemory() *Memory {
 	}
 }
 
-func NewBinaryTreeIndex() *BinaryTreeIndex {
+func NewBinaryTreeIndex(pages map[Word]*CachedPage) *BinaryTreeIndex {
 	return &BinaryTreeIndex{
-		nodes: make(map[uint64]*[32]byte),
+		nodes:     make(map[uint64]*[32]byte),
+		pageTable: pages,
 	}
 }
-func (m *BinaryTreeIndex) setPageBacking(pages map[Word]*CachedPage) {
-	m.pageTable = pages
-}
 
-func (m *BinaryTreeIndex) New() PageIndex {
-	x := NewBinaryTreeIndex()
+func (m *BinaryTreeIndex) New(pages map[Word]*CachedPage) PageIndex {
+	x := NewBinaryTreeIndex(pages)
 	return x
 }
 

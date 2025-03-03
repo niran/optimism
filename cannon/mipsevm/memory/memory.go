@@ -46,7 +46,8 @@ var zeroHashes = func() [256][32]byte {
 type Memory struct {
 	merkleIndex PageIndex
 	// Note: since we don't de-alloc Pages, we don't do ref-counting.
-	// Once a page exists, it doesn't leave memory
+	// Once a page exists, it doesn't leave memory.
+	// This map will usually be shared with the PageIndex as well.
 	pageTable map[Word]*CachedPage
 
 	// two caches: we often read instructions from one page, and do memory things with another page.
@@ -62,8 +63,7 @@ type PageIndex interface {
 	MerkleizeSubtree(gindex uint64) [32]byte
 	Invalidate(addr Word)
 
-	New() PageIndex
-	setPageBacking(pages map[Word]*CachedPage)
+	New(pages map[Word]*CachedPage) PageIndex
 }
 
 func NewMemory() *Memory {
@@ -244,8 +244,7 @@ func (m *Memory) Usage() string {
 
 func (m *Memory) Copy() *Memory {
 	pages := make(map[Word]*CachedPage)
-	table := m.merkleIndex.New()
-	table.setPageBacking(pages)
+	table := m.merkleIndex.New(pages)
 	out := &Memory{
 		merkleIndex:  table,
 		pageTable:    pages,
