@@ -1052,7 +1052,7 @@ func (d *DeployConfig) GenesisSystemConfig() eth.SystemConfig {
 		Overhead:          eth.Bytes32(common.BigToHash(new(big.Int).SetUint64(d.GasPriceOracleOverhead))),
 		Scalar:            d.FeeScalar(),
 		GasLimit:          uint64(d.L2GenesisBlockGasLimit),
-		OperatorFeeParams: eth.Bytes32(d.OperatorFeeParams()),
+		OperatorFeeParams: d.OperatorFeeParams(),
 	}
 }
 
