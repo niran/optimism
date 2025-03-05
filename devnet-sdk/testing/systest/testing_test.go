@@ -140,6 +140,10 @@ func (p *testPackage) NewSystemFromURL(string) (system.System, error) {
 	return p.creator()
 }
 
+func (p *testPackage) NewE2ESystem(t BasicT) (system.System, error) {
+	return p.creator()
+}
+
 // TestNewT tests the creation and basic functionality of the test wrapper
 func TestNewT(t *testing.T) {
 	t.Run("wraps *testing.T correctly", func(t *testing.T) {

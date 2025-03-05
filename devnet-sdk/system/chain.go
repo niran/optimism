@@ -72,6 +72,9 @@ func (c *chain) Client() (*ethclient.Client, error) {
 }
 
 func newChain(chainID string, rpcUrl string, users map[string]Wallet) *chain {
+	if users == nil {
+		users = make(map[string]Wallet)
+	}
 	return &chain{
 		id:      chainID,
 		rpcUrl:  rpcUrl,

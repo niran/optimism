@@ -86,6 +86,7 @@ type basicSystemTestHelper struct {
 
 // acquireFromEnvURL attempts to create a system from the URL specified in the environment variable.
 func (h *basicSystemTestHelper) acquireFromEnvURL(t BasicT) (system.System, error) {
+	t.Log("attempting to acquire system from env URL")
 	url := h.envGetter.Getenv(env.EnvURLVar)
 	if url == "" {
 		return nil, nil // Skip this acquirer
@@ -94,6 +95,17 @@ func (h *basicSystemTestHelper) acquireFromEnvURL(t BasicT) (system.System, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to create system from URL %q: %w", url, err)
 	}
+	t.Logf("system acquired from %s", url)
+	return sys, nil
+}
+
+func (h *basicSystemTestHelper) acquireFromE2E(t BasicT) (system.System, error) {
+	t.Log("attempting to acquire system from e2e")
+	sys, err := h.provider.NewE2ESystem(t)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system from e2e: %w", err)
+	}
+	t.Log("system acquired from e2e backend")
 	return sys, nil
 }
 
@@ -161,6 +173,7 @@ func newBasicSystemTestHelper(envGetter envGetter) *basicSystemTestHelper {
 	// Set up acquirers after helper is constructed so we can use the method
 	helper.acquirers = []SystemAcquirer{
 		helper.acquireFromEnvURL,
+		helper.acquireFromE2E,
 	}
 
 	return helper
