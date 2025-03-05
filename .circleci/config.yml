@@ -121,7 +121,8 @@ commands:
   install-contracts-dependencies:
     description: "Install the dependencies for the smart contracts"
     steps:
-      - run: Install SVM compilers
+      - run:
+        name: Install SVM compilers
         command: |
           svm install 0.8.15
           svm install 0.8.19
