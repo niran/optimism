@@ -37,6 +37,8 @@ func NewLogProcessor(chain eth.ChainID, logStore LogStorage, depSet depset.Chain
 // ProcessLogs processes logs from a block and stores them in the log storage
 // for any logs that are related to executing messages, they are decoded and stored
 func (p *logProcessor) ProcessLogs(_ context.Context, block eth.BlockRef, rcpts ethTypes.Receipts) error {
+	fmt.Printf("DEBUG: processing logs for block %s - %v\n", block.ID(), p.chain)
+
 	for _, rcpt := range rcpts {
 		for _, l := range rcpt.Logs {
 			// log hash represents the hash of *this* log as a potentially initiating message
@@ -56,6 +58,7 @@ func (p *logProcessor) ProcessLogs(_ context.Context, block eth.BlockRef, rcpts 
 	if err := p.logStore.SealBlock(p.chain, block); err != nil {
 		return fmt.Errorf("failed to seal block %s: %w", block.ID(), err)
 	}
+	fmt.Printf("DEBUG: finished processing logs for block %s - %v\n", block.ID(), p.chain)
 	return nil
 }
 

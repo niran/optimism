@@ -361,6 +361,8 @@ func (db *DB) findLogInfo(blockNum uint64, logIdx uint32) (common.Hash, Iterator
 		return common.Hash{}, nil, err
 	}
 	if err := iter.NextInitMsg(); err != nil {
+		h, x, ok := iter.SealedBlock()
+		fmt.Printf("DEBUG: iter.SealedBlock(): %d, %t %v. input blockNum=%d\n", x, ok, h, blockNum)
 		return common.Hash{}, nil, fmt.Errorf("failed to read initiating message %d, on top of block %d: %w", logIdx, blockNum, err)
 	}
 	if _, x, ok := iter.SealedBlock(); !ok {

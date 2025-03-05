@@ -444,6 +444,112 @@ func TestInteropFaultProofs_IntraBlock(gt *testing.T) {
 	}
 }
 
+func TestInteropFaultProofs_CascadeInvalidBlock(gt *testing.T) {
+	t := helpers.NewDefaultTesting(gt)
+
+	system := dsl.NewInteropDSL(t)
+
+	actors := system.Actors
+	alice := system.CreateUser()
+	emitterContract := dsl.NewEmitterContract(t)
+	// Deploy emitter contract to both chains
+	system.AddL2Block(actors.ChainA, dsl.WithL2BlockTransactions(
+		emitterContract.Deploy(alice),
+	))
+	system.AddL2Block(actors.ChainB, dsl.WithL2BlockTransactions(
+		emitterContract.Deploy(alice),
+	))
+
+	assertHeads(t, actors.ChainA, 1, 0, 1, 0)
+	assertHeads(t, actors.ChainB, 1, 0, 1, 0)
+
+	// Create initiating and executing messages within the same block
+	actors.ChainA.Sequencer.ActL2StartBlock(t)
+	actors.ChainB.Sequencer.ActL2StartBlock(t)
+
+	chainAInitTx := emitterContract.EmitMessage(alice, "chainA message")(actors.ChainA)
+	chainAInitTx.Include()
+
+	// Create messages with a conflicting payload on chain B, while also emitting an initiating message
+	chainBExecTx := system.InboxContract.Execute(alice, chainAInitTx,
+		dsl.WithPayload([]byte("this message waws never emitted")))(actors.ChainB)
+	chainBExecTx.Include()
+	chainBInitTx := emitterContract.EmitMessage(alice, "chainB message")(actors.ChainB)
+	chainBInitTx.Include()
+
+	// Create a message with a valid message on chain A, pointing to the initiating message on B from the same block
+	// as an invalid message.
+	chainAExecTx := system.InboxContract.Execute(alice, chainBInitTx)(actors.ChainA)
+	chainAExecTx.Include()
+
+	actors.ChainA.Sequencer.ActL2EndBlock(t)
+	actors.ChainB.Sequencer.ActL2EndBlock(t)
+
+	assertHeads(t, actors.ChainA, 2, 0, 1, 0)
+	assertHeads(t, actors.ChainB, 2, 0, 1, 0)
+
+	system.SubmitBatchData(func(opts *dsl.SubmitBatchDataOpts) {
+		opts.SkipCrossSafeUpdate = true
+	})
+
+	assertHeads(t, actors.ChainA, 2, 2, 1, 0)
+	assertHeads(t, actors.ChainB, 2, 2, 1, 0)
+
+	endTimestamp := actors.ChainB.Sequencer.L2Unsafe().Time
+	startTimestamp := endTimestamp - 1
+	optimisticEnd := system.Outputs.SuperRoot(endTimestamp)
+
+	preConsolidation := system.Outputs.TransitionState(startTimestamp, 1023,
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainA, endTimestamp),
+		system.Outputs.OptimisticBlockAtTimestamp(actors.ChainB, endTimestamp),
+	).Marshal()
+
+	// TODO: testing to see if the supervisor stalls after introducing new events
+	/*
+		actors.ChainA.Sequencer.SyncSupervisor(t)
+		actors.ChainB.Sequencer.SyncSupervisor(t)
+		actors.Supervisor.ProcessFull(t)
+		actors.ChainA.Sequencer.ActL2PipelineFull(t)
+		actors.ChainB.Sequencer.ActL2PipelineFull(t)
+		system.AddL2Block(actors.ChainA)
+		system.AddL2Block(actors.ChainB, dsl.WithL1BlockCrossUnsafe())
+		system.SubmitBatchData(func(opts *dsl.SubmitBatchDataOpts) {
+			opts.SkipCrossSafeUpdate = true
+		})
+		status := actors.ChainA.Sequencer.SyncStatus()
+		t.Logf("DEBUG: chainA status: %#v", status)
+		system.ProcessCrossSafe()
+		return
+	*/
+
+	// Induce block replacement
+	system.ProcessCrossSafeCascade()
+	// assert that the invalid message txs were reorged out
+	chainBExecTx.CheckNotIncluded()
+	chainBInitTx.CheckNotIncluded() // Should have been reorged out with chainBExecTx
+	chainAExecTx.CheckNotIncluded() // Reorged out because chainBInitTx was reorged out
+
+	crossSafeEnd := system.Outputs.SuperRoot(endTimestamp)
+
+	tests := []*transitionTest{
+		{
+			name:               "Consolidate-ExpectInvalidPendingBlock",
+			agreedClaim:        preConsolidation,
+			disputedClaim:      optimisticEnd.Marshal(),
+			disputedTraceIndex: 1023,
+			expectValid:        false,
+		},
+		{
+			name:               "Consolidate-ReplaceInvalidBlocks",
+			agreedClaim:        preConsolidation,
+			disputedClaim:      crossSafeEnd.Marshal(),
+			disputedTraceIndex: 1023,
+			expectValid:        true,
+		},
+	}
+	runFppAndChallengerTests(gt, system, tests)
+}
+
 func TestInteropFaultProofs_MessageExpiry(gt *testing.T) {
 	t := helpers.NewDefaultTesting(gt)
 	system := dsl.NewInteropDSL(t)

@@ -1,11 +1,15 @@
 package dsl
 
 import (
+	"sync"
+	"time"
+
 	"github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/superevents"
 	"github.com/stretchr/testify/require"
 )
 
@@ -211,6 +215,112 @@ func (d *InteropDSL) SubmitBatchData(optionalArgs ...func(*SubmitBatchDataOpts))
 
 type ProcessCrossSafeOpts struct {
 	ChainOpts
+}
+
+func (d *InteropDSL) ProcessCrossSafeCascade(optionalArgs ...func(*ProcessCrossSafeOpts)) {
+	opts := ProcessCrossSafeOpts{
+		ChainOpts: d.defaultChainOpts(),
+	}
+	for _, arg := range optionalArgs {
+		arg(&opts)
+	}
+	// Process cross-safe updates
+	d.Actors.Supervisor.ProcessFull(d.t)
+
+	type replacementEvent struct {
+		localUnsafeUpdate *superevents.LocalUnsafeReceivedEvent
+		localSafeUpdate   *superevents.LocalSafeUpdateEvent
+		replacement       *superevents.ReplaceBlockEvent
+	}
+	var mutex sync.Mutex
+	replacements := make(map[eth.BlockID]replacementEvent)
+
+	// attach a listener for block replacement events
+	// 1 block replacement per chain
+	ex := event.ExecutableFunc(func(ev event.AnnotatedEvent) {
+		switch x := ev.Event.(type) {
+		case superevents.ReplaceBlockEvent:
+			mutex.Lock()
+			r := replacements[x.Replacement.Replacement.ID()]
+			r.replacement = &x
+			replacements[x.Replacement.Replacement.ID()] = r
+			mutex.Unlock()
+		case superevents.LocalUnsafeReceivedEvent:
+			mutex.Lock()
+			r := replacements[x.NewLocalUnsafe.ID()]
+			r.localUnsafeUpdate = &x
+			replacements[x.NewLocalUnsafe.ID()] = r
+			mutex.Unlock()
+		case superevents.LocalSafeUpdateEvent:
+			mutex.Lock()
+			r := replacements[x.NewLocalSafe.Derived.ID()]
+			r.localSafeUpdate = &x
+			replacements[x.NewLocalSafe.Derived.ID()] = r
+			mutex.Unlock()
+		}
+	})
+	d.Actors.Supervisor.exec.Add(ex, nil)
+
+	// Process each chain.
+	// At some point during processing, either chain A or B will replace its local safe head.
+	// Then that chain will trigger a LocalSafeUpdateEvent for the other chain.
+	// However, there's a race condition in the supervisor where the LocalSafeUpdateEvent is emitted
+	// before the replacement block and its log is indexed.
+	// If this happens, then the cross chain will fail to reference the replacement block (i.e. "future data" error) and the cascading test setup fails.
+	// To work around this, we manually trigger the event again, sometime after we expect the replacement block to be indexed.
+	for _, chain := range opts.Chains {
+		chain.Sequencer.ActL2PipelineFull(d.t)
+		chain.Sequencer.SyncSupervisor(d.t)
+		d.Actors.Supervisor.ProcessFull(d.t)
+	}
+	require.NoError(d.t, d.Actors.Supervisor.exec.Drain())
+
+	// Wait for the replacement block to be indexed
+	// There isn't an event that indicates this, so we just sleep and hope for the best
+	// NOTE: FLAKE ALERT! Bump the timeout if we aren't seeing the replacement update events
+	time.Sleep(5 * time.Second)
+
+	var rv []replacementEvent
+	mutex.Lock()
+	for _, r := range replacements {
+		rv = append(rv, r)
+	}
+	mutex.Unlock()
+	require.Len(d.t, rv, 1, "expected 1 replacement entry")
+
+	for _, r := range rv {
+		rr := r.replacement
+		d.t.Logf("handling replacement local-safe-update. chainID: %v, replacement: %v", rr.ChainID, rr.Replacement.Replacement)
+		if r.localSafeUpdate == nil || r.localUnsafeUpdate == nil {
+			d.t.Fatalf("did not receive update events for replacement block")
+		}
+		d.Actors.Supervisor.exec.Enqueue(event.AnnotatedEvent{Event: *r.localUnsafeUpdate, EmitContext: 999998})
+		time.Sleep(5 * time.Second)
+		d.Actors.Supervisor.exec.Enqueue(event.AnnotatedEvent{Event: *r.localSafeUpdate, EmitContext: 999999})
+	}
+
+	// Process updates on each chain and verify the cross-safe head advanced
+	for _, chain := range opts.Chains {
+		chain.Sequencer.ActL2PipelineFull(d.t)
+		status := chain.Sequencer.SyncStatus()
+		d.t.Logf("DEBUG: chain %v status: %#v", chain.ChainID, status)
+		require.Equalf(d.t, status.UnsafeL2, status.SafeL2, "Chain %v did not fully advance safe head", chain.ChainID)
+
+		chain.Sequencer.SyncSupervisor(d.t)
+		// Re-run in case there was an invalid block that was replaced so it can now be considered safe
+		// This needs to happen in the loop else replace-block events are never processed before the status checks above
+		d.Actors.Supervisor.ProcessFull(d.t)
+	}
+
+	// Re-run in case there was an invalid block that was replaced so it can now be considered safe
+	// TODO: Should this just loop until the cross safe heads stop updating or is once enough?
+	d.Actors.Supervisor.ProcessFull(d.t)
+	// Process updates on each chain and verify the cross-safe head advanced
+	for _, chain := range opts.Chains {
+		chain.Sequencer.ActL2PipelineFull(d.t)
+		status := chain.Sequencer.SyncStatus()
+		require.Equalf(d.t, status.UnsafeL2, status.SafeL2, "Chain %v did not fully advance safe head", chain.ChainID)
+	}
 }
 
 // ProcessCrossSafe processes evens in the supervisor and nodes to ensure the cross-safe head is fully updated.

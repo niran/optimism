@@ -332,6 +332,7 @@ func (l *logContext) forceBlock(upd eth.BlockID, timestamp uint64) error {
 	if l.nextEntryIndex != 0 {
 		return errors.New("can only bootstrap on top of an empty state")
 	}
+	fmt.Printf("DEBUG: forceBlock: %d, %v. old_block_num=%d\n", upd.Number, upd.Hash, l.blockNum)
 	l.blockHash = upd.Hash
 	l.blockNum = upd.Number
 	l.timestamp = timestamp
@@ -361,6 +362,7 @@ func (l *logContext) SealBlock(parent common.Hash, upd eth.BlockID, timestamp ui
 			return fmt.Errorf("%w: block timestamp %d must be equal or larger than current timestamp %d", types.ErrConflict, timestamp, l.timestamp)
 		}
 	}
+	fmt.Printf("DEBUG: SealBlock: %d, %v. old_block_num=%d old_block_hash=%v\n", upd.Number, upd.Hash, l.blockNum, l.blockHash)
 	l.blockHash = upd.Hash
 	l.blockNum = upd.Number
 	l.timestamp = timestamp
