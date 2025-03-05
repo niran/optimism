@@ -549,6 +549,14 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
             ISuperchainConfig superchainConfig =
                 IOptimismPortal2(payable(opChainAddrs.optimismPortal)).superchainConfig();
 
+            // Start by upgrading the SystemConfig contract to have the l2ChainId.
+            upgradeToAndCall(
+                _opChainConfigs[i].proxyAdmin,
+                address(_opChainConfigs[i].systemConfigProxy),
+                impls.systemConfigImpl,
+                abi.encodeCall(ISystemConfig.upgrade, (l2ChainId))
+            );
+
             // Separate context to avoid stack too deep.
             IAnchorStateRegistry newAnchorStateRegistryProxy;
             {
