@@ -5,7 +5,7 @@ pragma solidity 0.8.15;
 import { Blueprint } from "src/libraries/Blueprint.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { Bytes } from "src/libraries/Bytes.sol";
-import { Claim, Duration, GameType, GameTypes, OutputRoot } from "src/dispute/lib/Types.sol";
+import { Claim, Duration, GameType, GameTypes, OutputRoot, Hash } from "src/dispute/lib/Types.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 
 // Interfaces
@@ -525,34 +525,12 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
     /// @dev This function is intended to be called via DELEGATECALL from the Upgrade Controller Safe
     function upgrade(OPContractsManager.OpChainConfig[] memory _opChainConfigs) external virtual {
         OPContractsManager.Implementations memory impls = getImplementations();
-        OPContractsManager.Blueprints memory bps = getBlueprints();
 
         for (uint256 i = 0; i < _opChainConfigs.length; i++) {
             assertValidOpChainConfig(_opChainConfigs[i]);
             ISystemConfig.Addresses memory opChainAddrs = _opChainConfigs[i].systemConfigProxy.getAddresses();
 
-            // -------- Upgrade SystemConfig to Isthmus implementation --------
-            upgradeTo(
-                _opChainConfigs[i].proxyAdmin, address(_opChainConfigs[i].systemConfigProxy), impls.systemConfigImpl
-            );
-
-            // -------- Upgrade Contracts Stored in SystemConfig --------
-
-            // OptimismPortal and L1CrossDomainMessenger are being upgraded to include the fixes
-            // for EIP-7623 (minimum gas limits for L1 -> L2 messages).
-            upgradeTo(_opChainConfigs[i].proxyAdmin, opChainAddrs.optimismPortal, impls.optimismPortalImpl);
-            upgradeTo(
-                _opChainConfigs[i].proxyAdmin, opChainAddrs.l1CrossDomainMessenger, impls.l1CrossDomainMessengerImpl
-            );
-
-            // L1ERC721Bridge and L1StandardBridge are being upgraded to include the tweaks to the
-            // EOA checking code for EIP-7702 (code length == 23).
-            upgradeTo(_opChainConfigs[i].proxyAdmin, opChainAddrs.l1ERC721Bridge, impls.l1ERC721BridgeImpl);
-            upgradeTo(_opChainConfigs[i].proxyAdmin, opChainAddrs.l1StandardBridge, impls.l1StandardBridgeImpl);
-
-            // -------- Discover and Upgrade Proofs Contracts --------
-
-            // All chains have the Permissioned Dispute Game.
+            // All chains have the PermissionedDisputeGame, grab that.
             IPermissionedDisputeGame permissionedDisputeGame = IPermissionedDisputeGame(
                 address(
                     getGameImplementation(
@@ -561,35 +539,66 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
                 )
             );
 
-            // We're also going to need the l2ChainId below, so we cache it in the outer scope.
+            // Grab the L2 chain ID from the PermissionedDisputeGame.
             uint256 l2ChainId = getL2ChainId(IFaultDisputeGame(address(permissionedDisputeGame)));
 
-            deployAndSetNewGameImpl({
-                _l2ChainId: l2ChainId,
-                _disputeGame: IDisputeGame(address(permissionedDisputeGame)),
-                _gameType: GameTypes.PERMISSIONED_CANNON,
-                _opChainConfig: _opChainConfigs[i],
-                _implementations: impls,
-                _blueprints: bps,
-                _opChainAddrs: opChainAddrs
-            });
+            // Grab the current respectedGameType from the OptimismPortal contract before the upgrade.
+            GameType respectedGameType = IOptimismPortal2(payable(opChainAddrs.optimismPortal)).respectedGameType();
 
-            // Now retrieve the permissionless game. If it exists, replace its implementation.
-            IFaultDisputeGame permissionlessDisputeGame = IFaultDisputeGame(
-                address(getGameImplementation(IDisputeGameFactory(opChainAddrs.disputeGameFactory), GameTypes.CANNON))
-            );
+            // Grab the current SuperchainConfig from the OptimismPortal contract before the upgrade.
+            ISuperchainConfig superchainConfig =
+                IOptimismPortal2(payable(opChainAddrs.optimismPortal)).superchainConfig();
 
-            if (address(permissionlessDisputeGame) != address(0)) {
-                // Deploy and set a new permissionless game to update its prestate
-                deployAndSetNewGameImpl({
-                    _l2ChainId: l2ChainId,
-                    _disputeGame: IDisputeGame(address(permissionlessDisputeGame)),
-                    _gameType: GameTypes.CANNON,
-                    _opChainConfig: _opChainConfigs[i],
-                    _implementations: impls,
-                    _blueprints: bps,
-                    _opChainAddrs: opChainAddrs
-                });
+            IAnchorStateRegistry newAnchorStateRegistryProxy;
+            {
+                // Deploy a new AnchorStateRegistry contract.
+                newAnchorStateRegistryProxy = IAnchorStateRegistry(
+                    deployProxy({
+                        _l2ChainId: l2ChainId,
+                        _proxyAdmin: _opChainConfigs[i].proxyAdmin,
+                        _saltMixer: reusableSaltMixer(_opChainConfigs[i]),
+                        _contractName: "AnchorStateRegistry"
+                    })
+                );
+
+                {
+                    // Get the existing anchor root from the old AnchorStateRegistry contract.
+                    // Get the AnchorStateRegistry from the PermissionedDisputeGame.
+                    (Hash root, uint256 l2BlockNumber) = getAnchorStateRegistry(
+                        IFaultDisputeGame(address(permissionedDisputeGame))
+                    ).anchors(respectedGameType);
+
+                    // Upgrade and initialize the AnchorStateRegistry contract.
+                    // Since this is a net-new contract, we need to initialize it.
+                    upgradeToAndCall(
+                        _opChainConfigs[i].proxyAdmin,
+                        address(newAnchorStateRegistryProxy),
+                        impls.anchorStateRegistryImpl,
+                        abi.encodeCall(
+                            IAnchorStateRegistry.initialize,
+                            (
+                                superchainConfig,
+                                IDisputeGameFactory(opChainAddrs.disputeGameFactory),
+                                OutputRoot({ root: root, l2BlockNumber: l2BlockNumber }),
+                                respectedGameType
+                            )
+                        )
+                    );
+                }
+            }
+
+            // Separate context to avoid stack too deep.
+            {
+                // Upgrade the OptimismPortal contract.
+                upgradeToAndCall(
+                    _opChainConfigs[i].proxyAdmin,
+                    opChainAddrs.optimismPortal,
+                    impls.optimismPortalImpl,
+                    abi.encodeCall(
+                        IOptimismPortal2.upgrade,
+                        (newAnchorStateRegistryProxy, _opChainConfigs[i].disputeGameUsesSuperRoots)
+                    )
+                );
             }
 
             // Emit the upgraded event with the address of the caller. Since this will be a delegatecall,
@@ -805,7 +814,7 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
             output.opChainProxyAdmin, address(output.l1ERC721BridgeProxy), implementation.l1ERC721BridgeImpl, data
         );
 
-        data = encodeOptimismPortalInitializer(output, _superchainConfig);
+        data = encodeOptimismPortalInitializer(_input, output, _superchainConfig);
         upgradeToAndCall(
             output.opChainProxyAdmin, address(output.optimismPortalProxy), implementation.optimismPortalImpl, data
         );
@@ -954,6 +963,7 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
 
     /// @notice Helper method for encoding the OptimismPortal initializer data.
     function encodeOptimismPortalInitializer(
+        OPContractsManager.DeployInput memory _input,
         OPContractsManager.DeployOutput memory _output,
         ISuperchainConfig _superchainConfig
     )
@@ -965,10 +975,10 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
         return abi.encodeCall(
             IOptimismPortal2.initialize,
             (
-                _output.disputeGameFactoryProxy,
                 _output.systemConfigProxy,
                 _superchainConfig,
-                GameTypes.PERMISSIONED_CANNON
+                _output.anchorStateRegistryProxy,
+                _input.disputeGameUsesSuperRoots
             )
         );
     }
@@ -997,7 +1007,8 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
                 _input.roles.unsafeBlockSigner,
                 referenceResourceConfig,
                 chainIdToBatchInboxAddress(_input.l2ChainId),
-                opChainAddrs
+                opChainAddrs,
+                _input.l2ChainId
             )
         );
     }
@@ -1057,7 +1068,7 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
         OutputRoot memory startingAnchorRoot = abi.decode(_input.startingAnchorRoot, (OutputRoot));
         return abi.encodeCall(
             IAnchorStateRegistry.initialize,
-            (_superchainConfig, _output.disputeGameFactoryProxy, _output.optimismPortalProxy, startingAnchorRoot)
+            (_superchainConfig, _output.disputeGameFactoryProxy, startingAnchorRoot, GameTypes.PERMISSIONED_CANNON)
         );
     }
 
@@ -1113,7 +1124,8 @@ contract OPContractsManagerDeployerInterop is OPContractsManagerDeployer {
                 referenceResourceConfig,
                 chainIdToBatchInboxAddress(_input.l2ChainId),
                 opChainAddrs,
-                dependencyManager
+                dependencyManager,
+                _input.l2ChainId
             )
         );
     }
@@ -1292,23 +1304,8 @@ contract OPContractsManager is ISemver {
     /// @notice Thrown when an invalid `l2ChainId` is provided to `deploy`.
     error InvalidChainId();
 
-    /// @notice Thrown when a role's address is not valid (opChainProxyAdminOwner).
-    error InvalidRoleAddressPAO();
-
-    /// @notice Thrown when a role's address is not valid (systemConfigOwner).
-    error InvalidRoleAddressSCO();
-
-    /// @notice Thrown when a role's address is not valid (batcher).
-    error InvalidRoleAddressBatcher();
-
-    /// @notice Thrown when a role's address is not valid (unsafeBlockSigner).
-    error InvalidRoleAddressUBS();
-
-    /// @notice Thrown when a role's address is not valid (proposer).
-    error InvalidRoleAddressProposer();
-
-    /// @notice Thrown when a role's address is not valid (challenger).
-    error InvalidRoleAddressChallenger();
+    /// @notice Thrown when a role's address is not valid.
+    error InvalidRoleAddress(string role);
 
     /// @notice Thrown when the latest release is not set upon initialization.
     error LatestReleaseNotSet();

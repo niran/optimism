@@ -1012,7 +1012,7 @@ contract OPContractsManager_UpdatePrestate_Test is Test {
             }),
             optimismPortalImpl: DeployUtils.create1({
                 _name: "OptimismPortal2",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IOptimismPortal2.__constructor__, (1, 1)))
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IOptimismPortal2.__constructor__, (1)))
             }),
             systemConfigImpl: DeployUtils.create1({
                 _name: "SystemConfig",
@@ -1036,7 +1036,7 @@ contract OPContractsManager_UpdatePrestate_Test is Test {
             }),
             anchorStateRegistryImpl: DeployUtils.create1({
                 _name: "AnchorStateRegistry",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IAnchorStateRegistry.__constructor__, ()))
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IAnchorStateRegistry.__constructor__, (1)))
             }),
             delayedWETHImpl: DeployUtils.create1({
                 _name: "DelayedWETH",
@@ -1128,6 +1128,7 @@ contract OPContractsManager_UpdatePrestate_Test is Test {
                 l2ChainId: 100,
                 saltMixer: "hello",
                 gasLimit: 30_000_000,
+                disputeGameUsesSuperRoots: false,
                 disputeGameType: GameType.wrap(1),
                 disputeAbsolutePrestate: Claim.wrap(
                     bytes32(hex"038512e02c4c3f7bdaec27d00edf55b7155e0905301e1a88083e4e0a6764d54c")
@@ -1149,7 +1150,10 @@ contract OPContractsManager_UpdatePrestate_Test is Test {
     function test_updatePrestate_pdgOnlyWithValidInput_succeeds() public {
         IOPContractsManager.OpChainConfig[] memory inputs = new IOPContractsManager.OpChainConfig[](1);
         inputs[0] = IOPContractsManager.OpChainConfig(
-            chainDeployOutput.systemConfigProxy, chainDeployOutput.opChainProxyAdmin, Claim.wrap(bytes32(hex"ABBA"))
+            chainDeployOutput.systemConfigProxy,
+            chainDeployOutput.opChainProxyAdmin,
+            Claim.wrap(bytes32(hex"ABBA")),
+            false
         );
         address proxyAdminOwner = chainDeployOutput.opChainProxyAdmin.owner();
 
@@ -1180,7 +1184,10 @@ contract OPContractsManager_UpdatePrestate_Test is Test {
 
         IOPContractsManager.OpChainConfig[] memory inputs = new IOPContractsManager.OpChainConfig[](1);
         inputs[0] = IOPContractsManager.OpChainConfig(
-            chainDeployOutput.systemConfigProxy, chainDeployOutput.opChainProxyAdmin, Claim.wrap(bytes32(hex"ABBA"))
+            chainDeployOutput.systemConfigProxy,
+            chainDeployOutput.opChainProxyAdmin,
+            Claim.wrap(bytes32(hex"ABBA")),
+            false
         );
         address proxyAdminOwner = chainDeployOutput.opChainProxyAdmin.owner();
 
@@ -1217,7 +1224,8 @@ contract OPContractsManager_UpdatePrestate_Test is Test {
         inputs[0] = IOPContractsManager.OpChainConfig({
             systemConfigProxy: chainDeployOutput.systemConfigProxy,
             proxyAdmin: chainDeployOutput.opChainProxyAdmin,
-            absolutePrestate: Claim.wrap(bytes32(0))
+            absolutePrestate: Claim.wrap(bytes32(0)),
+            disputeGameUsesSuperRoots: false
         });
 
         address proxyAdminOwner = chainDeployOutput.opChainProxyAdmin.owner();

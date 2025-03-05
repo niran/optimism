@@ -208,6 +208,11 @@
             "internalType": "Claim",
             "name": "absolutePrestate",
             "type": "bytes32"
+          },
+          {
+            "internalType": "bool",
+            "name": "disputeGameUsesSuperRoots",
+            "type": "bool"
           }
         ],
         "internalType": "struct OPContractsManager.OpChainConfig[]",
@@ -279,11 +284,6 @@
   {
     "inputs": [],
     "name": "NotABlueprint",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "PrestateNotSet",
     "type": "error"
   },
   {
