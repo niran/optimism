@@ -1005,3 +1005,80 @@ func logFields(xs ...any) (fs []any) {
 	}
 	return fs
 }
+
+// SetL2Scope limits the view over the L2 chain for testing purposes
+func (l *BatchSubmitter) SetL2Scope(ctx context.Context, start, end uint64) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if !l.Config.TestMode {
+		return errors.New("batcher is not in test mode")
+	}
+
+	l.Log.Info("Setting L2 scope", "start", start, "end", end)
+
+	// Clear the current state
+	l.clearState(ctx)
+
+	// Load the blocks in the specified range
+	return l.loadBlocksIntoState(ctx, start, end)
+}
+
+// SubmitNow forces the batcher to submit the current data, even if the buffer is not full
+func (l *BatchSubmitter) SubmitNow(ctx context.Context) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if !l.Config.TestMode {
+		return errors.New("batcher is not in test mode")
+	}
+
+	l.Log.Info("Forcing batch submission")
+
+	// Signal the publishing loop to publish immediately
+	if l.running {
+		trySignal(l.ActiveSeqChanged)
+		return nil
+	}
+
+	return ErrBatcherNotRunning
+}
+
+// Cursors returns the current cursor positions (submitted L2 block)
+func (l *BatchSubmitter) Cursors(ctx context.Context) (map[string]uint64, error) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if !l.Config.TestMode {
+		return nil, errors.New("batcher is not in test mode")
+	}
+
+	l.channelMgrMutex.Lock()
+	defer l.channelMgrMutex.Unlock()
+
+	if l.channelMgr == nil {
+		return nil, errors.New("channel manager not initialized")
+	}
+
+	// Get the last stored block
+	lastBlock := l.channelMgr.LastStoredBlock()
+
+	// Create a map with cursor information
+	cursors := make(map[string]uint64)
+	cursors["lastStoredL2Block"] = lastBlock.Number
+
+	// If we have a current channel, add information about it
+	if l.channelMgr.currentChannel != nil {
+		if oldestL2 := l.channelMgr.currentChannel.OldestL2(); oldestL2.Number > 0 {
+			cursors["currentChannelOldestL2Block"] = oldestL2.Number
+		}
+		if latestL2 := l.channelMgr.currentChannel.LatestL2(); latestL2.Number > 0 {
+			cursors["currentChannelLatestL2Block"] = latestL2.Number
+		}
+	}
+
+	// Add information about pending blocks
+	cursors["pendingBlocks"] = uint64(l.channelMgr.pendingBlocks())
+
+	return cursors, nil
+}
