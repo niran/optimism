@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/errutil"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -282,8 +281,6 @@ func (m *SimpleTxManager) SendAsync(ctx context.Context, candidate TxCandidate, 
 		return
 	}
 
-	m.metr.RecordPendingTx(m.pending.Add(1))
-
 	var cancel context.CancelFunc
 	if m.cfg.TxSendTimeout == 0 {
 		ctx, cancel = context.WithCancel(ctx)
@@ -295,7 +292,6 @@ func (m *SimpleTxManager) SendAsync(ctx context.Context, candidate TxCandidate, 
 	if err != nil {
 		m.resetNonce()
 		cancel()
-		m.metr.RecordPendingTx(m.pending.Add(-1))
 		ch <- SendResponse{
 			Receipt: nil,
 			Err:     err,
@@ -303,8 +299,10 @@ func (m *SimpleTxManager) SendAsync(ctx context.Context, candidate TxCandidate, 
 		return
 	}
 
+	m.metr.RecordPendingTx(m.pending.Add(1))
+
 	go func() {
-		defer m.metr.RecordPendingTx(m.pending.Add(-1))
+		defer func() { m.metr.RecordPendingTx(m.pending.Add(-1)) }()
 		defer cancel()
 		receipt, err := m.sendTx(ctx, tx)
 		if err != nil {
@@ -346,7 +344,7 @@ func (m *SimpleTxManager) craftTx(ctx context.Context, candidate TxCandidate) (*
 	gasTipCap, baseFee, blobBaseFee, err := m.SuggestGasPriceCaps(ctx)
 	if err != nil {
 		m.metr.RPCError()
-		return nil, fmt.Errorf("failed to get gas price info: %w", err)
+		return nil, fmt.Errorf("failed to get gas price info or it's too high: %w", err)
 	}
 	gasFeeCap := calcGasFeeCap(baseFee, gasTipCap)
 
@@ -638,9 +636,14 @@ func (m *SimpleTxManager) publishTx(ctx context.Context, tx *types.Transaction, 
 		cancel()
 		sendState.ProcessSendError(err)
 
-		if err == nil {
+		if err == nil || errStringContainsAny(err, m.cfg.AlreadyPublishedCustomErrs) {
+			// only empty error strings are recorded as successful publishes
 			m.metr.TxPublished("")
-			l.Info("Transaction successfully published", "tx", tx.Hash())
+			if err == nil {
+				l.Info("Transaction successfully published", "tx", tx.Hash())
+			} else {
+				l.Info("Transaction successfully published (custom RPC error)", "tx", tx.Hash(), "err", err)
+			}
 			// Tx made it into the mempool, so we'll need a fee bump if we end up trying to replace
 			// it with another publish attempt.
 			sendState.bumpFees = true
@@ -756,7 +759,7 @@ func (m *SimpleTxManager) queryReceipt(ctx context.Context, txHash common.Hash, 
 
 	m.metr.RecordBaseFee(tip.BaseFee)
 	if tip.ExcessBlobGas != nil {
-		blobFee := eip4844.CalcBlobFee(*tip.ExcessBlobGas)
+		blobFee := eth.CalcBlobFeeDefault(tip)
 		m.metr.RecordBlobBaseFee(blobFee)
 	}
 
@@ -889,6 +892,7 @@ func (m *SimpleTxManager) increaseGasPrice(ctx context.Context, tx *types.Transa
 
 // SuggestGasPriceCaps suggests what the new tip, base fee, and blob base fee should be based on
 // the current L1 conditions. `blobBaseFee` will be nil if 4844 is not yet active.
+// Note that an error will be returned if MaxTipCap or MaxBaseFee is exceeded.
 func (m *SimpleTxManager) SuggestGasPriceCaps(ctx context.Context) (*big.Int, *big.Int, *big.Int, error) {
 	cCtx, cancel := context.WithTimeout(ctx, m.cfg.NetworkTimeout)
 	defer cancel()
@@ -910,15 +914,24 @@ func (m *SimpleTxManager) SuggestGasPriceCaps(ctx context.Context) (*big.Int, *b
 
 	// Enforce minimum base fee and tip cap
 	minTipCap := m.cfg.MinTipCap.Load()
+	maxTipCap := m.cfg.MaxTipCap.Load()
 	minBaseFee := m.cfg.MinBaseFee.Load()
+	maxBaseFee := m.cfg.MaxBaseFee.Load()
 
 	if minTipCap != nil && tip.Cmp(minTipCap) == -1 {
 		m.l.Debug("Enforcing min tip cap", "minTipCap", minTipCap, "origTipCap", tip)
 		tip = new(big.Int).Set(minTipCap)
 	}
+	if maxTipCap != nil && tip.Cmp(maxTipCap) > 0 {
+		return nil, nil, nil, fmt.Errorf("tip is too high: %v, cap:%v", tip, maxTipCap)
+	}
+
 	if minBaseFee != nil && baseFee.Cmp(minBaseFee) == -1 {
 		m.l.Debug("Enforcing min base fee", "minBaseFee", minBaseFee, "origBaseFee", baseFee)
 		baseFee = new(big.Int).Set(minBaseFee)
+	}
+	if maxBaseFee != nil && baseFee.Cmp(maxBaseFee) > 0 {
+		return nil, nil, nil, fmt.Errorf("baseFee is too high: %v, cap:%v", baseFee, maxBaseFee)
 	}
 
 	return tip, baseFee, blobFee, nil
@@ -1051,6 +1064,19 @@ func errStringMatch(err, target error) bool {
 		return false
 	}
 	return strings.Contains(err.Error(), target.Error())
+}
+
+func errStringContainsAny(err error, targets []string) bool {
+	if err == nil || len(targets) == 0 {
+		return false
+	}
+
+	for _, target := range targets {
+		if strings.Contains(err.Error(), target) {
+			return true
+		}
+	}
+	return false
 }
 
 // finishBlobTx finishes creating a blob tx message by safely converting bigints to uint256

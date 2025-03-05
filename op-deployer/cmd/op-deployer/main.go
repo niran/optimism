@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/manage"
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/clean"
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/upgrade"
 
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer"
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/bootstrap"
@@ -45,6 +46,12 @@ func main() {
 			Action: deployer.ApplyCLI(),
 		},
 		{
+			Name:        "upgrade",
+			Usage:       "upgrades contracts by sending tx to OPCM.upgrade function",
+			Flags:       cliapp.ProtectFlags(deployer.UpgradeFlags),
+			Subcommands: upgrade.Commands,
+		},
+		{
 			Name:        "bootstrap",
 			Usage:       "bootstraps global contract instances",
 			Subcommands: bootstrap.Commands,
@@ -55,9 +62,9 @@ func main() {
 			Subcommands: inspect.Commands,
 		},
 		{
-			Name:        "manage",
-			Usage:       "performs individual operations on a chain",
-			Subcommands: manage.Commands,
+			Name:        "clean",
+			Usage:       "cleans up various things",
+			Subcommands: clean.Commands,
 		},
 	}
 	app.Writer = os.Stdout

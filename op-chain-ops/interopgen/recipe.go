@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/params"
@@ -32,7 +30,6 @@ func (r *InteropDevRecipe) Build(addrs devkeys.Addresses) (*WorldConfig, error) 
 		Prefund: make(map[common.Address]*big.Int),
 	}
 
-	// TODO(#11887): consider making the number of prefunded keys configurable.
 	l1Users := devkeys.ChainUserKeys(l1Cfg.ChainID)
 	for i := uint64(0); i < 20; i++ {
 		userAddr, err := addrs.Address(l1Users(i))
@@ -71,15 +68,14 @@ func (r *InteropDevRecipe) Build(addrs devkeys.Addresses) (*WorldConfig, error) 
 		Implementations: OPCMImplementationsConfig{
 			L1ContractsRelease: "dev",
 			FaultProof: SuperFaultProofConfig{
-				WithdrawalDelaySeconds:          big.NewInt(604800),
+				WithdrawalDelaySeconds:          big.NewInt(302400),
 				MinProposalSizeBytes:            big.NewInt(10000),
 				ChallengePeriodSeconds:          big.NewInt(120),
 				ProofMaturityDelaySeconds:       big.NewInt(12),
 				DisputeGameFinalityDelaySeconds: big.NewInt(6),
 				MipsVersion:                     big.NewInt(1),
 			},
-			UseInterop:           true,
-			StandardVersionsToml: standard.VersionsMainnetData,
+			UseInterop: true,
 		},
 		SuperchainL1DeployConfig: genesis.SuperchainL1DeployConfig{
 			RequiredProtocolVersion:    params.OPStackSupport,
@@ -234,8 +230,10 @@ func InteropL2DevConfig(l1ChainID, l2ChainID uint64, addrs devkeys.Addresses) (*
 				L2GenesisFjordTimeOffset:    new(hexutil.Uint64),
 				L2GenesisGraniteTimeOffset:  new(hexutil.Uint64),
 				L2GenesisHoloceneTimeOffset: new(hexutil.Uint64),
+				L2GenesisIsthmusTimeOffset:  new(hexutil.Uint64),
 				L2GenesisInteropTimeOffset:  new(hexutil.Uint64),
 				L1CancunTimeOffset:          new(hexutil.Uint64),
+				L1PragueTimeOffset:          new(hexutil.Uint64),
 				UseInterop:                  true,
 			},
 			L2CoreDeployConfig: genesis.L2CoreDeployConfig{
@@ -264,7 +262,6 @@ func InteropL2DevConfig(l1ChainID, l2ChainID uint64, addrs devkeys.Addresses) (*
 		DisputeMaxClockDuration: 302400, // 3.5 days (input in seconds)
 	}
 
-	// TODO(#11887): consider making the number of prefunded keys configurable.
 	l2Users := devkeys.ChainUserKeys(new(big.Int).SetUint64(l2ChainID))
 	for i := uint64(0); i < 20; i++ {
 		userAddr, err := addrs.Address(l2Users(i))

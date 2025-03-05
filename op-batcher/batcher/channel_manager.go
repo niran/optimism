@@ -62,7 +62,7 @@ func NewChannelManager(log log.Logger, metr metrics.Metricer, cfgProvider Channe
 		log:         log,
 		metr:        metr,
 		cfgProvider: cfgProvider,
-		defaultCfg:  cfgProvider.ChannelConfig(),
+		defaultCfg:  cfgProvider.ChannelConfig(false),
 		rollupCfg:   rollupCfg,
 		outFactory:  NewChannelOut,
 		txChannels:  make(map[string]*channel),
@@ -83,6 +83,7 @@ func (s *channelManager) Clear(l1OriginLastSubmittedChannel eth.BlockID) {
 	s.tip = common.Hash{}
 	s.currentChannel = nil
 	s.channelQueue = nil
+	s.metr.RecordChannelQueueLength(0)
 	s.txChannels = make(map[string]*channel)
 }
 
@@ -110,6 +111,7 @@ func (s *channelManager) TxConfirmed(_id txID, inclusionBlock eth.BlockID) {
 	if channel, ok := s.txChannels[id]; ok {
 		delete(s.txChannels, id)
 		if timedOut := channel.TxConfirmed(id, inclusionBlock); timedOut {
+			s.log.Warn("channel timed out on chain", "channel_id", channel.ID(), "tx_id", id)
 			s.handleChannelInvalidated(channel)
 		}
 	} else {
@@ -124,11 +126,21 @@ func (s *channelManager) TxConfirmed(_id txID, inclusionBlock eth.BlockID) {
 // in the block queue and the blockCursor is ahead of it.
 // Panics if the block is not in state.
 func (s *channelManager) rewindToBlock(block eth.BlockID) {
+	initialCursor := s.blockCursor
 	idx := block.Number - s.blocks[0].Number().Uint64()
 	if s.blocks[idx].Hash() == block.Hash && idx < uint64(s.blockCursor) {
 		s.blockCursor = int(idx)
 	} else {
-		panic("tried to rewind to nonexistent block")
+		panic("rewindToBlock: tried to rewind to nonexistent block")
+	}
+
+	// Ensure metrics stay in sync by re-adding blocks which the cursor rewound over
+	for i := initialCursor - 1; i >= s.blockCursor; i-- {
+		block, ok := s.blocks.PeekN(i)
+		if !ok {
+			panic("rewindToBlock: block not found at index " + fmt.Sprint(i))
+		}
+		s.metr.RecordL2BlockInPendingQueue(block)
 	}
 }
 
@@ -143,21 +155,41 @@ func (s *channelManager) handleChannelInvalidated(c *channel) {
 		// In that case we end up with an empty frame (header only),
 		// and there are no blocks to requeue.
 		blockID := eth.ToBlockID(c.channelBuilder.blocks[0])
-		for _, block := range c.channelBuilder.blocks {
-			s.metr.RecordL2BlockInPendingQueue(block)
-		}
 		s.rewindToBlock(blockID)
 	} else {
 		s.log.Debug("channelManager.handleChannelInvalidated: channel had no blocks")
 	}
 
-	// Trim provided channel and any older channels:
+	// Trim provided channel and any newer channels:
+	invalidatedChannelIdx := 0
+
 	for i := range s.channelQueue {
 		if s.channelQueue[i] == c {
-			s.channelQueue = s.channelQueue[:i]
+			invalidatedChannelIdx = i
 			break
 		}
 	}
+
+	for i := invalidatedChannelIdx; i < len(s.channelQueue); i++ {
+		s.log.Warn("Dropped channel",
+			"id", s.channelQueue[i].ID(),
+			"none_submitted", s.channelQueue[i].NoneSubmitted(),
+			"fully_submitted", s.channelQueue[i].isFullySubmitted(),
+			"timed_out", s.channelQueue[i].isTimedOut(),
+			"full_reason", s.channelQueue[i].FullErr(),
+			"oldest_l2", s.channelQueue[i].OldestL2(),
+			"newest_l2", s.channelQueue[i].LatestL2(),
+		)
+		// Remove the channel from the txChannels map
+		for txID := range s.txChannels {
+			if s.txChannels[txID] == s.channelQueue[i] {
+				delete(s.txChannels, txID)
+			}
+		}
+	}
+	s.channelQueue = s.channelQueue[:invalidatedChannelIdx]
+
+	s.metr.RecordChannelQueueLength(len(s.channelQueue))
 
 	// We want to start writing to a new channel, so reset currentChannel.
 	s.currentChannel = nil
@@ -190,7 +222,7 @@ func (s *channelManager) nextTxData(channel *channel) (txData, error) {
 // It will decide whether to switch DA type automatically.
 // When switching DA type, the channelManager state will be rebuilt
 // with a new ChannelConfig.
-func (s *channelManager) TxData(l1Head eth.BlockID) (txData, error) {
+func (s *channelManager) TxData(l1Head eth.BlockID, isPectra bool) (txData, error) {
 	channel, err := s.getReadyChannel(l1Head)
 	if err != nil {
 		return emptyTxData, err
@@ -202,7 +234,7 @@ func (s *channelManager) TxData(l1Head eth.BlockID) (txData, error) {
 	}
 
 	// Call provider method to reassess optimal DA type
-	newCfg := s.cfgProvider.ChannelConfig()
+	newCfg := s.cfgProvider.ChannelConfig(isPectra)
 
 	// No change:
 	if newCfg.UseBlobs == s.defaultCfg.UseBlobs {
@@ -306,8 +338,6 @@ func (s *channelManager) ensureChannelWithSpace(l1Head eth.BlockID) error {
 	pc := newChannel(s.log, s.metr, cfg, s.rollupCfg, s.l1OriginLastSubmittedChannel.Number, channelOut)
 
 	s.currentChannel = pc
-	s.channelQueue = append(s.channelQueue, pc)
-
 	s.log.Info("Created channel",
 		"id", pc.ID(),
 		"l1Head", l1Head,
@@ -320,6 +350,9 @@ func (s *channelManager) ensureChannelWithSpace(l1Head eth.BlockID) error {
 		"use_blobs", cfg.UseBlobs,
 	)
 	s.metr.RecordChannelOpened(pc.ID(), s.pendingBlocks())
+
+	s.channelQueue = append(s.channelQueue, pc)
+	s.metr.RecordChannelQueueLength(len(s.channelQueue))
 
 	return nil
 }
@@ -342,6 +375,23 @@ func (s *channelManager) processBlocks() error {
 		_chFullErr  *ChannelFullError // throw away, just for type checking
 		latestL2ref eth.L2BlockRef
 	)
+
+	defer func() {
+		s.blockCursor += blocksAdded
+
+		s.metr.RecordL2BlocksAdded(latestL2ref,
+			blocksAdded,
+			s.pendingBlocks(),
+			s.currentChannel.InputBytes(),
+			s.currentChannel.ReadyBytes())
+		s.log.Debug("Added blocks to channel",
+			"blocks_added", blocksAdded,
+			"blocks_pending", s.pendingBlocks(),
+			"channel_full", s.currentChannel.IsFull(),
+			"input_bytes", s.currentChannel.InputBytes(),
+			"ready_bytes", s.currentChannel.ReadyBytes(),
+		)
+	}()
 
 	for i := s.blockCursor; ; i++ {
 		block, ok := s.blocks.PeekN(i)
@@ -366,21 +416,6 @@ func (s *channelManager) processBlocks() error {
 			break
 		}
 	}
-
-	s.blockCursor += blocksAdded
-
-	s.metr.RecordL2BlocksAdded(latestL2ref,
-		blocksAdded,
-		s.pendingBlocks(),
-		s.currentChannel.InputBytes(),
-		s.currentChannel.ReadyBytes())
-	s.log.Debug("Added blocks to channel",
-		"blocks_added", blocksAdded,
-		"blocks_pending", s.pendingBlocks(),
-		"channel_full", s.currentChannel.IsFull(),
-		"input_bytes", s.currentChannel.InputBytes(),
-		"ready_bytes", s.currentChannel.ReadyBytes(),
-	)
 	return nil
 }
 
@@ -452,8 +487,8 @@ func l2BlockRefFromBlockAndL1Info(block *types.Block, l1info *derive.L1BlockInfo
 
 var ErrPendingAfterClose = errors.New("pending channels remain after closing channel-manager")
 
-// pruneSafeBlocks dequeues the provided number of blocks from the internal blocks queue
-func (s *channelManager) pruneSafeBlocks(num int) {
+// PruneSafeBlocks dequeues the provided number of blocks from the internal blocks queue
+func (s *channelManager) PruneSafeBlocks(num int) {
 	_, ok := s.blocks.DequeueN(int(num))
 	if !ok {
 		panic("tried to prune more blocks than available")
@@ -464,8 +499,8 @@ func (s *channelManager) pruneSafeBlocks(num int) {
 	}
 }
 
-// pruneChannels dequeues the provided number of channels from the internal channels queue
-func (s *channelManager) pruneChannels(num int) {
+// PruneChannels dequeues the provided number of channels from the internal channels queue
+func (s *channelManager) PruneChannels(num int) {
 	clearCurrentChannel := false
 	for i := 0; i < num; i++ {
 		if s.channelQueue[i] == s.currentChannel {
@@ -473,9 +508,11 @@ func (s *channelManager) pruneChannels(num int) {
 		}
 	}
 	s.channelQueue = s.channelQueue[num:]
+	s.metr.RecordChannelQueueLength(len(s.channelQueue))
 	if clearCurrentChannel {
 		s.currentChannel = nil
 	}
+
 }
 
 // PendingDABytes returns the current number of bytes pending to be written to the DA layer (from blocks fetched from L2
@@ -489,22 +526,6 @@ func (s *channelManager) PendingDABytes() int64 {
 		return math.MinInt64
 	}
 	return int64(f)
-}
-
-// CheckExpectedProgress uses the supplied syncStatus to infer
-// whether the node providing the status has made the expected
-// safe head progress given fully submitted channels held in
-// state.
-func (m *channelManager) CheckExpectedProgress(syncStatus eth.SyncStatus) error {
-	for _, ch := range m.channelQueue {
-		if ch.isFullySubmitted() && // This implies a number of l1 confirmations has passed, depending on how the txmgr was configured
-			!ch.isTimedOut() &&
-			syncStatus.CurrentL1.Number > ch.maxInclusionBlock &&
-			syncStatus.SafeL2.Number < ch.LatestL2().Number {
-			return errors.New("safe head did not make expected progress")
-		}
-	}
-	return nil
 }
 
 func (m *channelManager) LastStoredBlock() eth.BlockID {

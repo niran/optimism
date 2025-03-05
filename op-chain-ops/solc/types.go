@@ -1,10 +1,23 @@
 package solc
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 )
+
+type AbiType struct {
+	Parsed abi.ABI
+	Raw    interface{}
+}
+
+func (a *AbiType) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &a.Raw); err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &a.Parsed)
+}
 
 type CompilerInput struct {
 	Language string                       `json:"language"`
@@ -39,7 +52,7 @@ type CompilerOutputContracts map[string]CompilerOutputContract
 // CompilerOutputContract represents the solc compiler output for a contract.
 // Ignoring some fields such as devdoc and userdoc.
 type CompilerOutputContract struct {
-	Abi           abi.ABI           `json:"abi"`
+	Abi           AbiType           `json:"abi"`
 	Evm           CompilerOutputEvm `json:"evm"`
 	Metadata      string            `json:"metadata"`
 	StorageLayout StorageLayout     `json:"storageLayout"`
@@ -70,6 +83,14 @@ func (s *StorageLayout) GetStorageLayoutType(name string) (StorageLayoutType, er
 		return ty, nil
 	}
 	return StorageLayoutType{}, fmt.Errorf("%s not found", name)
+}
+
+type AbiSpecStorageLayoutEntry struct {
+	Bytes  uint   `json:"bytes,string"`
+	Label  string `json:"label"`
+	Offset uint   `json:"offset"`
+	Slot   uint   `json:"slot,string"`
+	Type   string `json:"type"`
 }
 
 type StorageLayoutEntry struct {
@@ -180,11 +201,13 @@ type AstNode struct {
 	Value    interface{} `json:"value,omitempty"`
 
 	// Other fields
-	Arguments []Expression `json:"arguments,omitempty"`
-	Condition *Expression  `json:"condition,omitempty"`
-	TrueBody  *AstBlock    `json:"trueBody,omitempty"`
-	FalseBody *AstBlock    `json:"falseBody,omitempty"`
-	Operator  string       `json:"operator,omitempty"`
+	ModifierName *Expression  `json:"modifierName,omitempty"`
+	Modifiers    []AstNode    `json:"modifiers,omitempty"`
+	Arguments    []Expression `json:"arguments,omitempty"`
+	Condition    *Expression  `json:"condition,omitempty"`
+	TrueBody     *AstBlock    `json:"trueBody,omitempty"`
+	FalseBody    *AstBlock    `json:"falseBody,omitempty"`
+	Operator     string       `json:"operator,omitempty"`
 }
 
 type AstBaseContract struct {
@@ -238,10 +261,11 @@ type Expression struct {
 	OverloadedDeclarations []int                 `json:"overloadedDeclarations,omitempty"`
 	ReferencedDeclaration  int                   `json:"referencedDeclaration,omitempty"`
 	ArgumentTypes          []AstTypeDescriptions `json:"argumentTypes,omitempty"`
+	Value                  interface{}           `json:"value,omitempty"`
 }
 
 type ForgeArtifact struct {
-	Abi               abi.ABI                `json:"abi"`
+	Abi               AbiType                `json:"abi"`
 	Bytecode          CompilerOutputBytecode `json:"bytecode"`
 	DeployedBytecode  CompilerOutputBytecode `json:"deployedBytecode"`
 	MethodIdentifiers map[string]string      `json:"methodIdentifiers"`
@@ -266,7 +290,7 @@ type ForgeCompilerInfo struct {
 }
 
 type ForgeMetadataOutput struct {
-	Abi     abi.ABI        `json:"abi"`
+	Abi     AbiType        `json:"abi"`
 	DevDoc  ForgeDocObject `json:"devdoc"`
 	UserDoc ForgeDocObject `json:"userdoc"`
 }

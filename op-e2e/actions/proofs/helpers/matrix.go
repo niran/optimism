@@ -3,6 +3,8 @@ package helpers
 import (
 	"fmt"
 	"testing"
+
+	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
 )
 
 type RunTest[cfg any] func(t *testing.T, testCfg *TestCfg[cfg])
@@ -12,6 +14,7 @@ type TestCfg[cfg any] struct {
 	CheckResult CheckResult
 	InputParams []FixtureInputParam
 	Custom      cfg
+	Allocs      *e2eutils.AllocParams
 }
 
 type TestCase[cfg any] struct {
@@ -88,10 +91,11 @@ var (
 	Fjord    = &Hardfork{Name: "Fjord", Precedence: 5}
 	Granite  = &Hardfork{Name: "Granite", Precedence: 6}
 	Holocene = &Hardfork{Name: "Holocene", Precedence: 7}
+	Isthmus  = &Hardfork{Name: "Isthmus", Precedence: 8}
 )
 
 var (
-	Hardforks      = ForkMatrix{Regolith, Canyon, Delta, Ecotone, Fjord, Granite, Holocene}
+	Hardforks      = ForkMatrix{Regolith, Canyon, Delta, Ecotone, Fjord, Granite, Holocene, Isthmus}
 	LatestFork     = Hardforks[len(Hardforks)-1]
 	LatestForkOnly = ForkMatrix{LatestFork}
 )

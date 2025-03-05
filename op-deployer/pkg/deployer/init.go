@@ -16,18 +16,13 @@ import (
 )
 
 type InitConfig struct {
-	DeploymentStrategy state.DeploymentStrategy
-	IntentConfigType   state.IntentConfigType
-	L1ChainID          uint64
-	Outdir             string
-	L2ChainIDs         []common.Hash
+	IntentType state.IntentType
+	L1ChainID  uint64
+	Outdir     string
+	L2ChainIDs []common.Hash
 }
 
 func (c *InitConfig) Check() error {
-	if err := c.DeploymentStrategy.Check(); err != nil {
-		return err
-	}
-
 	if c.L1ChainID == 0 {
 		return fmt.Errorf("l1ChainID must be specified")
 	}
@@ -45,11 +40,10 @@ func (c *InitConfig) Check() error {
 
 func InitCLI() func(ctx *cli.Context) error {
 	return func(ctx *cli.Context) error {
-		deploymentStrategy := ctx.String(DeploymentStrategyFlagName)
 		l1ChainID := ctx.Uint64(L1ChainIDFlagName)
 		outdir := ctx.String(OutdirFlagName)
 		l2ChainIDsRaw := ctx.String(L2ChainIDsFlagName)
-		intentConfigType := ctx.String(IntentConfigTypeFlagName)
+		intentType := ctx.String(IntentTypeFlagName)
 
 		if len(l2ChainIDsRaw) == 0 {
 			return fmt.Errorf("must specify at least one L2 chain ID")
@@ -66,11 +60,10 @@ func InitCLI() func(ctx *cli.Context) error {
 		}
 
 		err := Init(InitConfig{
-			DeploymentStrategy: state.DeploymentStrategy(deploymentStrategy),
-			IntentConfigType:   state.IntentConfigType(intentConfigType),
-			L1ChainID:          l1ChainID,
-			Outdir:             outdir,
-			L2ChainIDs:         l2ChainIDs,
+			IntentType: state.IntentType(intentType),
+			L1ChainID:  l1ChainID,
+			Outdir:     outdir,
+			L2ChainIDs: l2ChainIDs,
 		})
 		if err != nil {
 			return err
@@ -86,12 +79,11 @@ func Init(cfg InitConfig) error {
 		return fmt.Errorf("invalid config for init: %w", err)
 	}
 
-	intent, err := state.NewIntent(cfg.IntentConfigType, cfg.DeploymentStrategy, cfg.L1ChainID, cfg.L2ChainIDs)
+	intent, err := state.NewIntent(cfg.IntentType, cfg.L1ChainID, cfg.L2ChainIDs)
 	if err != nil {
 		return err
 	}
-	intent.DeploymentStrategy = cfg.DeploymentStrategy
-	intent.ConfigType = cfg.IntentConfigType
+	intent.ConfigType = cfg.IntentType
 
 	st := &state.State{
 		Version: 1,

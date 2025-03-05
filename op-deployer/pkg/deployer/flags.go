@@ -3,6 +3,7 @@ package deployer
 import (
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/state"
 
@@ -12,16 +13,50 @@ import (
 )
 
 const (
-	EnvVarPrefix               = "DEPLOYER"
-	L1RPCURLFlagName           = "l1-rpc-url"
-	L1ChainIDFlagName          = "l1-chain-id"
-	L2ChainIDsFlagName         = "l2-chain-ids"
-	WorkdirFlagName            = "workdir"
-	OutdirFlagName             = "outdir"
-	PrivateKeyFlagName         = "private-key"
-	DeploymentStrategyFlagName = "deployment-strategy"
-	IntentConfigTypeFlagName   = "intent-config-type"
+	EnvVarPrefix       = "DEPLOYER"
+	L1RPCURLFlagName   = "l1-rpc-url"
+	CacheDirFlagName   = "cache-dir"
+	L1ChainIDFlagName  = "l1-chain-id"
+	L2ChainIDsFlagName = "l2-chain-ids"
+	WorkdirFlagName    = "workdir"
+	OutdirFlagName     = "outdir"
+	PrivateKeyFlagName = "private-key"
+	IntentTypeFlagName = "intent-type"
 )
+
+type DeploymentTarget string
+
+const (
+	DeploymentTargetLive     DeploymentTarget = "live"
+	DeploymentTargetGenesis  DeploymentTarget = "genesis"
+	DeploymentTargetCalldata DeploymentTarget = "calldata"
+	DeploymentTargetNoop     DeploymentTarget = "noop"
+)
+
+func NewDeploymentTarget(s string) (DeploymentTarget, error) {
+	switch s {
+	case string(DeploymentTargetLive):
+		return DeploymentTargetLive, nil
+	case string(DeploymentTargetGenesis):
+		return DeploymentTargetGenesis, nil
+	case string(DeploymentTargetCalldata):
+		return DeploymentTargetCalldata, nil
+	case string(DeploymentTargetNoop):
+		return DeploymentTargetNoop, nil
+	default:
+		return "", fmt.Errorf("invalid deployment target: %s", s)
+	}
+}
+
+var homeDir string
+
+func init() {
+	var err error
+	homeDir, err = os.UserHomeDir()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get home directory: %s", err))
+	}
+}
 
 var (
 	L1RPCURLFlag = &cli.StringFlag{
@@ -31,6 +66,13 @@ var (
 		EnvVars: []string{
 			"L1_RPC_URL",
 		},
+	}
+	CacheDirFlag = &cli.StringFlag{
+		Name: CacheDirFlagName,
+		Usage: "Cache directory. " +
+			"If set, the deployer will attempt to cache downloaded artifacts in the specified directory.",
+		EnvVars: PrefixEnvVar("CACHE_DIR"),
+		Value:   path.Join(homeDir, ".op-deployer/cache"),
 	}
 	L1ChainIDFlag = &cli.Uint64Flag{
 		Name:    L1ChainIDFlagName,
@@ -57,39 +99,46 @@ var (
 		Usage:   "Private key of the deployer account.",
 		EnvVars: PrefixEnvVar("PRIVATE_KEY"),
 	}
-	DeploymentStrategyFlag = &cli.StringFlag{
-		Name:    DeploymentStrategyFlagName,
-		Usage:   fmt.Sprintf("Deployment strategy to use. Options: %s, %s", state.DeploymentStrategyLive, state.DeploymentStrategyGenesis),
-		EnvVars: PrefixEnvVar("DEPLOYMENT_STRATEGY"),
-		Value:   string(state.DeploymentStrategyLive),
+	DeploymentTargetFlag = &cli.StringFlag{
+		Name:    "deployment-target",
+		Usage:   fmt.Sprintf("Where to deploy L1 contracts. Options: %s, %s, %s, %s", DeploymentTargetLive, DeploymentTargetGenesis, DeploymentTargetCalldata, DeploymentTargetNoop),
+		EnvVars: PrefixEnvVar("DEPLOYMENT_TARGET"),
+		Value:   string(DeploymentTargetLive),
 	}
-	IntentConfigTypeFlag = &cli.StringFlag{
-		Name: IntentConfigTypeFlagName,
-		Usage: fmt.Sprintf("Intent config type to use. Options: %s (default), %s, %s, %s, %s",
-			state.IntentConfigTypeStandard,
-			state.IntentConfigTypeCustom,
-			state.IntentConfigTypeStrict,
-			state.IntentConfigTypeStandardOverrides,
-			state.IntentConfigTypeStrictOverrides),
-		EnvVars: PrefixEnvVar("INTENT_CONFIG_TYPE"),
-		Value:   string(state.IntentConfigTypeStandard),
+	IntentTypeFlag = &cli.StringFlag{
+		Name: IntentTypeFlagName,
+		Usage: fmt.Sprintf("Intent config type to use. Options: %s (default), %s, %s",
+			state.IntentTypeStandard,
+			state.IntentTypeCustom,
+			state.IntentTypeStandardOverrides),
+		EnvVars: PrefixEnvVar("INTENT_TYPE"),
+		Value:   string(state.IntentTypeStandard),
+		Aliases: []string{
+			"intent-config-type",
+		},
 	}
 )
 
-var GlobalFlags = append([]cli.Flag{}, oplog.CLIFlags(EnvVarPrefix)...)
+var GlobalFlags = append([]cli.Flag{CacheDirFlag}, oplog.CLIFlags(EnvVarPrefix)...)
 
 var InitFlags = []cli.Flag{
 	L1ChainIDFlag,
 	L2ChainIDsFlag,
 	WorkdirFlag,
-	DeploymentStrategyFlag,
-	IntentConfigTypeFlag,
+	IntentTypeFlag,
 }
 
 var ApplyFlags = []cli.Flag{
 	L1RPCURLFlag,
 	WorkdirFlag,
 	PrivateKeyFlag,
+	DeploymentTargetFlag,
+}
+
+var UpgradeFlags = []cli.Flag{
+	L1RPCURLFlag,
+	PrivateKeyFlag,
+	DeploymentTargetFlag,
 }
 
 func PrefixEnvVar(name string) []string {

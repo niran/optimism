@@ -98,7 +98,10 @@ func NewEVMEnv(contracts *ContractMetadata) (*vm.EVM, *state.StateDB) {
 	cancunActivation := *chainCfg.ShanghaiTime + 10
 	chainCfg.CancunTime = &cancunActivation
 	offsetBlocks := uint64(1000) // blocks after cancun fork
-	bc := &testChain{startTime: *chainCfg.CancunTime + offsetBlocks*12}
+	bc := &testChain{
+		config:    chainCfg,
+		startTime: *chainCfg.CancunTime + offsetBlocks*12,
+	}
 	header := bc.GetHeader(common.Hash{}, 17034870+offsetBlocks)
 	db := rawdb.NewMemoryDatabase()
 	statedb := state.NewDatabase(triedb.NewDatabase(db, nil), nil)
@@ -109,7 +112,7 @@ func NewEVMEnv(contracts *ContractMetadata) (*vm.EVM, *state.StateDB) {
 	blockContext := core.NewEVMBlockContext(header, bc, nil, chainCfg, state)
 	vmCfg := vm.Config{}
 
-	env := vm.NewEVM(blockContext, vm.TxContext{}, state, chainCfg, vmCfg)
+	env := vm.NewEVM(blockContext, state, chainCfg, vmCfg)
 	// pre-deploy the contracts
 	env.StateDB.SetCode(contracts.Addresses.Oracle, contracts.Artifacts.Oracle.DeployedBytecode.Object)
 
@@ -129,11 +132,16 @@ func NewEVMEnv(contracts *ContractMetadata) (*vm.EVM, *state.StateDB) {
 }
 
 type testChain struct {
+	config    *params.ChainConfig
 	startTime uint64
 }
 
 func (d *testChain) Engine() consensus.Engine {
 	return ethash.NewFullFaker()
+}
+
+func (d *testChain) Config() *params.ChainConfig {
+	return d.config
 }
 
 func (d *testChain) GetHeader(h common.Hash, n uint64) *types.Header {

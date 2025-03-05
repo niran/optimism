@@ -19,10 +19,12 @@ type Metrics struct {
 	*contractMetrics.ContractMetrics
 	*metrics.VmMetrics
 
+	up                  prometheus.Gauge
 	vmLastExecutionTime *prometheus.GaugeVec
 	vmLastMemoryUsed    *prometheus.GaugeVec
 	successTotal        *prometheus.CounterVec
 	failuresTotal       *prometheus.CounterVec
+	panicsTotal         *prometheus.CounterVec
 	invalidTotal        *prometheus.CounterVec
 }
 
@@ -31,11 +33,11 @@ var _ Metricer = (*Metrics)(nil)
 // Metrics implementation must implement RegistryMetricer to allow the metrics server to work.
 var _ opmetrics.RegistryMetricer = (*Metrics)(nil)
 
-func NewMetrics() *Metrics {
+func NewMetrics(runConfigs []RunConfig) *Metrics {
 	registry := opmetrics.NewRegistry()
 	factory := opmetrics.With(registry)
 
-	return &Metrics{
+	metrics := &Metrics{
 		ns:       Namespace,
 		registry: registry,
 		factory:  factory,
@@ -43,6 +45,11 @@ func NewMetrics() *Metrics {
 		ContractMetrics: contractMetrics.MakeContractMetrics(Namespace, factory),
 		VmMetrics:       metrics.NewVmMetrics(Namespace, factory),
 
+		up: factory.NewGauge(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Name:      "up",
+			Help:      "The VM runner has started to run",
+		}),
 		vmLastExecutionTime: factory.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: Namespace,
 			Name:      "vm_last_execution_time",
@@ -63,16 +70,35 @@ func NewMetrics() *Metrics {
 			Name:      "failures_total",
 			Help:      "Number of failures to execute a VM",
 		}, []string{"type"}),
+		panicsTotal: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Name:      "panics_total",
+			Help:      "Number of times the VM panicked",
+		}, []string{"type"}),
 		invalidTotal: factory.NewCounterVec(prometheus.CounterOpts{
 			Namespace: Namespace,
 			Name:      "invalid_total",
 			Help:      "Number of runs that determined the output root was invalid",
 		}, []string{"type"}),
 	}
+
+	for _, runConfig := range runConfigs {
+		metrics.successTotal.WithLabelValues(runConfig.Name).Add(0)
+		metrics.failuresTotal.WithLabelValues(runConfig.Name).Add(0)
+		metrics.panicsTotal.WithLabelValues(runConfig.Name).Add(0)
+		metrics.invalidTotal.WithLabelValues(runConfig.Name).Add(0)
+		metrics.RecordUp()
+	}
+
+	return metrics
 }
 
 func (m *Metrics) Registry() *prometheus.Registry {
 	return m.registry
+}
+
+func (m *Metrics) RecordUp() {
+	m.up.Set(1)
 }
 
 func (m *Metrics) RecordVmExecutionTime(vmType string, dur time.Duration) {
@@ -92,6 +118,10 @@ func (m *Metrics) RecordSuccess(vmType string) {
 
 func (m *Metrics) RecordFailure(vmType string) {
 	m.failuresTotal.WithLabelValues(vmType).Inc()
+}
+
+func (m *Metrics) RecordPanic(vmType string) {
+	m.panicsTotal.WithLabelValues(vmType).Inc()
 }
 
 func (m *Metrics) RecordInvalid(vmType string) {

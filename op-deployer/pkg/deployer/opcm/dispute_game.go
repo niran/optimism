@@ -8,7 +8,6 @@ import (
 
 type DeployDisputeGameInput struct {
 	Release                  string
-	StandardVersionsToml     string
 	VmAddress                common.Address
 	GameKind                 string
 	GameType                 uint32
@@ -24,6 +23,10 @@ type DeployDisputeGameInput struct {
 	Challenger               common.Address
 }
 
+func (input *DeployDisputeGameInput) StandardVersionsToml() string {
+	return ""
+}
+
 func (input *DeployDisputeGameInput) InputSet() bool {
 	return true
 }
@@ -34,10 +37,6 @@ type DeployDisputeGameOutput struct {
 
 func (output *DeployDisputeGameOutput) CheckOutput(input common.Address) error {
 	return nil
-}
-
-type DeployDisputeGameScript struct {
-	Run func(input, output common.Address) error
 }
 
 func DeployDisputeGame(

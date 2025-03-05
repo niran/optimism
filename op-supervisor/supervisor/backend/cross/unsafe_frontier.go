@@ -10,10 +10,10 @@ import (
 )
 
 type UnsafeFrontierCheckDeps interface {
-	ParentBlock(chainID types.ChainID, parentOf eth.BlockID) (parent eth.BlockID, err error)
+	ParentBlock(chainID eth.ChainID, parentOf eth.BlockID) (parent eth.BlockID, err error)
 
-	IsCrossUnsafe(chainID types.ChainID, block eth.BlockID) error
-	IsLocalUnsafe(chainID types.ChainID, block eth.BlockID) error
+	IsCrossUnsafe(chainID eth.ChainID, block eth.BlockID) error
+	IsLocalUnsafe(chainID eth.ChainID, block eth.BlockID) error
 
 	DependencySet() depset.DependencySet
 }
@@ -22,13 +22,13 @@ type UnsafeFrontierCheckDeps interface {
 //   - already cross-unsafe.
 //   - the first (if not first: local blocks to verify before proceeding)
 //     local-unsafe block, after the cross-unsafe block.
-func HazardUnsafeFrontierChecks(d UnsafeFrontierCheckDeps, hazards map[types.ChainIndex]types.BlockSeal) error {
+func HazardUnsafeFrontierChecks(d UnsafeFrontierCheckDeps, hazards *HazardSet) error {
 	depSet := d.DependencySet()
-	for hazardChainIndex, hazardBlock := range hazards {
+	for hazardChainIndex, hazardBlock := range hazards.Entries() {
 		hazardChainID, err := depSet.ChainIDFromIndex(hazardChainIndex)
 		if err != nil {
 			if errors.Is(err, types.ErrUnknownChain) {
-				err = fmt.Errorf("cannot cross-unsafe verify block %s of unknown chain index %s: %w", hazardBlock, hazardChainIndex, types.ErrConflict)
+				err = fmt.Errorf("cannot cross-safe verify block %s of unknown chain index %s: %w", hazardBlock, hazardChainIndex, types.ErrConflict)
 			}
 			return err
 		}

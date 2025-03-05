@@ -17,13 +17,13 @@ It functions as a Consensus Layer client of an OP Stack chain.
 This builds, relays and verifies the canonical chain of blocks.
 The blocks are processed by an execution layer client, like [op-geth].
 
-[rollup-node spec]: https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/rollup-node.m
+[rollup-node spec]: https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/rollup-node.md
 [op-geth]: https://github.com/ethereum-optimism/op-geth
 
 ## Quickstart
 
 ```bash
-make op-node
+just op-node
 
 # Network selection:
 # - Join any of the pre-configured networks with the `--network` flag.
@@ -71,7 +71,8 @@ make op-node
 
 ```bash
 # from op-node dir:
-make op-node
+just op-node
+
 ./bin/op-node --help
 ```
 

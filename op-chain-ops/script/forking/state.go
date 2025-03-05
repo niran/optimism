@@ -250,12 +250,12 @@ func (fst *ForkableState) CreateContract(address common.Address) {
 	fst.stateFor(address).CreateContract(address)
 }
 
-func (fst *ForkableState) SubBalance(address common.Address, u *uint256.Int, reason tracing.BalanceChangeReason) {
-	fst.stateFor(address).SubBalance(address, u, reason)
+func (fst *ForkableState) SubBalance(address common.Address, u *uint256.Int, reason tracing.BalanceChangeReason) uint256.Int {
+	return fst.stateFor(address).SubBalance(address, u, reason)
 }
 
-func (fst *ForkableState) AddBalance(address common.Address, u *uint256.Int, reason tracing.BalanceChangeReason) {
-	fst.stateFor(address).AddBalance(address, u, reason)
+func (fst *ForkableState) AddBalance(address common.Address, u *uint256.Int, reason tracing.BalanceChangeReason) uint256.Int {
+	return fst.stateFor(address).AddBalance(address, u, reason)
 }
 
 func (fst *ForkableState) GetBalance(address common.Address) *uint256.Int {
@@ -266,8 +266,8 @@ func (fst *ForkableState) GetNonce(address common.Address) uint64 {
 	return fst.stateFor(address).GetNonce(address)
 }
 
-func (fst *ForkableState) SetNonce(address common.Address, u uint64) {
-	fst.stateFor(address).SetNonce(address, u)
+func (fst *ForkableState) SetNonce(address common.Address, u uint64, reason tracing.NonceChangeReason) {
+	fst.stateFor(address).SetNonce(address, u, reason)
 }
 
 func (fst *ForkableState) GetCodeHash(address common.Address) common.Hash {
@@ -278,8 +278,8 @@ func (fst *ForkableState) GetCode(address common.Address) []byte {
 	return fst.stateFor(address).GetCode(address)
 }
 
-func (fst *ForkableState) SetCode(address common.Address, bytes []byte) {
-	fst.stateFor(address).SetCode(address, bytes)
+func (fst *ForkableState) SetCode(address common.Address, bytes []byte) []byte {
+	return fst.stateFor(address).SetCode(address, bytes)
 }
 
 func (fst *ForkableState) GetCodeSize(address common.Address) int {
@@ -306,8 +306,8 @@ func (fst *ForkableState) GetState(address common.Address, k common.Hash) common
 	return fst.stateFor(address).GetState(address, k)
 }
 
-func (fst *ForkableState) SetState(address common.Address, k common.Hash, v common.Hash) {
-	fst.stateFor(address).SetState(address, k, v)
+func (fst *ForkableState) SetState(address common.Address, k common.Hash, v common.Hash) common.Hash {
+	return fst.stateFor(address).SetState(address, k, v)
 }
 
 func (fst *ForkableState) GetStorageRoot(addr common.Address) common.Hash {
@@ -322,16 +322,16 @@ func (fst *ForkableState) SetTransientState(addr common.Address, key, value comm
 	fst.stateFor(addr).SetTransientState(addr, key, value)
 }
 
-func (fst *ForkableState) SelfDestruct(address common.Address) {
-	fst.stateFor(address).SelfDestruct(address)
+func (fst *ForkableState) SelfDestruct(address common.Address) uint256.Int {
+	return fst.stateFor(address).SelfDestruct(address)
 }
 
 func (fst *ForkableState) HasSelfDestructed(address common.Address) bool {
 	return fst.stateFor(address).HasSelfDestructed(address)
 }
 
-func (fst *ForkableState) Selfdestruct6780(address common.Address) {
-	fst.stateFor(address).Selfdestruct6780(address)
+func (fst *ForkableState) SelfDestruct6780(address common.Address) (uint256.Int, bool) {
+	return fst.stateFor(address).SelfDestruct6780(address)
 }
 
 func (fst *ForkableState) Exist(address common.Address) bool {
@@ -384,6 +384,10 @@ func (fst *ForkableState) AddPreimage(hash common.Hash, img []byte) {
 
 func (fst *ForkableState) Witness() *stateless.Witness {
 	return fst.selected.Witness()
+}
+
+func (fst *ForkableState) AccessEvents() *state.AccessEvents {
+	return fst.selected.AccessEvents()
 }
 
 func (fst *ForkableState) SetBalance(addr common.Address, amount *uint256.Int, reason tracing.BalanceChangeReason) {
