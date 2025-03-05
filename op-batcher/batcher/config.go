@@ -117,6 +117,9 @@ type CLIConfig struct {
 	// Should only be used for testing purposes.
 	TestUseMaxTxSizeForBlobs bool
 
+	// TestMode enables testing APIs for controlling the batcher
+	TestMode bool
+
 	TxMgrConfig   txmgr.CLIConfig
 	LogConfig     oplog.CLIConfig
 	MetricsConfig opmetrics.CLIConfig
@@ -219,5 +222,7 @@ func NewConfig(ctx *cli.Context) *CLIConfig {
 		ThrottleBlockSize:            ctx.Uint64(flags.ThrottleBlockSizeFlag.Name),
 		ThrottleAlwaysBlockSize:      ctx.Uint64(flags.ThrottleAlwaysBlockSizeFlag.Name),
 		PreferLocalSafeL2:            ctx.Bool(flags.PreferLocalSafeL2Flag.Name),
+		TestUseMaxTxSizeForBlobs:     ctx.Bool(flags.TestUseMaxTxSizeForBlobsFlag.Name),
+		TestMode:                     ctx.Bool(flags.TestModeFlag.Name),
 	}
 }
