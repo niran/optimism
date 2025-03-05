@@ -345,7 +345,7 @@ func (m *SimpleTxManager) craftTx(ctx context.Context, candidate TxCandidate) (*
 	gasTipCap, baseFee, blobBaseFee, err := m.SuggestGasPriceCaps(ctx)
 	if err != nil {
 		m.metr.RPCError()
-		return nil, fmt.Errorf("failed to get gas price info: %w", err)
+		return nil, fmt.Errorf("failed to get gas price info or it's too high: %w", err)
 	}
 	gasFeeCap := calcGasFeeCap(baseFee, gasTipCap)
 
