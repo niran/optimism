@@ -124,10 +124,12 @@ commands:
       - run:
           name: Install SVM compilers
           command: |
-            svm install 0.8.15
-            svm install 0.8.19
-            svm install 0.8.25
-            svm install 0.8.28
+            # Have to pipe yes here since SVM will sometimes prompt you to set
+            # the compiler as the global version, which hangs CI.
+            yes | svm install 0.8.15
+            yes | svm install 0.8.19
+            yes | svm install 0.8.25
+            yes | svm install 0.8.28
       - run:
           name: Install dependencies
           command: |
