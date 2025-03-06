@@ -106,18 +106,17 @@ func (s *HealthMonitorTestSuite) TestUnhealthyUnsafeHeadNotProgressing() {
 	rc := &testutils.MockRollupClient{}
 	ss1 := mockSyncStatus(now, 5, now-8, 1)
 	unsafeBlocksInterval := 10
-	// every clock tick until the unsafe block interval is hit, expect no errors:
-	for i := 0; i < unsafeBlocksInterval-1; i++ {
+	for i := 0; i < unsafeBlocksInterval+2; i++ {
 		rc.ExpectSyncStatus(ss1, nil)
 	}
-	rc.ExpectSyncStatus(ss1, ErrSequencerNotHealthy)
 
 	monitor := s.SetupMonitor(now, uint64(unsafeBlocksInterval), 60, rc, nil)
 	healthUpdateCh := monitor.Subscribe()
 
-	for i := 0; i < unsafeBlocksInterval; i++ {
+	// once the unsafe interval is surpassed, we should expect "unsafe head is falling behind the unsafe interval"
+	for i := 0; i < unsafeBlocksInterval+2; i++ {
 		healthFailure := <-healthUpdateCh
-		if i < unsafeBlocksInterval-1 {
+		if i <= unsafeBlocksInterval {
 			s.Nil(healthFailure)
 			s.Equal(now, monitor.lastSeenUnsafeTime)
 			s.Equal(uint64(5), monitor.lastSeenUnsafeNum)
