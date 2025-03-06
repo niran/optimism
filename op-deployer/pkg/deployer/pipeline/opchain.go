@@ -58,6 +58,7 @@ func DeployOPChain(env *Env, intent *state.Intent, st *state.State, chainID comm
 
 	st.ImplementationsDeployment.DelayedWETHImplAddress = impls.DelayedWETH
 	st.ImplementationsDeployment.OptimismPortalImplAddress = impls.OptimismPortal
+	st.ImplementationsDeployment.ETHLockboxImplAddress = impls.ETHLockbox
 	st.ImplementationsDeployment.SystemConfigImplAddress = impls.SystemConfig
 	st.ImplementationsDeployment.L1CrossDomainMessengerImplAddress = impls.L1CrossDomainMessenger
 	st.ImplementationsDeployment.L1ERC721BridgeImplAddress = impls.L1ERC721Bridge

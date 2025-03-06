@@ -37,6 +37,8 @@ func (l L1Contracts) AsL1Deployments() *genesis.L1Deployments {
 		OptimismMintableERC20FactoryProxy: l.OpChainDeployment.OptimismMintableERC20FactoryProxyAddress,
 		OptimismPortal:                    l.ImplementationsDeployment.OptimismPortalImplAddress,
 		OptimismPortalProxy:               l.OpChainDeployment.OptimismPortalProxyAddress,
+		ETHLockbox:                        l.ImplementationsDeployment.ETHLockboxImplAddress,
+		ETHLockboxProxy:                   l.OpChainDeployment.ETHLockboxProxyAddress,
 		ProxyAdmin:                        l.OpChainDeployment.ProxyAdminAddress,
 		SystemConfig:                      l.ImplementationsDeployment.SystemConfigImplAddress,
 		SystemConfigProxy:                 l.OpChainDeployment.SystemConfigProxyAddress,
@@ -64,6 +66,7 @@ type OpChainDeployment struct {
 	L1StandardBridgeProxyAddress             common.Address `json:"l1StandardBridgeProxyAddress"`
 	L1CrossDomainMessengerProxyAddress       common.Address `json:"l1CrossDomainMessengerProxyAddress"`
 	OptimismPortalProxyAddress               common.Address `json:"optimismPortalProxyAddress"`
+	ETHLockboxProxyAddress                   common.Address `json:"ethLockboxProxyAddress"`
 	DisputeGameFactoryProxyAddress           common.Address `json:"disputeGameFactoryProxyAddress"`
 	AnchorStateRegistryProxyAddress          common.Address `json:"anchorStateRegistryProxyAddress"`
 	AnchorStateRegistryImplAddress           common.Address `json:"anchorStateRegistryImplAddress"`
@@ -79,6 +82,7 @@ type ImplementationsDeployment struct {
 	OpcmAddress                             common.Address `json:"opcmAddress"`
 	DelayedWETHImplAddress                  common.Address `json:"delayedWETHImplAddress"`
 	OptimismPortalImplAddress               common.Address `json:"optimismPortalImplAddress"`
+	ETHLockboxImplAddress                   common.Address `json:"ethLockboxImplAddress"`
 	PreimageOracleSingletonAddress          common.Address `json:"preimageOracleSingletonAddress"`
 	MipsSingletonAddress                    common.Address `json:"mipsSingletonAddress"`
 	SystemConfigImplAddress                 common.Address `json:"systemConfigImplAddress"`
@@ -148,6 +152,7 @@ func L1(globalState *state.State, chainID common.Hash) (*L1Contracts, error) {
 			OpcmAddress:                             globalState.ImplementationsDeployment.OpcmAddress,
 			DelayedWETHImplAddress:                  globalState.ImplementationsDeployment.DelayedWETHImplAddress,
 			OptimismPortalImplAddress:               globalState.ImplementationsDeployment.OptimismPortalImplAddress,
+			ETHLockboxImplAddress:                   globalState.ImplementationsDeployment.ETHLockboxImplAddress,
 			PreimageOracleSingletonAddress:          globalState.ImplementationsDeployment.PreimageOracleSingletonAddress,
 			MipsSingletonAddress:                    globalState.ImplementationsDeployment.MipsSingletonAddress,
 			SystemConfigImplAddress:                 globalState.ImplementationsDeployment.SystemConfigImplAddress,

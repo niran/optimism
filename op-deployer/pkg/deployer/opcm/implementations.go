@@ -37,6 +37,7 @@ type DeployImplementationsOutput struct {
 	OpcmUpgrader                     common.Address
 	DelayedWETHImpl                  common.Address
 	OptimismPortalImpl               common.Address
+	ETHLockboxImpl                   common.Address
 	PreimageOracleSingleton          common.Address
 	MipsSingleton                    common.Address
 	SystemConfigImpl                 common.Address
@@ -48,7 +49,6 @@ type DeployImplementationsOutput struct {
 	AnchorStateRegistryImpl          common.Address
 	SuperchainConfigImpl             common.Address
 	ProtocolVersionsImpl             common.Address
-	EthLockboxImpl                   common.Address
 }
 
 func (output *DeployImplementationsOutput) CheckOutput(input common.Address) error {

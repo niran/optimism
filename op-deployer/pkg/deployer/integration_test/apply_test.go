@@ -682,6 +682,7 @@ func validateOPChainDeployment(t *testing.T, cg codeGetter, st *state.State, int
 	}{
 		{"DelayedWETHImplAddress", st.ImplementationsDeployment.DelayedWETHImplAddress},
 		{"OptimismPortalImplAddress", st.ImplementationsDeployment.OptimismPortalImplAddress},
+		{"ETHLockboxImplAddress", st.ImplementationsDeployment.ETHLockboxImplAddress},
 		{"SystemConfigImplAddress", st.ImplementationsDeployment.SystemConfigImplAddress},
 		{"L1CrossDomainMessengerImplAddress", st.ImplementationsDeployment.L1CrossDomainMessengerImplAddress},
 		{"L1ERC721BridgeImplAddress", st.ImplementationsDeployment.L1ERC721BridgeImplAddress},
