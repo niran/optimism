@@ -337,7 +337,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @param _byteCount Number of bytes in the calldata.
     /// @return The minimum gas limit for a deposit.
     function minimumGasLimit(uint64 _byteCount) public pure returns (uint64) {
-        return _byteCount * 16 + 21000;
+        return _byteCount * 40 + 21000;
     }
 
     /// @notice Accepts value so that users can send ETH directly to this contract and have the

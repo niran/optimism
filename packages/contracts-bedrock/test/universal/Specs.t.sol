@@ -10,7 +10,6 @@ import { ForgeArtifacts, Abi, AbiEntry } from "scripts/libraries/ForgeArtifacts.
 
 // Interfaces
 import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
-import { IOPPrestateUpdater } from "interfaces/L1/IOPPrestateUpdater.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IOptimismPortalInterop } from "interfaces/L1/IOptimismPortalInterop.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
@@ -117,6 +116,9 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("RELAY_CONSTANT_OVERHEAD()") });
         _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("RELAY_GAS_CHECK_BUFFER()") });
         _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("RELAY_RESERVED_GAS()") });
+        _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("TX_BASE_GAS()") });
+        _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("FLOOR_CALLDATA_OVERHEAD()") });
+        _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("ENCODING_OVERHEAD()") });
         _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("baseGas(bytes,uint32)") });
         _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("failedMessages(bytes32)") });
         _addSpec({ _name: "L1CrossDomainMessenger", _sel: _getSel("initialize(address,address)") });
@@ -385,6 +387,8 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "SystemConfig", _sel: _getSel("gasLimit()") });
         _addSpec({ _name: "SystemConfig", _sel: _getSel("eip1559Denominator()") });
         _addSpec({ _name: "SystemConfig", _sel: _getSel("eip1559Elasticity()") });
+        _addSpec({ _name: "SystemConfig", _sel: _getSel("operatorFeeScalar()") });
+        _addSpec({ _name: "SystemConfig", _sel: _getSel("operatorFeeConstant()") });
         _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.initialize.selector });
         _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.minimumGasLimit.selector });
         _addSpec({ _name: "SystemConfig", _sel: _getSel("overhead()") });
@@ -396,6 +400,11 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.setGasConfig.selector, _auth: Role.SYSTEMCONFIGOWNER });
         _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.setGasLimit.selector, _auth: Role.SYSTEMCONFIGOWNER });
         _addSpec({ _name: "SystemConfig", _sel: ISystemConfig.setEIP1559Params.selector, _auth: Role.SYSTEMCONFIGOWNER });
+        _addSpec({
+            _name: "SystemConfig",
+            _sel: ISystemConfig.setOperatorFeeScalars.selector,
+            _auth: Role.SYSTEMCONFIGOWNER
+        });
         _addSpec({
             _name: "SystemConfig",
             _sel: ISystemConfig.setUnsafeBlockSigner.selector,
@@ -440,6 +449,8 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("gasLimit()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("eip1559Denominator()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("eip1559Elasticity()") });
+        _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("operatorFeeScalar()") });
+        _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("operatorFeeConstant()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfigInterop.initialize.selector });
         _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfig.initialize.selector });
         _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfigInterop.minimumGasLimit.selector });
@@ -466,6 +477,11 @@ contract Specification_Test is CommonTest {
         _addSpec({
             _name: "SystemConfigInterop",
             _sel: ISystemConfigInterop.setEIP1559Params.selector,
+            _auth: Role.SYSTEMCONFIGOWNER
+        });
+        _addSpec({
+            _name: "SystemConfigInterop",
+            _sel: ISystemConfigInterop.setOperatorFeeScalars.selector,
             _auth: Role.SYSTEMCONFIGOWNER
         });
         _addSpec({
@@ -944,48 +960,19 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("protocolVersions()") });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("superchainProxyAdmin()") });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("l1ContractsRelease()") });
+        _addSpec({ _name: "OPContractsManager", _sel: _getSel("opcmGameTypeAdder()") });
+        _addSpec({ _name: "OPContractsManager", _sel: _getSel("opcmDeployer()") });
+        _addSpec({ _name: "OPContractsManager", _sel: _getSel("opcmUpgrader()") });
         _addSpec({ _name: "OPContractsManager", _sel: IOPContractsManager.deploy.selector });
         _addSpec({ _name: "OPContractsManager", _sel: IOPContractsManager.blueprints.selector });
         _addSpec({ _name: "OPContractsManager", _sel: IOPContractsManager.chainIdToBatchInboxAddress.selector });
         _addSpec({ _name: "OPContractsManager", _sel: IOPContractsManager.implementations.selector });
         _addSpec({ _name: "OPContractsManager", _sel: IOPContractsManager.upgrade.selector });
         _addSpec({ _name: "OPContractsManager", _sel: IOPContractsManager.addGameType.selector });
+        _addSpec({ _name: "OPContractsManager", _sel: IOPContractsManager.updatePrestate.selector });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("isRC()") });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("setRC(bool)") });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("upgradeController()") });
-
-        // OPPrestateUpdate
-        _addSpec({ _name: "OPPrestateUpdater", _sel: _getSel("version()") });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: _getSel("superchainConfig()") });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: _getSel("protocolVersions()") });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: _getSel("superchainProxyAdmin()") });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: _getSel("l1ContractsRelease()") });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: IOPContractsManager.deploy.selector });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: IOPContractsManager.blueprints.selector });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: IOPContractsManager.chainIdToBatchInboxAddress.selector });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: IOPContractsManager.implementations.selector });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: IOPContractsManager.upgrade.selector });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: IOPContractsManager.addGameType.selector });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: IOPPrestateUpdater.updatePrestate.selector });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: _getSel("isRC()") });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: _getSel("setRC(bool)") });
-        _addSpec({ _name: "OPPrestateUpdater", _sel: _getSel("upgradeController()") });
-
-        // OPContractsManagerInterop
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("version()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("superchainConfig()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("protocolVersions()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("superchainProxyAdmin()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("l1ContractsRelease()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: IOPContractsManager.deploy.selector });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: IOPContractsManager.blueprints.selector });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: IOPContractsManager.chainIdToBatchInboxAddress.selector });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: IOPContractsManager.implementations.selector });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: IOPContractsManager.upgrade.selector });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: IOPContractsManager.addGameType.selector });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("isRC()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("setRC(bool)") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("upgradeController()") });
 
         // DeputyGuardianModule
         _addSpec({

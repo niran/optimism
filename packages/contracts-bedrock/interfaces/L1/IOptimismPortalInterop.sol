@@ -17,7 +17,6 @@ interface IOptimismPortalInterop is IProxyAdminOwnerBase {
     error EmptyItem();
     error InvalidDataRemainder();
     error InvalidHeader();
-    error OptimismPortal_Unauthorized();
     error ReinitializableBase_ZeroInitVersion();
     error OptimismPortal_AlreadyFinalized();
     error OptimismPortal_BadTarget();
@@ -33,6 +32,7 @@ interface IOptimismPortalInterop is IProxyAdminOwnerBase {
     error OptimismPortal_InvalidRootClaim();
     error OptimismPortal_NoReentrancy();
     error OptimismPortal_ProofNotOldEnough();
+    error OptimismPortal_Unauthorized();
     error OptimismPortal_Unproven();
     error OptimismPortal_InvalidOutputRootIndex();
     error OptimismPortal_InvalidSuperRootProof();

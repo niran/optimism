@@ -367,8 +367,6 @@ func TestInteropFaultProofs(gt *testing.T) {
 
 func TestInteropFaultProofs_Cycle(gt *testing.T) {
 	t := helpers.NewDefaultTesting(gt)
-	// TODO(#14425): Handle cyclic valid messages
-	t.Skip("Cyclic valid messages does not work")
 
 	system := dsl.NewInteropDSL(t)
 	actors := system.Actors
@@ -445,9 +443,9 @@ func TestInteropFaultProofs_Cycle(gt *testing.T) {
 }
 
 func TestInteropFaultProofs_CascadeInvalidBlock(gt *testing.T) {
+	// TODO(#14307): Support cascading block invalidations
+	gt.Skip("TODO(#14307): Support cascading block invalidations")
 	t := helpers.NewDefaultTesting(gt)
-	// TODO(#14307): Support cascading invalidation in op-supervisor
-	t.Skip("Cascading invalidation not yet working")
 
 	system := dsl.NewInteropDSL(t)
 
@@ -462,31 +460,39 @@ func TestInteropFaultProofs_CascadeInvalidBlock(gt *testing.T) {
 		emitterContract.Deploy(alice),
 	))
 
-	// Initiating messages on chain A
-	system.AddL2Block(actors.ChainA, dsl.WithL2BlockTransactions(
-		emitterContract.EmitMessage(alice, "chainA message"),
-	))
-	chainAInitTx := emitterContract.LastEmittedMessage()
-	system.AddL2Block(actors.ChainB)
-	system.SubmitBatchData()
+	assertHeads(t, actors.ChainA, 1, 0, 1, 0)
+	assertHeads(t, actors.ChainB, 1, 0, 1, 0)
 
-	// Create a message with a conflicting payload on chain B, that also emits an initiating message
-	system.AddL2Block(actors.ChainB, dsl.WithL2BlockTransactions(
-		system.InboxContract.Execute(alice, chainAInitTx, dsl.WithPayload([]byte("this message was never emitted"))),
-		emitterContract.EmitMessage(alice, "chainB message"),
-	), dsl.WithL1BlockCrossUnsafe())
-	chainBExecTx := system.InboxContract.LastTransaction()
-	chainBExecTx.CheckIncluded()
-	chainBInitTx := emitterContract.LastEmittedMessage()
-
-	// Create a message with a valid message on chain A, pointing to the initiating message on B from the same block
-	// as an invalid message.
-	system.AddL2Block(actors.ChainA,
-		dsl.WithL2BlockTransactions(system.InboxContract.Execute(alice, chainBInitTx)),
-		// Block becomes cross-unsafe because the init msg is currently present, but it should not become cross-safe.
+	// Create initiating and executing messages within the same block
+	var (
+		chainAExecTx *dsl.GeneratedTransaction
+		chainBExecTx *dsl.GeneratedTransaction
+		chainBInitTx *dsl.GeneratedTransaction
 	)
-	chainAExecTx := system.InboxContract.LastTransaction()
-	chainAExecTx.CheckIncluded()
+	{
+		actors.ChainA.Sequencer.ActL2StartBlock(t)
+		actors.ChainB.Sequencer.ActL2StartBlock(t)
+
+		chainAInitTx := emitterContract.EmitMessage(alice, "chainA message")(actors.ChainA)
+		chainAInitTx.Include()
+
+		// Create messages with a conflicting payload on chain B, while also emitting an initiating message
+		chainBExecTx := system.InboxContract.Execute(alice, chainAInitTx,
+			dsl.WithPayload([]byte("this message was never emitted")))(actors.ChainB)
+		chainBExecTx.Include()
+		chainBInitTx = emitterContract.EmitMessage(alice, "chainB message")(actors.ChainB)
+		chainBInitTx.Include()
+
+		// Create a message with a valid message on chain A, pointing to the initiating message on B from the same block
+		// as an invalid message.
+		chainAExecTx = system.InboxContract.Execute(alice, chainBInitTx)(actors.ChainA)
+		chainAExecTx.Include()
+
+		actors.ChainA.Sequencer.ActL2EndBlock(t)
+		actors.ChainB.Sequencer.ActL2EndBlock(t)
+	}
+	assertHeads(t, actors.ChainA, 2, 0, 1, 0)
+	assertHeads(t, actors.ChainB, 2, 0, 1, 0)
 
 	system.SubmitBatchData(func(opts *dsl.SubmitBatchDataOpts) {
 		opts.SkipCrossSafeUpdate = true
@@ -517,9 +523,6 @@ func TestInteropFaultProofs_CascadeInvalidBlock(gt *testing.T) {
 			disputedClaim:      optimisticEnd.Marshal(),
 			disputedTraceIndex: consolidateStep,
 			expectValid:        false,
-			// TODO(#14306): Support cascading re-orgs in op-program
-			skipProgram:    true,
-			skipChallenger: true,
 		},
 		{
 			name:               "Consolidate-ReplaceInvalidBlocks",
@@ -527,9 +530,6 @@ func TestInteropFaultProofs_CascadeInvalidBlock(gt *testing.T) {
 			disputedClaim:      crossSafeEnd.Marshal(),
 			disputedTraceIndex: consolidateStep,
 			expectValid:        true,
-			// TODO(#14306): Support cascading re-orgs in op-program
-			skipProgram:    true,
-			skipChallenger: true,
 		},
 	}
 	runFppAndChallengerTests(gt, system, tests)

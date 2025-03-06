@@ -970,7 +970,7 @@ contract Deploy is Deployer {
             saltMixer: saltMixer,
             gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
             disputeGameUsesSuperRoots: false,
-            disputeGameType: GameType.wrap(4),
+            disputeGameType: GameTypes.PERMISSIONED_CANNON,
             disputeAbsolutePrestate: Claim.wrap(bytes32(cfg.faultGameAbsolutePrestate())),
             disputeMaxGameDepth: cfg.faultGameMaxDepth(),
             disputeSplitDepth: cfg.faultGameSplitDepth(),
