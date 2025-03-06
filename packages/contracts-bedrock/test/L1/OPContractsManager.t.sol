@@ -27,6 +27,7 @@ import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMin
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IMIPS } from "interfaces/cannon/IMIPS.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
+import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
@@ -500,7 +501,7 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
                 abi.encode(
                     l2ChainId,
                     string.concat(string(bytes.concat(bytes32(uint256(uint160(address(systemConfig))))))),
-                    "AnchorStateRegistry"
+                    "AnchorStateRegistry-SOT"
                 )
             );
 
@@ -521,10 +522,6 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
         // Expect the SystemConfig and OptimismPortal to be upgraded.
         expectEmitUpgraded(impls.systemConfigImpl, address(systemConfig));
         expectEmitUpgraded(impls.optimismPortalImpl, address(optimismPortal2));
-
-        // Expect the new AnchorStateRegistry to be initialized.
-        vm.expectEmit(address(newAsrProxy));
-        emit AdminChanged(address(0), address(proxyAdmin));
 
         // We always expect the PermissionedDisputeGame to be deployed. We don't yet know the
         // address of the new permissionedGame which will be deployed by the
@@ -601,7 +598,9 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
 
         // Make sure the new AnchorStateRegistry has the right version and is initialized.
         assertEq(ISemver(address(newAsrProxy)).version(), "3.0.0");
-        DeployUtils.assertInitialized({ _contractAddress: address(newAsrProxy), _isProxy: false, _slot: 0, _offset: 0 });
+        vm.prank(address(proxyAdmin));
+        assertEq(IProxy(payable(newAsrProxy)).admin(), address(proxyAdmin));
+        DeployUtils.assertInitialized({ _contractAddress: address(newAsrProxy), _isProxy: true, _slot: 0, _offset: 0 });
     }
 
     function runUpgradeTestAndChecks(address _delegateCaller) public {
