@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { console2 as console } from "forge-std/console2.sol";
+
 import { Script } from "forge-std/Script.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { IFaultDisputeGame } from "src/dispute/interfaces/IFaultDisputeGame.sol";
@@ -11,7 +13,7 @@ import { IDisputeGameFactory } from "src/dispute/interfaces/IDisputeGameFactory.
 import { IDelayedWETH } from "src/dispute/interfaces/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "src/dispute/interfaces/IAnchorStateRegistry.sol";
 import { IBigStepper } from "src/dispute/interfaces/IBigStepper.sol";
-import { GameType, OutputRoot, Claim, GameStatus, Hash } from "src/dispute/lib/Types.sol";
+import { GameType, Duration, OutputRoot, Claim, GameStatus, Hash } from "src/dispute/lib/Types.sol";
 
 import { StorageSetter } from "src/universal/StorageSetter.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
@@ -46,14 +48,36 @@ contract AddFDG is Script {
         IFaultDisputeGame fdg = _deployFDG(IFaultDisputeGame(address(pdg)));
 
         // Set the FDG implementation address on the dispute game factory
+        vm.startBroadcast();
         disputeGameFactory.setImplementation(GameType.wrap(0), fdg);
         disputeGameFactory.setInitBond(GameType.wrap(0), 0.08 ether);
+        vm.stopBroadcast();
 
         // Reinitialize the anchor state registry
         _reinitAnchorStateRegistry(anchorStateRegistry);
 
         // Set the respected game type on the portal
-        optimismPortal.setRespectedGameType(GameType.wrap(0));
+        _setRespectedGameType();
+    }
+
+    /**
+     * @notice Sets the respected game type on the Optimism Portal
+     */
+    function _setRespectedGameType() internal {
+        vm.startBroadcast();
+        address optimismPortalImpl = EIP1967Helper.getImplementation(address(optimismPortal));
+        IProxyAdmin(proxyAdmin).upgrade(payable(address(optimismPortal)), address(storageSetter));
+        // Pack respectedGameTypeUpdatedAt (8 bytes) and respectedGameType (4 bytes) into a single 32-byte value
+        // respectedGameTypeUpdatedAt is stored in the lower 8 bytes, respectedGameType in the next 4 bytes
+        bytes32 packedData = bytes32(uint256(uint64(block.timestamp))) << 32 | bytes32(uint256(0));
+
+        // Step 1: Set the respected game type to the FDG
+        StorageSetter(address(optimismPortal)).setBytes32(bytes32(uint256(59)), packedData);
+        IProxyAdmin(proxyAdmin).upgrade(payable(address(optimismPortal)), address(optimismPortalImpl));
+        vm.stopBroadcast();
+
+        require(GameType.unwrap(optimismPortal.respectedGameType()) == 0);
+        require(optimismPortal.respectedGameTypeUpdatedAt() == block.timestamp);
     }
 
     /**
@@ -63,28 +87,33 @@ contract AddFDG is Script {
         // Provided by Zach:
         // https://oplabs-pbc.slack.com/archives/C0885T0HRCG/p1741022679358429?thread_ts=1740770336.922089&cid=C0885T0HRCG
         Claim absolutePrestate = Claim.wrap(0x03f206f043bb34f9e931a49716754b303e635e931b7f1294ff8ca45c969fc627);
+        uint256 maxGameDepth = _disputeGame.maxGameDepth();
+        uint256 splitDepth = _disputeGame.splitDepth();
+        Duration clockExtension = _disputeGame.clockExtension();
+        Duration maxClockDuration = _disputeGame.maxClockDuration();
+        IBigStepper _vm = _disputeGame.vm();
+        IDelayedWETH weth = _disputeGame.weth();
+        uint256 l2ChainId = _disputeGame.l2ChainId();
 
         // sanity check
         require(_disputeGame.anchorStateRegistry() == anchorStateRegistry);
 
         // Read the constructor params from the game, and use them to deploy the FDG.
+        vm.broadcast();
         return IFaultDisputeGame(
             DeployUtils.create1(
                 "FaultDisputeGame",
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        _disputeGame.gameType(), // GameType
+                abi.encode(
+                        GameType.wrap(0), // GameType
                         absolutePrestate, // Claim
-                        _disputeGame.maxGameDepth(), // uint256
-                        _disputeGame.splitDepth(), // uint256
-                        _disputeGame.clockExtension(), // Duration
-                        _disputeGame.maxClockDuration(), // Duration
-                        _disputeGame.vm(), // IBigStepper
-                        _disputeGame.weth(), // IDelayedWETH
+                        maxGameDepth, // uint256
+                        splitDepth, // uint256
+                        clockExtension, // Duration
+                        maxClockDuration, // Duration
+                        _vm, // IBigStepper
+                        weth, // IDelayedWETH
                         anchorStateRegistry, // IAnchorStateRegistry
-                        _disputeGame.l2ChainId() // uint256
-                    )
+                        l2ChainId // uint256
                 )
             )
         );
@@ -126,10 +155,7 @@ contract AddFDG is Script {
 
         // Check that the anchor state registry has been reinitialized
         (Hash root0, uint256 l2BlockNumber0) = anchorStateRegistry.anchors(GameType.wrap(0));
-        (Hash root1, uint256 l2BlockNumber1) = anchorStateRegistry.anchors(GameType.wrap(1));
         require(keccak256(abi.encode(root0)) == keccak256(abi.encode(startingRoots[0].outputRoot.root)));
         require(l2BlockNumber0 == startingRoots[0].outputRoot.l2BlockNumber);
-        require(keccak256(abi.encode(root1)) == keccak256(abi.encode(startingRoots[1].outputRoot.root)));
-        require(l2BlockNumber1 == startingRoots[1].outputRoot.l2BlockNumber);
     }
 }
