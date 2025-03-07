@@ -326,8 +326,8 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("migrateLiquidity()") });
         _addSpec({ _name: "OptimismPortal2", _sel: _getSel("proxyAdminOwner()") });
 
-        // ProxyAdminOwnerBase
-        _addSpec({ _name: "ProxyAdminOwnerBase", _sel: _getSel("proxyAdminOwner()") });
+        // ProxyAdminOwnedBase
+        _addSpec({ _name: "ProxyAdminOwnedBase", _sel: _getSel("proxyAdminOwner()") });
 
         // ProtocolVersions
         _addSpec({ _name: "ProtocolVersions", _sel: _getSel("RECOMMENDED_SLOT()") });

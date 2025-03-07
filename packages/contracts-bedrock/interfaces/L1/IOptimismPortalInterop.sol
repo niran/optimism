@@ -10,9 +10,9 @@ import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { ConfigType } from "interfaces/L2/IL1BlockInterop.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IProxyAdminOwnerBase } from "interfaces/L1/IProxyAdminOwnerBase.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
-interface IOptimismPortalInterop is IProxyAdminOwnerBase {
+interface IOptimismPortalInterop is IProxyAdminOwnedBase {
     error ContentLengthMismatch();
     error EmptyItem();
     error InvalidDataRemainder();
@@ -49,7 +49,7 @@ interface IOptimismPortalInterop is IProxyAdminOwnerBase {
     event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
     event WithdrawalProven(bytes32 indexed withdrawalHash, address indexed from, address indexed to);
     event WithdrawalProvenExtension1(bytes32 indexed withdrawalHash, address indexed proofSubmitter);
-    event ETHMigrated(uint256 ethBalance);
+    event ETHMigrated(address indexed lockbox, uint256 ethBalance);
     event LockboxUpdated(address oldLockbox, address newLockbox);
 
     receive() external payable;

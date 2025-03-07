@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { ProxyAdminOwnerBase } from "src/L1/ProxyAdminOwnerBase.sol";
+import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { ResourceMetering } from "src/L1/ResourceMetering.sol";
 import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
@@ -32,7 +32,7 @@ import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 /// @notice The OptimismPortal is a low-level contract responsible for passing messages between L1
 ///         and L2. Messages sent directly to the OptimismPortal have no form of replayability.
 ///         Users are encouraged to use the L1CrossDomainMessenger for a higher-level interface.
-contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase, ProxyAdminOwnerBase, ISemver {
+contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase, ProxyAdminOwnedBase, ISemver {
     /// @notice Represents a proven withdrawal.
     /// @custom:field disputeGameProxy Game that the withdrawal was proven against.
     /// @custom:field timestamp        Timestamp at which the withdrawal was proven.
@@ -153,8 +153,9 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
 
     /// @notice Emitted when the total ETH balance is migrated to the ETHLockbox.
+    /// @param lockbox The address of the ETHLockbox contract.
     /// @param ethBalance Amount of ETH migrated.
-    event ETHMigrated(uint256 ethBalance);
+    event ETHMigrated(address indexed lockbox, uint256 ethBalance);
 
     /// @notice Emitted when the ETHLockbox contract is updated.
     /// @param oldLockbox The address of the old ETHLockbox contract.
@@ -362,7 +363,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         if (msg.sender != proxyAdminOwner()) revert OptimismPortal_Unauthorized();
 
         address oldLockbox = address(ethLockbox);
-        ethLockbox = IETHLockbox(_newLockbox);
+        ethLockbox = _newLockbox;
 
         emit LockboxUpdated(oldLockbox, address(_newLockbox));
     }
@@ -738,7 +739,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         uint256 ethBalance = address(this).balance;
         ethLockbox.lockETH{ value: ethBalance }();
 
-        emit ETHMigrated(ethBalance);
+        emit ETHMigrated(address(ethLockbox), ethBalance);
     }
 
     /// @notice Getter for the resource config. Used internally by the ResourceMetering contract.

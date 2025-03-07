@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 // Contracts
-import { ProxyAdminOwnerBase } from "src/L1/ProxyAdminOwnerBase.sol";
+import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 // Libraries
@@ -18,7 +18,7 @@ import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 /// @title ETHLockbox
 /// @notice Manages ETH liquidity locking and unlocking for authorized OptimismPortals, enabling unified ETH liquidity
 ///         management across chains in the superchain cluster.
-contract ETHLockbox is ProxyAdminOwnerBase, Initializable, ISemver {
+contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
     /// @notice Thrown when the lockbox is paused.
     error ETHLockbox_Paused();
 
@@ -54,11 +54,12 @@ contract ETHLockbox is ProxyAdminOwnerBase, Initializable, ISemver {
 
     /// @notice Emitted when ETH liquidity is migrated from the current ETH lockbox to another.
     /// @param lockbox The address of the ETH lockbox that was migrated.
-    event LiquidityMigrated(address indexed lockbox);
+    event LiquidityMigrated(address indexed lockbox, uint256 amount);
 
     /// @notice Emitted when ETH liquidity is received during an authorized lockbox migration.
     /// @param lockbox The address of the ETH lockbox that received the liquidity.
-    event LiquidityReceived(address indexed lockbox);
+    /// @param amount The amount of ETH received.
+    event LiquidityReceived(address indexed lockbox, uint256 amount);
 
     /// @notice The address of the SuperchainConfig contract.
     ISuperchainConfig public superchainConfig;
@@ -111,7 +112,7 @@ contract ETHLockbox is ProxyAdminOwnerBase, Initializable, ISemver {
     /// @notice Receives the ETH liquidity migrated from an authorized lockbox.
     function receiveLiquidity() external payable {
         if (!authorizedLockboxes[msg.sender]) revert ETHLockbox_Unauthorized();
-        emit LiquidityReceived(msg.sender);
+        emit LiquidityReceived(msg.sender, msg.value);
     }
 
     /// @notice Locks ETH in the lockbox.
@@ -159,7 +160,7 @@ contract ETHLockbox is ProxyAdminOwnerBase, Initializable, ISemver {
         if (!_sameProxyAdminOwner(address(_lockbox))) revert ETHLockbox_DifferentProxyAdminOwner();
 
         IETHLockbox(_lockbox).receiveLiquidity{ value: address(this).balance }();
-        emit LiquidityMigrated(address(_lockbox));
+        emit LiquidityMigrated(address(_lockbox), address(this).balance);
     }
 
     /// @notice Authorizes a portal to lock and unlock ETH.

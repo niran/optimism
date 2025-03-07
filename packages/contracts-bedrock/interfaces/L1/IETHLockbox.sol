@@ -3,10 +3,10 @@ pragma solidity ^0.8.0;
 
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IProxyAdminOwnerBase } from "interfaces/L1/IProxyAdminOwnerBase.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 
-interface IETHLockbox is IProxyAdminOwnerBase, ISemver {
+interface IETHLockbox is IProxyAdminOwnedBase, ISemver {
     error ETHLockbox_Unauthorized();
     error ETHLockbox_Paused();
     error ETHLockbox_InsufficientBalance();
@@ -18,8 +18,8 @@ interface IETHLockbox is IProxyAdminOwnerBase, ISemver {
     event ETHUnlocked(address indexed portal, uint256 amount);
     event PortalAuthorized(address indexed portal);
     event LockboxAuthorized(address indexed lockbox);
-    event LiquidityMigrated(address indexed lockbox);
-    event LiquidityReceived(address indexed lockbox);
+    event LiquidityMigrated(address indexed lockbox, uint256 amount);
+    event LiquidityReceived(address indexed lockbox, uint256 amount);
 
     function initialize(ISuperchainConfig _superchainConfig, IOptimismPortal2[] calldata _portals) external;
     function superchainConfig() external view returns (ISuperchainConfig);

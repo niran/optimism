@@ -8,10 +8,10 @@ import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol"
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
-import { IProxyAdminOwnerBase } from "interfaces/L1/IProxyAdminOwnerBase.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
-interface IOptimismPortal2 is IProxyAdminOwnerBase {
+interface IOptimismPortal2 is IProxyAdminOwnedBase {
     error OptimismPortal_Unauthorized();
     error ContentLengthMismatch();
     error EmptyItem();
@@ -48,7 +48,7 @@ interface IOptimismPortal2 is IProxyAdminOwnerBase {
     event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
     event WithdrawalProven(bytes32 indexed withdrawalHash, address indexed from, address indexed to);
     event WithdrawalProvenExtension1(bytes32 indexed withdrawalHash, address indexed proofSubmitter);
-    event ETHMigrated(uint256 ethBalance);
+    event ETHMigrated(address indexed lockbox, uint256 ethBalance);
     event LockboxUpdated(address oldLockbox, address newLockbox);
 
     receive() external payable;
