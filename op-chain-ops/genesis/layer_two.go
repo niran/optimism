@@ -28,6 +28,8 @@ const (
 	L2AllocsGranite  L2AllocsMode = "granite"
 	L2AllocsHolocene L2AllocsMode = "holocene"
 	L2AllocsIsthmus  L2AllocsMode = "isthmus"
+	// This needs to be updated whenever the latest hardfork is changed.
+	LatestHF L2AllocsMode = L2AllocsIsthmus
 )
 
 var (

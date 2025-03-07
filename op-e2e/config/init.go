@@ -328,8 +328,7 @@ func initAllocType(root string, allocType AllocType) {
 			l2Alloc[mode] = st.Chains[0].Allocs.Data
 			mtx.Unlock()
 
-			// This needs to be updated whenever the latest hardfork is changed.
-			if mode == genesis.L2AllocsGranite {
+			if mode == genesis.LatestHF {
 				dc, err := inspect.DeployConfig(st, intent.Chains[0].ID)
 				if err != nil {
 					panic(fmt.Errorf("failed to inspect deploy config: %w", err))
