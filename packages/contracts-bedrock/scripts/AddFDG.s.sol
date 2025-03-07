@@ -46,13 +46,14 @@ contract AddFDG is Script {
         IFaultDisputeGame fdg = _deployFDG(IFaultDisputeGame(address(pdg)));
 
         // Set the FDG implementation address on the dispute game factory
-        disputeGameFactory.setImplementation(GameType.wrap(1), fdg);
+        disputeGameFactory.setImplementation(GameType.wrap(0), fdg);
+        disputeGameFactory.setInitBond(GameType.wrap(0), 0.08 ether);
 
         // Reinitialize the anchor state registry
         _reinitAnchorStateRegistry(anchorStateRegistry);
 
         // Set the respected game type on the portal
-        optimismPortal.setRespectedGameType(GameType.wrap(1));
+        optimismPortal.setRespectedGameType(GameType.wrap(0));
     }
 
     /**
