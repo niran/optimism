@@ -143,7 +143,7 @@ contract AddFDG is Script {
         startingRoots[0] = IAnchorStateRegistry.StartingAnchorRoot({
             gameType: GameType.wrap(0), // Cannon
             outputRoot: OutputRoot({
-                l2BlockNumber: 0,
+                l2BlockNumber: 178565,
                 root: Hash.wrap(0xe50e5ae025f1d11b8862a170621c095c7d571463d6854f34f4352a445dd17f9f)
             })
         });
