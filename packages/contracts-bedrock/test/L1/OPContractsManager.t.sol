@@ -1017,7 +1017,7 @@ contract OPContractsManager_UpdatePrestate_Test is Test {
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(ISystemConfig.__constructor__, ()))
             }),
             optimismMintableERC20FactoryImpl: DeployUtils.create1({
-                _name: "OptimismMintableERC20Factory",
+                _name: "L1OptimismMintableERC20Factory",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IL1OptimismMintableERC20Factory.__constructor__, ()))
             }),
             l1CrossDomainMessengerImpl: DeployUtils.create1({

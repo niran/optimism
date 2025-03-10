@@ -320,7 +320,8 @@ contract L1BlockSetConfig_Test is L1BlockTest {
 
     /// @dev Tests that `setXFork` reverts if the L1Block is already in XFork mode.
     function test_setXFork_ifAlreadySet_reverts() external {
-        vm.store(address(l1Block), IS_XFORK_SLOT, bytes32(uint256(1)));
+        bytes32 packedValue = bytes32(uint256(1) << 96);
+        vm.store(address(l1Block), IS_XFORK_SLOT, packedValue);
 
         vm.prank(Constants.DEPOSITOR_ACCOUNT);
         vm.expectRevert(XForkAlreadyActive.selector);
@@ -424,10 +425,11 @@ contract L1BlockSetConfig_Test is L1BlockTest {
     }
 
     function test_setIsXFork_alreadySet_reverts() external {
-        vm.store(address(l1Block), IS_XFORK_SLOT, bytes32(uint256(1)));
+        bytes32 packedValue = bytes32(uint256(1) << 96);
+        vm.store(address(l1Block), IS_XFORK_SLOT, packedValue);
         vm.prank(Constants.DEPOSITOR_ACCOUNT);
         vm.expectRevert(XForkAlreadyActive.selector);
-        l1Block.setXFork();
+        l1Block.setIsXFork();
     }
 
     /// @dev Mocks a fee vault members call.
