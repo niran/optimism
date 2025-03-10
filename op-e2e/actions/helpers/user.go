@@ -427,6 +427,14 @@ func (s *CrossLayerUser) Address() common.Address {
 	return s.L1.address
 }
 
+func (s *CrossLayerUser) GetLatestDepositL2Receipt(t Testing) (*types.Receipt, error) {
+	depositL1Receipt := s.L1.CheckReceipt(t, true, s.lastL1DepositTxHash)
+	reconstructedDep, err := derive.UnmarshalDepositLogEvent(depositL1Receipt.Logs[0])
+	require.NoError(t, err, "Could not reconstruct L2 Deposit")
+	l2Tx := types.NewTx(reconstructedDep)
+	return s.L2.CheckReceipt(t, true, l2Tx.Hash()), nil
+}
+
 func (s *CrossLayerUser) getLatestWithdrawalParams(t Testing) (*withdrawals.ProvenWithdrawalParameters, error) {
 	receipt := s.L2.CheckReceipt(t, true, s.lastL2WithdrawalTxHash)
 	l2WithdrawalBlock, err := s.L2.env.EthCl.BlockByNumber(t.Ctx(), receipt.BlockNumber)
