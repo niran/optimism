@@ -677,6 +677,28 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
         // Try to upgrade the current OPChain
         runUpgradeTestAndChecks(upgrader);
     }
+
+    function test_upgrade_absolutePrestateNotSet_succeeds() public {
+        // Get the pdg and fdg before the upgrade
+        Claim pdgPrestateBefore = IPermissionedDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))).absolutePrestate();
+        Claim fdgPrestateBefore = IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.CANNON))).absolutePrestate();
+
+        runV200UpgradeAndChecks(upgrader);
+        runUpgrade14UpgradeAndChecks(upgrader);
+
+        // Set the absolute prestate input to 0
+        opChainConfigs[0].absolutePrestate = Claim.wrap(bytes32(0));
+
+        runUpgrade15UpgradeAndChecks(upgrader);
+
+        // Get the absolute prestate after the upgrade
+        Claim pdgPrestateAfter = IPermissionedDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))).absolutePrestate();
+        Claim fdgPrestateAfter = IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.CANNON))).absolutePrestate();
+
+        // Assert that the absolute prestate is 0
+        assertEq(Claim.unwrap(pdgPrestateAfter), Claim.unwrap(pdgPrestateBefore));
+        assertEq(Claim.unwrap(fdgPrestateAfter), Claim.unwrap(fdgPrestateBefore));
+    }
 }
 
 contract OPContractsManager_Upgrade_TestFails is OPContractsManager_Upgrade_Harness {
@@ -703,12 +725,6 @@ contract OPContractsManager_Upgrade_TestFails is OPContractsManager_Upgrade_Harn
         DelegateCaller(delegateCaller).dcForward(
             address(opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChainConfigs))
         );
-    }
-
-    function test_upgrade_absolutePrestateNotSet_reverts() public {
-        opChainConfigs[0].absolutePrestate = Claim.wrap(bytes32(0));
-        vm.expectRevert(IOPContractsManager.PrestateNotSet.selector);
-        DelegateCaller(upgrader).dcForward(address(opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChainConfigs)));
     }
 }
 

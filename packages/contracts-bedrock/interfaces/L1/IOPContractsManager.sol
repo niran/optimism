@@ -253,8 +253,6 @@ interface IOPContractsManager {
 
     error SuperchainProxyAdminMismatch();
 
-    error PrestateNotSet();
-
     error PrestateRequired();
 
     // -------- Methods --------

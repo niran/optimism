@@ -724,10 +724,9 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
         // Modify the params with the new vm values.
         params.anchorStateRegistry = IAnchorStateRegistry(address(_newAnchorStateRegistryProxy));
         params.vm = IBigStepper(impls.mipsImpl);
-        if (Claim.unwrap(_opChainConfig.absolutePrestate) == bytes32(0)) {
-            revert OPContractsManager.PrestateNotSet();
+        if (Claim.unwrap(_opChainConfig.absolutePrestate) != bytes32(0)) {
+            params.absolutePrestate = _opChainConfig.absolutePrestate;
         }
-        params.absolutePrestate = _opChainConfig.absolutePrestate;
 
         IDisputeGame newGame;
         if (GameType.unwrap(_gameType) == GameType.unwrap(GameTypes.PERMISSIONED_CANNON)) {
@@ -1421,9 +1420,6 @@ contract OPContractsManager is ISemver {
 
     /// @notice Thrown when the SuperchainProxyAdmin does not match the SuperchainConfig's admin.
     error SuperchainProxyAdminMismatch();
-
-    /// @notice Thrown when a prestate is not set for a game.
-    error PrestateNotSet();
 
     /// @notice Thrown when the prestate of a permissioned disputed game is 0.
     error PrestateRequired();
