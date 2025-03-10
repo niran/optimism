@@ -58,7 +58,7 @@ orbs:
 
 commands:
   gcp-oidc-authenticate:
-    description: "Authenticate with GCP using a CircleCI OIDC token."
+    description: "Authenticate wit GCP using a CircleCI OIDC token."
     parameters:
       project_id:
         type: env_var_name
