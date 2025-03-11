@@ -100,7 +100,7 @@ fi
 echo "Running analysis with VM profile: $VM_PROFILE using baseline report: $BASELINE_REPORT..."
 OUTPUT_FILE=$(mktemp)
 
-"$ANALYZER_BIN" analyze --with-trace=true --format=json --vm-profile "$VM_PROFILE" --baseline-report "$BASELINE_REPORT" --skip-warnings ./client/cmd/main.go > "$OUTPUT_FILE"
+"$ANALYZER_BIN" analyze --with-trace=true --format=json --vm-profile "$VM_PROFILE" --baseline-report "$BASELINE_REPORT" --skip-warnings --report-output-path "$OUTPUT_FILE" ./client/cmd/main.go
 
 # Check if JSON output contains any issues
 ISSUE_COUNT=$(jq 'length' "$OUTPUT_FILE")
