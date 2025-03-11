@@ -364,6 +364,12 @@ type UpgradeScheduleDeployConfig struct {
 	// Set it to 0 to activate at genesis. Nil to disable Interop.
 	L2GenesisInteropTimeOffset *hexutil.Uint64 `json:"l2GenesisInteropTimeOffset,omitempty"`
 
+	// Optional Forks
+
+	// L2GenesisPectraBlobScheduleTimeOffset is the number of seconds after genesis block that the PectraBlobSchedule fix activates.
+	// Set it to 0 to activate at genesis. Nil to disable the PectraBlobSchedule fix.
+	L2GenesisPectraBlobScheduleTimeOffset *hexutil.Uint64 `json:"l2GenesisPectraBlobScheduleTimeOffset,omitempty"`
+
 	// When Cancun activates. Relative to L1 genesis.
 	L1CancunTimeOffset *hexutil.Uint64 `json:"l1CancunTimeOffset,omitempty"`
 	// When Prague activates. Relative to L1 genesis.
@@ -491,6 +497,10 @@ func (d *UpgradeScheduleDeployConfig) GraniteTime(genesisTime uint64) *uint64 {
 
 func (d *UpgradeScheduleDeployConfig) HoloceneTime(genesisTime uint64) *uint64 {
 	return offsetToUpgradeTime(d.L2GenesisHoloceneTimeOffset, genesisTime)
+}
+
+func (d *UpgradeScheduleDeployConfig) PectraBlobScheduleTime(genesisTime uint64) *uint64 {
+	return offsetToUpgradeTime(d.L2GenesisPectraBlobScheduleTimeOffset, genesisTime)
 }
 
 func (d *UpgradeScheduleDeployConfig) IsthmusTime(genesisTime uint64) *uint64 {
@@ -1036,6 +1046,7 @@ func (d *DeployConfig) RollupConfig(l1StartBlock *types.Header, l2GenesisBlockHa
 		FjordTime:               d.FjordTime(l1StartTime),
 		GraniteTime:             d.GraniteTime(l1StartTime),
 		HoloceneTime:            d.HoloceneTime(l1StartTime),
+		PectraBlobScheduleTime:  d.PectraBlobScheduleTime(l1StartTime),
 		IsthmusTime:             d.IsthmusTime(l1StartTime),
 		InteropTime:             d.InteropTime(l1StartTime),
 		ProtocolVersionsAddress: d.ProtocolVersionsProxy,
@@ -1100,6 +1111,8 @@ type L1Deployments struct {
 	OptimismMintableERC20FactoryProxy common.Address `json:"OptimismMintableERC20FactoryProxy"`
 	OptimismPortal                    common.Address `json:"OptimismPortal"`
 	OptimismPortalProxy               common.Address `json:"OptimismPortalProxy"`
+	ETHLockbox                        common.Address `json:"ETHLockbox"`
+	ETHLockboxProxy                   common.Address `json:"ETHLockboxProxy"`
 	ProxyAdmin                        common.Address `json:"ProxyAdmin"`
 	SystemConfig                      common.Address `json:"SystemConfig"`
 	SystemConfigProxy                 common.Address `json:"SystemConfigProxy"`
@@ -1145,6 +1158,7 @@ func (d *L1Deployments) Check(deployConfig *DeployConfig) error {
 				name == "DataAvailabilityChallengeProxy") {
 			continue
 		}
+
 		if val.Field(i).Interface().(common.Address) == (common.Address{}) {
 			return fmt.Errorf("%s is not set", name)
 		}
