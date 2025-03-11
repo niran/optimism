@@ -629,9 +629,7 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
                 }
 
                 // Call `upgrade` on the OptimismPortal contract.
-                IOptimismPortal(payable(opChainAddrs.optimismPortal)).upgrade(
-                    newAnchorStateRegistryProxy, ethLockbox, _opChainConfigs[i].disputeGameUsesSuperRoots
-                );
+                IOptimismPortal(payable(opChainAddrs.optimismPortal)).upgrade(newAnchorStateRegistryProxy, ethLockbox);
             }
 
             // We also need to redeploy the dispute games because the AnchorStateRegistry is new.
@@ -723,10 +721,17 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
         // Modify the params with the new vm values.
         params.anchorStateRegistry = IAnchorStateRegistry(address(_newAnchorStateRegistryProxy));
         params.vm = IBigStepper(impls.mipsImpl);
-        if (Claim.unwrap(_opChainConfig.absolutePrestate) == bytes32(0)) {
+
+        // If the prestate is set in the config, use it. If not set, we'll try to use the prestate
+        // that already exists on the current dispute game.
+        if (Claim.unwrap(_opChainConfig.absolutePrestate) != bytes32(0)) {
+            params.absolutePrestate = _opChainConfig.absolutePrestate;
+        }
+
+        // As a sanity check, if the prestate is zero here, revert.
+        if (params.absolutePrestate.raw() == bytes32(0)) {
             revert OPContractsManager.PrestateNotSet();
         }
-        params.absolutePrestate = _opChainConfig.absolutePrestate;
 
         IDisputeGame newGame;
         if (GameType.unwrap(_gameType) == GameType.unwrap(GameTypes.PERMISSIONED_CANNON)) {
@@ -888,7 +893,7 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
             output.opChainProxyAdmin, address(output.l1ERC721BridgeProxy), implementation.l1ERC721BridgeImpl, data
         );
 
-        data = encodeOptimismPortalInitializer(_input, output, _superchainConfig);
+        data = encodeOptimismPortalInitializer(output, _superchainConfig);
         upgradeToAndCall(
             output.opChainProxyAdmin, address(output.optimismPortalProxy), implementation.optimismPortalImpl, data
         );
@@ -1043,7 +1048,6 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
 
     /// @notice Helper method for encoding the OptimismPortal initializer data.
     function encodeOptimismPortalInitializer(
-        OPContractsManager.DeployInput memory _input,
         OPContractsManager.DeployOutput memory _output,
         ISuperchainConfig _superchainConfig
     )
@@ -1054,13 +1058,7 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
     {
         return abi.encodeCall(
             IOptimismPortal.initialize,
-            (
-                _output.systemConfigProxy,
-                _superchainConfig,
-                _output.anchorStateRegistryProxy,
-                _output.ethLockboxProxy,
-                _input.disputeGameUsesSuperRoots
-            )
+            (_output.systemConfigProxy, _superchainConfig, _output.anchorStateRegistryProxy, _output.ethLockboxProxy)
         );
     }
 
@@ -1204,7 +1202,6 @@ contract OPContractsManager is ISemver {
         string saltMixer;
         uint64 gasLimit;
         // Configurable dispute game parameters.
-        bool disputeGameUsesSuperRoots;
         GameType disputeGameType;
         Claim disputeAbsolutePrestate;
         uint256 disputeMaxGameDepth;
@@ -1272,7 +1269,6 @@ contract OPContractsManager is ISemver {
         ISystemConfig systemConfigProxy;
         IProxyAdmin proxyAdmin;
         Claim absolutePrestate;
-        bool disputeGameUsesSuperRoots;
     }
 
     struct AddGameInput {
@@ -1298,9 +1294,9 @@ contract OPContractsManager is ISemver {
 
     // -------- Constants and Variables --------
 
-    /// @custom:semver 1.10.1
+    /// @custom:semver 1.11.1
     function version() public pure virtual returns (string memory) {
-        return "1.10.1";
+        return "1.11.1";
     }
 
     OPContractsManagerGameTypeAdder public immutable opcmGameTypeAdder;
