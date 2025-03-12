@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+set -x
 set -e  # Exit immediately if a command exits with a non-zero status
 
 # Usage function
@@ -47,7 +47,8 @@ fi
 echo "✅ llvm-objdump found at $(which llvm-objdump)"
 
 # Define the binary based on OS and ARCH
-ANALYZER_URL="https://github.com/ChainSafe/vm-compat/releases/latest/download/analyzer-${OS}-${ARCH}"
+ANALYZER_VERSION="v1.1.0"
+ANALYZER_URL="https://github.com/ChainSafe/vm-compat/releases/download/${ANALYZER_VERSION}/analyzer-${OS}-${ARCH}"
 
 # Fetch Analyzer if not present
 if [[ -f "$ANALYZER_BIN" ]]; then
