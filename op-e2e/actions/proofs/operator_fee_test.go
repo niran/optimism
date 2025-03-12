@@ -8,7 +8,6 @@ import (
 	actionsHelpers "github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
 	"github.com/ethereum-optimism/optimism/op-e2e/actions/proofs/helpers"
 	"github.com/ethereum-optimism/optimism/op-e2e/bindings"
-	"github.com/ethereum-optimism/optimism/op-program/client/claim"
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -66,6 +65,28 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			return bal
 		}
 
+		getCurrentBalances := func() (alice *big.Int, l1FeeVault *big.Int, baseFeeVault *big.Int, sequencerFeeVault *big.Int, operatorFeeVault *big.Int) {
+			alice = balanceAt(env.Alice.Address())
+			l1FeeVault = balanceAt(predeploys.L1FeeVaultAddr)
+			baseFeeVault = balanceAt(predeploys.BaseFeeVaultAddr)
+			sequencerFeeVault = balanceAt(predeploys.SequencerFeeVaultAddr)
+			operatorFeeVault = balanceAt(predeploys.OperatorFeeVaultAddr)
+
+			return alice, l1FeeVault, baseFeeVault, sequencerFeeVault, operatorFeeVault
+		}
+
+		setStorageInUpdateContractTo := func(t actionsHelpers.Testing, value byte) {
+			input := common.RightPadBytes(common.FromHex("0x60fe47b1"), 36)
+			input[35] = value
+			env.Sequencer.ActL2StartBlock(t)
+			env.Alice.L2.ActResetTxOpts(t)
+			env.Alice.L2.ActSetTxToAddr(&testStorageUpdateContractAddress)(t)
+			env.Alice.L2.ActSetTxCalldata(input)(t)
+			env.Alice.L2.ActMakeTx(t)
+			env.Engine.ActL2IncludeTx(env.Alice.Address())(t)
+			env.Sequencer.ActL2EndBlock(t)
+		}
+
 		t.Logf("L2 Genesis Time: %d, IsthmusTime: %d ", env.Sequencer.RollupCfg.Genesis.L2Time, *env.Sequencer.RollupCfg.IsthmusTime)
 
 		sysCfgContract, err := bindings.NewSystemConfig(env.Sd.RollupCfg.L1SystemConfigAddress, env.Miner.EthClient())
@@ -102,11 +123,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 		switch testCfg.Custom {
 		case NormalTx, IsthmusTransitionBlock:
 
-			aliceInitialBalance = balanceAt(env.Alice.Address())
-			l1FeeVaultInitialBalance = balanceAt(predeploys.L1FeeVaultAddr)
-			baseFeeVaultInitialBalance = balanceAt(predeploys.BaseFeeVaultAddr)
-			sequencerFeeVaultInitialBalance = balanceAt(predeploys.SequencerFeeVaultAddr)
-			operatorFeeVaultInitialBalance = balanceAt(predeploys.OperatorFeeVaultAddr)
+			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance = getCurrentBalances()
 
 			require.Equal(t, operatorFeeVaultInitialBalance.Sign(), 0)
 
@@ -119,27 +136,9 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			env.Sequencer.ActL2EndBlock(t)
 
 		case StateRefund:
-			env.Sequencer.ActL2StartBlock(t)
-			env.Alice.L2.ActResetTxOpts(t)
-			env.Alice.L2.ActSetTxToAddr(&testStorageUpdateContractAddress)(t)
-			env.Alice.L2.ActSetTxCalldata(common.FromHex("0x60fe47b10000000000000000000000000000000000000000000000000000000000000001"))(t)
-			env.Alice.L2.ActMakeTx(t)
-			env.Engine.ActL2IncludeTx(env.Alice.Address())(t)
-			env.Sequencer.ActL2EndBlock(t)
-
-			aliceInitialBalance = balanceAt(env.Alice.Address())
-			l1FeeVaultInitialBalance = balanceAt(predeploys.L1FeeVaultAddr)
-			baseFeeVaultInitialBalance = balanceAt(predeploys.BaseFeeVaultAddr)
-			sequencerFeeVaultInitialBalance = balanceAt(predeploys.SequencerFeeVaultAddr)
-			operatorFeeVaultInitialBalance = balanceAt(predeploys.OperatorFeeVaultAddr)
-
-			env.Sequencer.ActL2StartBlock(t)
-			env.Alice.L2.ActResetTxOpts(t)
-			env.Alice.L2.ActSetTxToAddr(&testStorageUpdateContractAddress)
-			env.Alice.L2.ActSetTxCalldata(common.FromHex("0x60fe47b10000000000000000000000000000000000000000000000000000000000000000"))(t)
-			env.Alice.L2.ActMakeTx(t)
-			env.Engine.ActL2IncludeTx(env.Alice.Address())(t)
-			env.Sequencer.ActL2EndBlock(t)
+			setStorageInUpdateContractTo(t, 1)
+			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance = getCurrentBalances()
+			setStorageInUpdateContractTo(t, 0)
 		case DepositTx:
 			// regular L2 tx, in new L2 block
 			env.Alice.L2.ActResetTxOpts(t)
@@ -150,11 +149,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			env.Sequencer.ActL2EndBlock(t)
 			env.Alice.L2.ActCheckReceiptStatusOfLastTx(true)(t)
 
-			aliceInitialBalance = balanceAt(env.Alice.Address())
-			l1FeeVaultInitialBalance = balanceAt(predeploys.L1FeeVaultAddr)
-			baseFeeVaultInitialBalance = balanceAt(predeploys.BaseFeeVaultAddr)
-			sequencerFeeVaultInitialBalance = balanceAt(predeploys.SequencerFeeVaultAddr)
-			operatorFeeVaultInitialBalance = balanceAt(predeploys.OperatorFeeVaultAddr)
+			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance = getCurrentBalances()
 
 			// regular Deposit, in new L1 block
 			env.Alice.L1.ActResetTxOpts(t)
@@ -167,15 +162,11 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			env.Sequencer.ActL1HeadSignal(t)
 			env.Sequencer.ActBuildToL1HeadUnsafe(t)
 
-			receipt, err = env.Alice.GetLatestDepositL2Receipt(t)
+			receipt, err = env.Alice.GetLastDepositL2Receipt(t)
 			require.NoError(t, err)
 		}
 
-		l1FeeVaultFinalBalance := balanceAt(predeploys.L1FeeVaultAddr)
-		baseFeeVaultFinalBalance := balanceAt(predeploys.BaseFeeVaultAddr)
-		sequencerFeeVaultFinalBalance := balanceAt(predeploys.SequencerFeeVaultAddr)
-		operatorFeeVaultFinalBalance := balanceAt(predeploys.OperatorFeeVaultAddr)
-		aliceFinalBalance := balanceAt(env.Alice.Address())
+		aliceFinalBalance, l1FeeVaultFinalBalance, baseFeeVaultFinalBalance, sequencerFeeVaultFinalBalance, operatorFeeVaultFinalBalance := getCurrentBalances()
 
 		if receipt == nil {
 			receipt = env.Alice.L2.LastTxReceipt(t)
@@ -236,44 +227,8 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 	matrix := helpers.NewMatrix[testCase]()
 	defer matrix.Run(gt)
 
-	matrix.AddTestCase(
-		"HonestClaim-OperatorFeeConstistency-NormalTx",
-		NormalTx,
-		helpers.NewForkMatrix(helpers.Isthmus),
-		runIsthmusDerivationTest,
-		helpers.ExpectNoError(),
-	)
-
-	matrix.AddTestCase(
-		"HonestClaim-OperatorFeeConstistency-DepositTx",
-		DepositTx,
-		helpers.NewForkMatrix(helpers.Isthmus),
-		runIsthmusDerivationTest,
-		helpers.ExpectNoError(),
-	)
-
-	matrix.AddTestCase(
-		"HonestClaim-OperatorFeeConstistency-StateRefund",
-		StateRefund,
-		helpers.NewForkMatrix(helpers.Isthmus),
-		runIsthmusDerivationTest,
-		helpers.ExpectNoError(),
-	)
-
-	matrix.AddTestCase(
-		"HonestClaim-OperatorFeeConstistency-IsthmusTransitionBlock",
-		IsthmusTransitionBlock,
-		helpers.NewForkMatrix(helpers.Holocene),
-		runIsthmusDerivationTest,
-		helpers.ExpectNoError(),
-	)
-
-	matrix.AddTestCase(
-		"JunkClaim-OperatorFeeConstistency",
-		NormalTx,
-		helpers.NewForkMatrix(helpers.Isthmus),
-		runIsthmusDerivationTest,
-		helpers.ExpectError(claim.ErrClaimNotValid),
-		helpers.WithL2Claim(common.HexToHash("0xdeadbeef")),
-	)
+	matrix.AddDefaultTestCasesWithName("OperatorFeeConstistency-NormalTx", NormalTx, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
+	matrix.AddDefaultTestCasesWithName("OperatorFeeConstistency-DepositTx", DepositTx, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
+	matrix.AddDefaultTestCasesWithName("OperatorFeeConstistency-StateRefund", StateRefund, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
+	matrix.AddDefaultTestCasesWithName("OperatorFeeConstistency-IsthmusTransitionBlock", IsthmusTransitionBlock, helpers.NewForkMatrix(helpers.Holocene), runIsthmusDerivationTest)
 }
