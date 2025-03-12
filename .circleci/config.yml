@@ -1312,13 +1312,12 @@ jobs:
     docker:
       - image: cimg/go:1.21
     steps:
-      - checkout
+      - utils/checkout-with-mise
 
       - run:
           name: Install Dependencies
           command: |
-            sudo apt-get update
-            sudo apt-get install -y llvm curl
+            mise install llvm-objdump
 
       - run:
           name: Set up LLVM Path
