@@ -52,7 +52,7 @@ func toDepositTxn(t *testing.T, data hexutil.Bytes) (common.Address, *types.Tran
 	require.Truef(t, txn.IsDepositTx(), "expected deposit txn, got %v", txn.Type())
 	require.False(t, txn.IsSystemTx())
 
-	signer := types.NewLondonSigner(big.NewInt(420))
+	signer := types.NewIsthmusSigner(big.NewInt(420))
 	from, err := signer.Sender(txn)
 	require.NoError(t, err)
 
