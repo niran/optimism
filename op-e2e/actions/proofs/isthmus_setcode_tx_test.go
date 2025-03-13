@@ -10,18 +10,17 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	batcherFlags "github.com/ethereum-optimism/optimism/op-batcher/flags"
 	actionsHelpers "github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
 	"github.com/ethereum-optimism/optimism/op-e2e/actions/proofs/helpers"
 )
 
-func TestSetCodeTxTypeIsthmus(gt *testing.T) {
-	t := actionsHelpers.NewDefaultTesting(gt)
+var (
+	aa = common.HexToAddress("0x000000000000000000000000000000000000aaaa")
+	bb = common.HexToAddress("0x000000000000000000000000000000000000bbbb")
+)
 
-	var (
-		aa = common.HexToAddress("0x000000000000000000000000000000000000aaaa")
-		bb = common.HexToAddress("0x000000000000000000000000000000000000bbbb")
-	)
+func runSetCodeTxTypeTest(gt *testing.T, testCfg *helpers.TestCfg[any]) {
+	t := actionsHelpers.NewDefaultTesting(gt)
 
 	// hardcoded because it's not available until after we need it
 	bobAddr := common.HexToAddress("0x14dC79964da2C08b23698B3D3cc7Ca32193d9955")
@@ -39,19 +38,10 @@ func TestSetCodeTxTypeIsthmus(gt *testing.T) {
 		Code: callBobProgram.Bytes(),
 	}
 
-	testCfg := &helpers.TestCfg[interface{}]{
-		Hardfork: helpers.Isthmus,
-		Allocs:   &alloc,
-	}
+	testCfg.Allocs = &alloc
 
 	tp := helpers.NewTestParams()
-	env := helpers.NewL2FaultProofEnv(t, testCfg, tp, &actionsHelpers.BatcherCfg{
-		MinL1TxSize:          0,
-		MaxL1TxSize:          128_000,
-		DataAvailabilityType: batcherFlags.CalldataType,
-	})
-
-	require.Equal(gt, env.Bob.Address(), bobAddr)
+	env := helpers.NewL2FaultProofEnv(t, testCfg, tp, helpers.NewBatcherCfg())
 
 	cl := env.Engine.EthClient()
 
@@ -125,10 +115,7 @@ func TestSetCodeTxTypeIsthmus(gt *testing.T) {
 	}
 
 	// batch submit to L1. batcher should submit span batches.
-	env.Batcher.ActSubmitAll(t)
-	env.Miner.ActL1StartBlock(12)(t)
-	env.Miner.ActL1IncludeTx(env.Batcher.BatcherAddr)(t)
-	env.Miner.ActL1EndBlock(t)
+	env.BatchAndMine(t)
 
 	env.Sequencer.ActL1HeadSignal(t)
 	env.Sequencer.ActL2PipelineFull(t)
@@ -139,4 +126,15 @@ func TestSetCodeTxTypeIsthmus(gt *testing.T) {
 	env.RunFaultProofProgram(t, latestBlock.NumberU64(), func(t actionsHelpers.Testing, err error) {
 		require.NoError(t, err, "no error expected running FP program")
 	})
+}
+
+func TestSetCodeTx(gt *testing.T) {
+	matrix := helpers.NewMatrix[any]()
+	defer matrix.Run(gt)
+
+	matrix.AddDefaultTestCases(
+		nil,
+		helpers.LatestForkOnly,
+		runSetCodeTxTypeTest,
+	)
 }
