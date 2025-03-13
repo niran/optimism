@@ -52,8 +52,8 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 
 		if testCfg.Custom == IsthmusTransitionBlock {
 			deployConfigOverrides = func(dp *genesis.DeployConfig) {
-				isthmusTimeOffset := hexutil.Uint64(12)
-				dp.L2GenesisIsthmusTimeOffset = &isthmusTimeOffset
+				dp.L1PragueTimeOffset = ptr(hexutil.Uint64(0))
+				dp.L2GenesisIsthmusTimeOffset = ptr(hexutil.Uint64(13))
 			}
 		}
 
@@ -136,6 +136,10 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			env.Engine.ActL2IncludeTx(env.Alice.Address())(t)
 			env.Sequencer.ActL2EndBlock(t)
 
+			if testCfg.Custom == IsthmusTransitionBlock {
+				require.True(t, env.Sd.RollupCfg.IsIsthmusActivationBlock(env.Sequencer.L2Unsafe().Time))
+			}
+
 		case StateRefund:
 			setStorageInUpdateContractTo(t, 1)
 			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance = getCurrentBalances()
@@ -154,6 +158,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 
 			// regular Deposit, in new L1 block
 			env.Alice.L1.ActResetTxOpts(t)
+			env.Alice.L2.ActSetTxValue(new(big.Int).SetUint64(100000))
 			env.Alice.ActDeposit(t)
 			env.Miner.ActL1StartBlock(12)(t)
 			env.Miner.ActL1IncludeTx(env.Alice.Address())(t)
@@ -228,8 +233,12 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 	matrix := helpers.NewMatrix[testCase]()
 	defer matrix.Run(gt)
 
-	matrix.AddDefaultTestCasesWithName("OperatorFeeConstistency-NormalTx", NormalTx, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
-	matrix.AddDefaultTestCasesWithName("OperatorFeeConstistency-DepositTx", DepositTx, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
-	matrix.AddDefaultTestCasesWithName("OperatorFeeConstistency-StateRefund", StateRefund, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
-	matrix.AddDefaultTestCasesWithName("OperatorFeeConstistency-IsthmusTransitionBlock", IsthmusTransitionBlock, helpers.NewForkMatrix(helpers.Holocene), runIsthmusDerivationTest)
+	matrix.AddDefaultTestCasesWithName("NormalTx", NormalTx, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
+	matrix.AddDefaultTestCasesWithName("DepositTx", DepositTx, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
+	matrix.AddDefaultTestCasesWithName("StateRefund", StateRefund, helpers.NewForkMatrix(helpers.Isthmus), runIsthmusDerivationTest)
+	matrix.AddDefaultTestCasesWithName("IsthmusTransitionBlock", IsthmusTransitionBlock, helpers.NewForkMatrix(helpers.Holocene), runIsthmusDerivationTest)
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }
