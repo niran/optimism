@@ -547,15 +547,42 @@ func (l *BatchSubmitter) throttlingLoop(wg *sync.WaitGroup, pendingBytesUpdated 
 	retryTimer := time.NewTimer(retryInterval)
 	retryTimer.Stop()
 
+	// Initialize clients for sequencer endpoints and builder
+	// This is used for HA mode with rollup boost enabled, where we have multiple sequencer endpoints and a builder endpoint
+	// In the case of a single sequencer with rollup boost enabled, the sequencerClients will be a map with one entry
+	// In the case of a single sequencer without rollup boost enabled, we will use the old approach of dialing the sequencer endpoint directly
+	sequencerClients := make(map[string]*rpc.Client)
+	var builderClient *rpc.Client
+
+	// Initialize clients if endpoints are configured
+	if len(l.Config.SequencerEndpoints) > 0 {
+		// Initialize sequencer clients
+		for _, endpoint := range l.Config.SequencerEndpoints {
+			client, err := rpc.Dial(endpoint)
+			if err != nil {
+				l.Log.Warn("Failed to connect to sequencer endpoint", "endpoint", endpoint, "err", err)
+				continue
+			}
+			sequencerClients[endpoint] = client
+			l.Log.Info("Connected to sequencer for configuration distribution", "endpoint", endpoint)
+		}
+	}
+
+	// Initialize builder client
+	if l.Config.BuilderEndpoint != "" {
+		var err error
+		builderClient, err = rpc.Dial(l.Config.BuilderEndpoint)
+		if err != nil {
+			l.Log.Warn("Failed to connect to builder endpoint", "endpoint", l.Config.BuilderEndpoint, "err", err)
+		} else {
+			l.Log.Info("Connected to builder for configuration distribution", "endpoint", l.Config.BuilderEndpoint)
+		}
+	}
+
 	updateParams := func(pendingBytes int64) {
 		retryTimer.Stop()
 		ctx, cancel := context.WithTimeout(l.shutdownCtx, l.Config.NetworkTimeout)
 		defer cancel()
-		cl, err := l.EndpointProvider.EthClient(ctx)
-		if err != nil {
-			l.Log.Error("Can't reach sequencer execution RPC", "err", err)
-			return
-		}
 
 		maxTxSize := uint64(0)
 		maxBlockSize := l.Config.ThrottleAlwaysBlockSize
@@ -566,38 +593,134 @@ func (l *BatchSubmitter) throttlingLoop(wg *sync.WaitGroup, pendingBytesUpdated 
 				maxBlockSize = l.Config.ThrottleBlockSize
 			}
 		}
-		var (
-			success bool
-			rpcErr  rpc.Error
-		)
-		err = cl.Client().CallContext(
-			ctx, &success, SetMaxDASizeMethod, hexutil.Uint64(maxTxSize), hexutil.Uint64(maxBlockSize),
-		)
-		if errors.Is(ctx.Err(), context.Canceled) {
-			// If the context was cancelled, our work is done and we expect an error here:
-			// So log it quietly and exit.
-			l.Log.Debug("DA throttling context cancelled")
-			return
-		}
-		if errors.As(err, &rpcErr) && eth.ErrorCode(rpcErr.ErrorCode()).IsGenericRPCError() {
-			l.Log.Error("SetMaxDASize rpc unavailable or broken, shutting down. Either enable it or disable throttling.", "err", err)
-			// We'd probably hit this error right after startup, so a short shutdown duration should suffice.
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			// Call StopBatchSubmitting in another goroutine to avoid deadlock.
-			go func() {
-				// Always returns nil. An error is only returned to expose this function as an RPC.
-				_ = l.StopBatchSubmitting(ctx)
-			}()
-			return
-		} else if err != nil {
-			l.Log.Error("SetMaxDASize rpc failed, retrying.", "err", err)
-			retryTimer.Reset(retryInterval)
-			return
-		}
-		if !success {
-			l.Log.Error("Result of SetMaxDASize was false, retrying.")
-			retryTimer.Reset(retryInterval)
+
+		// If we have configured sequencer endpoints, distribute the configuration
+		if len(sequencerClients) > 0 {
+			l.Log.Info("Distributing DA size configuration", "tx_size", maxTxSize, "block_size", maxBlockSize,
+				"sequencer_endpoints", len(sequencerClients), "has_builder", builderClient != nil)
+
+			var wg sync.WaitGroup
+			errors := make(chan error, len(sequencerClients)+1) // +1 for builder
+			success := make(chan bool, len(sequencerClients)+1)
+
+			// Set DA size on all sequencer nodes
+			for endpoint, client := range sequencerClients {
+				wg.Add(1)
+				go func(endpoint string, client *rpc.Client) {
+					defer wg.Done()
+
+					timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 5*time.Second)
+					defer timeoutCancel()
+
+					var result bool
+					err := client.CallContext(timeoutCtx, &result, SetMaxDASizeMethod,
+						hexutil.Uint64(maxTxSize), hexutil.Uint64(maxBlockSize))
+
+					if err != nil {
+						l.Log.Error("Failed to set max DA size on sequencer",
+							"endpoint", endpoint, "error", err)
+						errors <- err
+					} else if !result {
+						l.Log.Error("Sequencer returned false for SetMaxDASize",
+							"endpoint", endpoint)
+						errors <- fmt.Errorf("sequencer returned false")
+					} else {
+						l.Log.Info("Successfully set max DA size on sequencer",
+							"endpoint", endpoint)
+						success <- true
+					}
+				}(endpoint, client)
+			}
+
+			// Set DA size on builder if configured
+			if builderClient != nil {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+
+					timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 5*time.Second)
+					defer timeoutCancel()
+
+					var result bool
+					err := builderClient.CallContext(timeoutCtx, &result, SetMaxDASizeMethod,
+						hexutil.Uint64(maxTxSize), hexutil.Uint64(maxBlockSize))
+
+					if err != nil {
+						l.Log.Error("Failed to set max DA size on builder", "error", err)
+						errors <- err
+					} else if !result {
+						l.Log.Error("Builder returned false for SetMaxDASize")
+						errors <- fmt.Errorf("builder returned false")
+					} else {
+						l.Log.Info("Successfully set max DA size on builder")
+						success <- true
+					}
+				}()
+			}
+
+			// Wait for all operations to complete
+			wg.Wait()
+			close(errors)
+			close(success)
+
+			// Count successes vs. required endpoints
+			successCount := len(success)
+			requiredCount := len(sequencerClients)
+			if builderClient != nil {
+				requiredCount++
+			}
+
+			if successCount < requiredCount {
+				l.Log.Error("Failed to distribute DA size configuration to all targets",
+					"success", successCount, "required", requiredCount)
+				retryTimer.Reset(retryInterval)
+				return
+			}
+
+			l.Log.Info("Successfully distributed DA size configuration to all targets",
+				"tx_size", maxTxSize, "block_size", maxBlockSize)
+		} else {
+			// Fall back to the original approach if no sequencer endpoints are configured
+			// meaning in this case we don't have HA mode with rollup boost enabled
+			cl, err := l.EndpointProvider.EthClient(ctx)
+			if err != nil {
+				l.Log.Error("Can't reach sequencer execution RPC", "err", err)
+				return
+			}
+
+			var (
+				success bool
+				rpcErr  rpc.Error
+			)
+			err = cl.Client().CallContext(
+				ctx, &success, SetMaxDASizeMethod, hexutil.Uint64(maxTxSize), hexutil.Uint64(maxBlockSize),
+			)
+			if errors.Is(ctx.Err(), context.Canceled) {
+				// If the context was cancelled, our work is done and we expect an error here:
+				// So log it quietly and exit.
+				l.Log.Debug("DA throttling context cancelled")
+				return
+			}
+			if errors.As(err, &rpcErr) && eth.ErrorCode(rpcErr.ErrorCode()).IsGenericRPCError() {
+				l.Log.Error("SetMaxDASize rpc unavailable or broken, shutting down. Either enable it or disable throttling.", "err", err)
+				// We'd probably hit this error right after startup, so a short shutdown duration should suffice.
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				// Call StopBatchSubmitting in another goroutine to avoid deadlock.
+				go func() {
+					// Always returns nil. An error is only returned to expose this function as an RPC.
+					_ = l.StopBatchSubmitting(ctx)
+				}()
+				return
+			} else if err != nil {
+				l.Log.Error("SetMaxDASize rpc failed, retrying.", "err", err)
+				retryTimer.Reset(retryInterval)
+				return
+			}
+			if !success {
+				l.Log.Error("Result of SetMaxDASize was false, retrying.")
+				retryTimer.Reset(retryInterval)
+			}
 		}
 	}
 

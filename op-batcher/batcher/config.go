@@ -117,6 +117,13 @@ type CLIConfig struct {
 	// Should only be used for testing purposes.
 	TestUseMaxTxSizeForBlobs bool
 
+	// SequencerEndpoints is a list of sequencer endpoints to distribute configuration updates to.
+	// This is used for HA mode with rollup boost enabled, where multiple sequencer nodes exist.
+	SequencerEndpoints []string
+
+	// BuilderEndpoint is the endpoint for the block builder to distribute configuration updates to.
+	BuilderEndpoint string
+
 	TxMgrConfig   txmgr.CLIConfig
 	LogConfig     oplog.CLIConfig
 	MetricsConfig opmetrics.CLIConfig
@@ -219,5 +226,9 @@ func NewConfig(ctx *cli.Context) *CLIConfig {
 		ThrottleBlockSize:            ctx.Uint64(flags.ThrottleBlockSizeFlag.Name),
 		ThrottleAlwaysBlockSize:      ctx.Uint64(flags.ThrottleAlwaysBlockSizeFlag.Name),
 		PreferLocalSafeL2:            ctx.Bool(flags.PreferLocalSafeL2Flag.Name),
+
+		// HA configuration with rollup boost enabled
+		SequencerEndpoints: ctx.StringSlice(flags.SequencerEndpointsFlag.Name),
+		BuilderEndpoint:    ctx.String(flags.BuilderEndpointFlag.Name),
 	}
 }
