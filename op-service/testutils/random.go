@@ -228,21 +228,41 @@ func RandomDynamicFeeTx(rng *rand.Rand, signer types.Signer) *types.Transaction 
 	return RandomDynamicFeeTxWithBaseFee(rng, baseFee, signer)
 }
 
+func RandomSetCodeAuth(rng *rand.Rand) types.SetCodeAuthorization {
+	key := InsecureRandomKey(rng)
+
+	auth := types.SetCodeAuthorization{
+		ChainID: *uint256.MustFromHex("0x0"),
+		Address: RandomAddress(rng),
+		Nonce:   rng.Uint64(),
+	}
+
+	authSigned, err := types.SignSetCode(key, auth)
+	if err != nil {
+		panic(err)
+	}
+
+	return authSigned
+}
+
 func RandomSetCodeTx(rng *rand.Rand, signer types.Signer) *types.Transaction {
 	baseFee := new(big.Int).SetUint64(rng.Uint64())
 	key := InsecureRandomKey(rng)
 	tip := big.NewInt(rng.Int63n(10 * params.GWei))
-	to := RandomTo(rng)
+	to := RandomAddress(rng)
 	txData := &types.SetCodeTx{
 		ChainID:    uint256.MustFromBig(signer.ChainID()),
 		Nonce:      rng.Uint64(),
 		GasTipCap:  uint256.MustFromBig(tip),
 		GasFeeCap:  uint256.MustFromBig(new(big.Int).Add(baseFee, tip)),
 		Gas:        params.TxGas + uint64(rng.Int63n(2_000_000)),
-		To:         *to,
+		To:         to,
 		Value:      uint256.MustFromBig(RandomETH(rng, 10)),
 		Data:       RandomData(rng, rng.Intn(RandomDataSize)),
 		AccessList: nil,
+		AuthList: []types.SetCodeAuthorization{
+			RandomSetCodeAuth(rng),
+		},
 	}
 	tx, err := types.SignNewTx(key, signer, txData)
 	if err != nil {
