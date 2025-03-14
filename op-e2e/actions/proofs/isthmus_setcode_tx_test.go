@@ -10,7 +10,6 @@ import (
 
 	actionsHelpers "github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
 	"github.com/ethereum-optimism/optimism/op-e2e/actions/proofs/helpers"
-	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-program/client/claim"
 )
 
@@ -67,10 +66,6 @@ func runSetCodeTxTypeTest(gt *testing.T, testCfg *helpers.TestCfg[any]) {
 	require.NoError(t, err, "error fetching latest block")
 
 	env.RunFaultProofProgram(t, latestBlock.NumberU64(), testCfg.CheckResult, testCfg.InputParams...)
-}
-
-type setCodeParams struct {
-	fork rollup.ForkName
 }
 
 func TestSetCodeTx(gt *testing.T) {
