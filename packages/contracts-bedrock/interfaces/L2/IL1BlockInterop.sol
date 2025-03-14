@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { Types } from "src/libraries/Types.sol";
+
 interface IL1BlockInterop {
     error NotCrossL2Inbox();
     error NotDepositor();
@@ -42,6 +44,8 @@ interface IL1BlockInterop {
     function setL1BlockValuesIsthmus() external;
     function timestamp() external view returns (uint64);
     function version() external pure returns (string memory);
+    function setConfig(Types.ConfigType _type, bytes memory _value) external;
+    function getConfig(Types.ConfigType _type) external view returns (bytes memory config_);
     function setXFork() external;
     function setIsXFork() external;
     function isXFork() external view returns (bool);
