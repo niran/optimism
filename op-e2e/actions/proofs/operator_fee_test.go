@@ -29,6 +29,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 
 	const testOperatorFeeScalar = uint32(20000)
 	const testOperatorFeeConstant = uint64(500)
+	const testDepositValue = uint64(10000)
 	testStorageUpdateContractAddress := common.HexToAddress("0xffffffff")
 	// contract TestSetter {
 	//   uint x;
@@ -161,8 +162,6 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 
 			// regular Deposit, in new L1 block
 			env.Alice.L1.ActResetTxOpts(t)
-			env.Alice.L2.ActResetTxOpts(t)
-			env.Alice.L2.ActSetTxToAddr(&env.Dp.Addresses.Bob)(t)
 			env.Alice.L2.ActSetTxValue(new(big.Int).SetUint64(10000))(t)
 			env.Alice.ActDeposit(t)
 			env.Miner.ActL1StartBlock(12)(t)
@@ -177,7 +176,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 
 			bobFinalBalance := balanceAt(env.Bob.Address())
 
-			require.Equal(t, bobInitialBalance.Uint64()+10000, bobFinalBalance.Uint64())
+			require.Equal(t, bobInitialBalance.Uint64()+testDepositValue, bobFinalBalance.Uint64())
 
 			receipt, err = env.Alice.GetLastDepositL2Receipt(t)
 			require.NoError(t, err)
@@ -236,7 +235,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 
 		if testCfg.Custom == DepositTx {
 			// Minus the deposit value that was sent to Bob
-			require.Equal(t, aliceInitialBalance.Uint64()-10000, finalTotalBalance.Uint64())
+			require.Equal(t, aliceInitialBalance.Uint64()-testDepositValue, finalTotalBalance.Uint64())
 		} else {
 			require.Equal(t, aliceInitialBalance, finalTotalBalance)
 		}
