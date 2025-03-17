@@ -471,27 +471,42 @@ func TestInteropExecutingMessageOutOfRangeLogIndex(gt *testing.T) {
 		actors.ChainB.Sequencer.ActL2EndBlock(t)
 	}
 
-	assertHeads(t, actors.ChainA, 2, 0, 1, 0)
-	assertHeads(t, actors.ChainB, 2, 0, 1, 0)
+	assertHeads(t, actors.ChainA, 2, 1, 0, 0)
+	assertHeads(t, actors.ChainB, 2, 1, 0, 0)
 
 	system.SubmitBatchData(func(opts *dsl.SubmitBatchDataOpts) {
 		opts.SkipCrossSafeUpdate = true
 	})
 
-	assertHeads(t, actors.ChainA, 2, 2, 1, 0)
-	assertHeads(t, actors.ChainB, 2, 2, 1, 0)
+	assertHeads(t, actors.ChainA, 2, 1, 2, 0)
+	assertHeads(t, actors.ChainB, 2, 1, 2, 0)
+
+	statusA, statusB := actors.ChainA.Sequencer.SyncStatus(), actors.ChainB.Sequencer.SyncStatus()
+	initialChainABlock := statusA.LocalSafeL2
+	initialChainBBlock := statusB.LocalSafeL2
 
 	actors.ChainA.Sequencer.SyncSupervisor(t)
 	actors.ChainB.Sequencer.SyncSupervisor(t)
 	actors.Supervisor.ProcessFull(t)
 	actors.ChainA.Sequencer.ActL2PipelineFull(t)
 	actors.ChainB.Sequencer.ActL2PipelineFull(t)
+
+	// We now have invalid blocks on both chains
+	// We should be checking both blocks and first seeing that chainB is invalid
+	// We should then replace the LocalSafe chainB block with a replacement block
+	// *Then* we should see that chainA is invalid, either because our check on B was through the hazard set or because there is now a block mismatch
+	// So we should then also replace the LocalSafe chainA block with a replacement block
+	// In doing the replacements of the Safe blocks we should also see the related Unsafe blocks being rewound
+
+	statusA, statusB = actors.ChainA.Sequencer.SyncStatus(), actors.ChainB.Sequencer.SyncStatus()
+	require.NotEqual(t, initialChainABlock, statusA.LocalSafeL2)
+	require.NotEqual(t, initialChainBBlock, statusB.LocalSafeL2)
 	system.AddL2Block(actors.ChainA)
 	system.AddL2Block(actors.ChainB, dsl.WithL1BlockCrossUnsafe())
 	system.SubmitBatchData(func(opts *dsl.SubmitBatchDataOpts) {
 		opts.SkipCrossSafeUpdate = true
 	})
-	statusA, statusB := actors.ChainA.Sequencer.SyncStatus(), actors.ChainB.Sequencer.SyncStatus()
+	statusA, statusB = actors.ChainA.Sequencer.SyncStatus(), actors.ChainB.Sequencer.SyncStatus()
 	t.Logf("statusA :%#v", statusA)
 	t.Logf("statusB :%#v", statusB)
 
