@@ -8,8 +8,6 @@ dangerous!), you should use an earlier version of OP Deployer. This setup allows
 breaking changes on `develop`, while still allowing new chains to be deployed and upgraded using production-ready smart
 contracts.
 
-Bugs that are fixed on develop will also be backported to earlier versions on a best-effort basis.
-
 If you deploy from an HTTPS or file [locator](./artifacts-locators.md), the deployment behavior will match the
 contract's tag. For example, if version `v0.2.0` supports `v2.0.0` then the deployment will work as if you were
 deploying `op-contracts/v2.0.0`. Typically, errors like `unknown selector: <some hex>` imply that you're using the wrong
@@ -17,6 +15,30 @@ version of OP Deployer for your contract artifacts. If this happens, we recommen
 get one that works. Note that this workflow is **not recommended** for production chains.
 
 [releases]: https://github.com/ethereum-optimism/optimism/releases
+
+## Version Backports
+
+From time to time, we may backport bugfixes from develop onto earlier versions of OP Deployer. The process for this is
+as follows:
+
+1. If one doesn't exist already, make a new branch for the version lineage you're patching (e.g. `v0.2.x`). This branch
+   should be protected (not deletable) and should be based on the latest release of that lineage. The branch should be named as follows:
+   `backports/op-deployer/<lineage, i.e. v0.2.0>`.
+2. Open a PR with the backport against that branch. Be sure to reference the original commit in the backport.
+3. Make and push a new tag on that lineage.
+
+Example for backporting fix(es) from `develop` and created a new release `op-deployer/v0.2.1`:
+```
+git checkout -b backports/op-deployer/v0.2.0 op-deployer/v0.2.0
+git push origin backports/op-deployer/v0.2.0
+git checkout -b fixes/deployer-v0.2.0 backports/op-deployer/v0.2.0
+git cherry-pick <commit-hash>
+git push origin fixes/deployer-v0.2.0
+
+1. open pr from fixes/deployer-v0.2.0 targeting backports/op-deployer/v0.2.0
+2. merge the pr
+3. push a new tag for op-deployer/v0.2.1 on backports/op-deployer/v0.2.0 branch (goreleaser will create the release)
+```
 
 ## Adding Support for New Contract Versions
 
@@ -56,16 +78,16 @@ Now, update `standard/standard.go` with these values so that the new artifacts t
 const ContractsVXTag = "op-contracts/vX.Y.Z"
 
 var taggedReleases = map[string]TaggedRelease{
-  // Other releases...
-  ContractsVXTag: {
-    ArtifactsHash: common.HexToHash("<the artifacts hash>"),
-    ContentHash:   common.HexToHash("<the checksum>"),
-  },
+    // Other releases...
+    ContractsVXTag: {
+		ArtifactsHash: common.HexToHash("<the artifacts hash>"),
+		ContentHash:   common.HexToHash("<the checksum>"),
+	},
 }
 
 // Update the L1/L2 versions accordingly
 func IsSupportedL1Version(tag string) bool {
-  return tag == ContractsVXTag
+	return tag == ContractsVXTag
 }
 ```
 
