@@ -296,11 +296,13 @@ func (db *DB) Contains(query types.ContainsQuery) (types.BlockSeal, error) {
 		if db.lastEntryContext.timestamp > timestamp {
 			return types.BlockSeal{}, types.ErrConflict
 		}
+		db.log.Debug("No block yet", "blockNum", blockNum, "lastBlockNum", db.lastEntryContext.blockNum, "logIdx", logIdx, "complete", db.lastEntryContext.hasCompleteBlock())
 		return types.BlockSeal{}, types.ErrFuture
 	}
 
 	evtHash, iter, err := db.findLogInfo(blockNum, logIdx)
 	if err != nil {
+		db.log.Debug("Log not found yet", "blockNum", blockNum, "logIdx", logIdx, "complete", db.lastEntryContext.hasCompleteBlock())
 		if errors.Is(err, types.ErrFuture) && db.lastEntryContext.hasCompleteBlock() {
 			err = types.ErrConflict
 		}
