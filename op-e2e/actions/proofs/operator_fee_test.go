@@ -8,6 +8,7 @@ import (
 	actionsHelpers "github.com/ethereum-optimism/optimism/op-e2e/actions/helpers"
 	"github.com/ethereum-optimism/optimism/op-e2e/actions/proofs/helpers"
 	"github.com/ethereum-optimism/optimism/op-e2e/bindings"
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -107,7 +108,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 		// sequence L2 blocks, and submit with new batcher
 		env.Sequencer.ActL1HeadSignal(t)
 		env.Sequencer.ActBuildToL1Head(t)
-		env.Batcher.ActSubmitAll(t)
+		env.BatchAndMine(t)
 		env.Miner.ActL1StartBlock(12)(t)
 		env.Miner.ActL1EndBlock(t)
 
@@ -156,9 +157,13 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 
 			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance = getCurrentBalances()
 
+			bobInitialBalance := balanceAt(env.Bob.Address())
+
 			// regular Deposit, in new L1 block
 			env.Alice.L1.ActResetTxOpts(t)
-			env.Alice.L2.ActSetTxValue(new(big.Int).SetUint64(100000))
+			env.Alice.L2.ActResetTxOpts(t)
+			env.Alice.L2.ActSetTxToAddr(&env.Dp.Addresses.Bob)(t)
+			env.Alice.L2.ActSetTxValue(new(big.Int).SetUint64(10000))(t)
 			env.Alice.ActDeposit(t)
 			env.Miner.ActL1StartBlock(12)(t)
 			env.Miner.ActL1IncludeTx(env.Alice.Address())(t)
@@ -167,6 +172,12 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			// sync sequencer build enough blocks to adopt latest L1 origin
 			env.Sequencer.ActL1HeadSignal(t)
 			env.Sequencer.ActBuildToL1HeadUnsafe(t)
+
+			env.Alice.ActCheckDepositStatus(true, true)(t)
+
+			bobFinalBalance := balanceAt(env.Bob.Address())
+
+			require.Equal(t, bobInitialBalance.Uint64()+10000, bobFinalBalance.Uint64())
 
 			receipt, err = env.Alice.GetLastDepositL2Receipt(t)
 			require.NoError(t, err)
@@ -223,11 +234,22 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			),
 		)
 
-		require.Equal(t, aliceInitialBalance, finalTotalBalance)
+		if testCfg.Custom == DepositTx {
+			// Minus the deposit value that was sent to Bob
+			require.Equal(t, aliceInitialBalance.Uint64()-10000, finalTotalBalance.Uint64())
+		} else {
+			require.Equal(t, aliceInitialBalance, finalTotalBalance)
+		}
 
-		l2SafeHead := env.Sequencer.L2Safe()
+		l2UnsafeHead := env.Engine.L2Chain().CurrentHeader()
 
-		env.RunFaultProofProgram(t, l2SafeHead.Number, testCfg.CheckResult, testCfg.InputParams...)
+		env.BatchAndMine(t)
+		env.Sequencer.ActL1HeadSignal(t)
+		env.Sequencer.ActL2PipelineFull(t)
+
+		l2SafeHead := env.Engine.L2Chain().CurrentSafeBlock()
+
+		require.Equal(t, eth.HeaderBlockID(l2SafeHead), eth.HeaderBlockID(l2UnsafeHead), "derivation leads to the same block")
 	}
 
 	matrix := helpers.NewMatrix[testCase]()
