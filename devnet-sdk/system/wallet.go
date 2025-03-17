@@ -104,6 +104,90 @@ func (w *wallet) Balance() types.Balance {
 	return types.NewBalance(balance)
 }
 
+// Use op-supervisor/supervisor/types
+// useful identifier type
+// provides useful methods. No arbitrary sizing
+// types: Identifier(location of message)
+// types: Message(location + payload)
+// We can calculate by call Checksum
+// types: Access.
+// EncodeAccessList we can call this and turn these into the list
+
+// the devnet-sdk/contract/bindings should not be primary
+
+// keep the wallet simple
+
+// make them composable,
+// we can describe a list of jobs which implements Call and implements each of them
+
+
+
+// really we should keep functionality in the devnet sdk leanly
+// smaller interfaces the better
+// no more complexity on wallets
+// decouple interop logic from wallet
+//  ex) prepare a transaction for something
+// responsiblity of the caller to generate transaction
+
+// example
+// Make a type for the initiateMessage
+type InitiateMessage struct {
+	topics []common.Hash
+	data []byte
+}
+
+func (w *InitiateMessage) inputData() []byte {
+
+}
+
+type ExecuteMessage struct {
+	identifier Identifier
+}
+
+type Call interface {
+	inputData() []byte
+	accessList() []byte
+}
+
+// results contains (receipt + result)
+// some kind of lambda functions that transforms this kind of data to
+// some useful data types like identifiers
+// we also want to check the execution result
+// tx should pass/fail. We need to express it.
+
+// New abstractions: Call and Multicall
+type MultiCall struct {
+	calls []Call
+}
+
+func (mc *MultiCall) inputData() []byte{
+	var result []byte
+	// just a poc. Please consider that this is a valid calldata
+	// use valid ABI for the mulitcall
+	for _, call := range mc.calls {
+		result = append(result, call.inputData())
+	}
+	return result
+}
+
+func (mc *MultiCall) AccessList() []byte {
+	// combine all the access list from each calls
+	// union of the access lists
+}
+
+func (w *wallet) RunCall(call Call) {
+	// create transaction with below data
+	call.inputData()
+	// wallet do not need to know about interop
+	ac := call.accessList()
+	if len(ac) > 0 {
+		// add it to the transaction
+	}
+}
+
+// some notes about tx plan
+// one call: multicall.
+
 func (w *wallet) InitiateMessage(chainID types.ChainID, target common.Address, message []byte) types.WriteInvocation[any] {
 	return &initiateMessageImpl{
 		chain:     w.chain,
@@ -141,16 +225,46 @@ func (i *initiateMessageImpl) Call(ctx context.Context) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to init transaction: %w", err)
 	}
+	// basically most succicnt way for particular contract
+	// this is doing single responsibility
 	data, err := messenger.ABI().Pack("sendMessage", i.chainID, i.target, i.message)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build calldata: %w", err)
 	}
+	// Helper contract?
+	// We can just use https://github.com/EthereumClassicDAO/multicall3.
+	// packing the call to the message
+
+	// for example
+	// we can use the existing the transaction builder and build on top it.
 	tx, err := builder.BuildTx(
-		WithFrom(i.from),
-		WithTo(constants.L2ToL2CrossDomainMessenger),
-		WithValue(big.NewInt(0)),
-		WithData(data),
+		[
+			WithFrom(i.from),
+			WithTo(A),
+			WithValue(big.NewInt(0)),
+			WithData(data1),
+		],
+		[
+			WithFrom(i.from),
+			WithTo(B),
+			WithValue(big.NewInt(0)),
+			WithData(data2),
+		],
+		[
+			WithFrom(i.from),
+			WithTo(C),
+			WithValue(big.NewInt(0)),
+			WithData(data3),
+		]
 	)
+	// create a byteslice that does the multicall.
+	// so reuse the buildertx
+	// but make a utility to create a calldata for the multicall.
+	// contract bindings for the contract is needed.
+
+	// still, we use the txbuilder. Boilerplate!
+
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to build transaction: %w", err)
 	}

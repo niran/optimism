@@ -42,6 +42,13 @@ func messagePassingScenario(lowLevelSystemGetter validators.LowLevelSystemGetter
 
 		// Initiate message
 		logger.Info("Initiate message", "address", sha256PrecompileAddr, "message", dummyMessage)
+		// describe the initiate step and execution step.
+		// when we initiate the message, I want these topics, and these data to be emitted as an event
+		// when we execute, I have the identifier that points to the message, and validate it.
+
+		// upper two things, needs to be described as an intent
+		messageA := userA.InitiateMessage(chainB.ID(), sha256PrecompileAddr, dummyMessage)
+
 		initResult := userA.InitiateMessage(chainB.ID(), sha256PrecompileAddr, dummyMessage).Send(ctx)
 		require.NoError(t, initResult.Wait())
 
@@ -52,6 +59,10 @@ func messagePassingScenario(lowLevelSystemGetter validators.LowLevelSystemGetter
 		// We are directly calling sendMessage, so we expect single log for SentMessage event
 		require.Equal(t, 1, len(logs), "expected single log")
 		log := logs[0]
+
+		// upper logic can be wrapped. List of events -> ready for execute message.
+		// there can be a helper function that inputs a receipts and generates identifers
+		// less error prone then manual executing message construction.
 
 		// Build sentMessage for message execution
 		blockNumber := initReceipt.BlockNumber()

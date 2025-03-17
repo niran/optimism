@@ -41,6 +41,9 @@ func smokeTestScenario(chainIdx uint64, walletGetter validators.WalletGetter) sy
 		logger = logger.With("user", user.Address())
 		logger.Info("initial balance retrieved", "balance", initialBalance)
 
+		// SendETH is simple enough but for
+		// complex things like touching L2toL2CDM, we can
+		// encapsulate the logic from the wallet
 		logger.Info("sending ETH to contract", "amount", funds)
 		require.NoError(t, user.SendETH(scw0Addr, funds).Send(ctx).Wait())
 
