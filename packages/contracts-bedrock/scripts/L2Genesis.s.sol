@@ -21,7 +21,6 @@ import { Constants } from "src/libraries/Constants.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
 
 // Interfaces
-import { IOperatorFeeVault } from "interfaces/L2/IOperatorFeeVault.sol";
 import { IGovernanceToken } from "interfaces/governance/IGovernanceToken.sol";
 import { IGasPriceOracle } from "interfaces/L2/IGasPriceOracle.sol";
 import { IL1Block } from "interfaces/L2/IL1Block.sol";
@@ -422,20 +421,7 @@ contract L2Genesis is Deployer {
 
     /// @notice This predeploy is following the safety invariant #2.
     function setOperatorFeeVault() public {
-        IOperatorFeeVault vault = IOperatorFeeVault(
-            DeployUtils.create1({
-                _name: "OperatorFeeVault",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IOperatorFeeVault.__constructor__, ()))
-            })
-        );
-
-        address impl = Predeploys.predeployToCodeNamespace(Predeploys.OPERATOR_FEE_VAULT);
-        console.log("Setting %s implementation at: %s", "OperatorFeeVault", impl);
-        vm.etch(impl, address(vault).code);
-
-        /// Reset so its not included state dump
-        vm.etch(address(vault), "");
-        vm.resetNonce(address(vault));
+        _setImplementationCode(Predeploys.OPERATOR_FEE_VAULT);
     }
 
     /// @notice This predeploy is following the safety invariant #2.
@@ -633,6 +619,15 @@ contract L2Genesis is Deployer {
         });
         IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).setConfig(
             Types.ConfigType.L1_FEE_VAULT_CONFIG, abi.encode(l1FeeVaultConfig)
+        );
+
+        bytes32 operatorFeeVaultConfig = Encoding.encodeFeeVaultConfig({
+            _recipient: _config.operatorFeeVaultRecipient(),
+            _amount: _config.operatorFeeVaultMinimumWithdrawalAmount(),
+            _network: Types.WithdrawalNetwork(_config.operatorFeeVaultWithdrawalNetwork())
+        });
+        IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).setConfig(
+            Types.ConfigType.OPERATOR_FEE_VAULT_CONFIG, abi.encode(operatorFeeVaultConfig)
         );
         vm.stopPrank();
     }

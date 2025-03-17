@@ -414,6 +414,13 @@ contract Setup {
             _network: Types.WithdrawalNetwork(deploy.cfg().l1FeeVaultWithdrawalNetwork())
         });
         l1Block.setConfig(Types.ConfigType.L1_FEE_VAULT_CONFIG, abi.encode(l1FeeVaultConfig));
+
+        bytes32 operatorFeeVaultConfig = Encoding.encodeFeeVaultConfig({
+            _recipient: deploy.cfg().operatorFeeVaultRecipient(),
+            _amount: deploy.cfg().operatorFeeVaultMinimumWithdrawalAmount(),
+            _network: Types.WithdrawalNetwork(deploy.cfg().operatorFeeVaultWithdrawalNetwork())
+        });
+        l1Block.setConfig(Types.ConfigType.OPERATOR_FEE_VAULT_CONFIG, abi.encode(operatorFeeVaultConfig));
         vm.stopPrank();
 
         console.log("Setup: configured fee vaults");
