@@ -100,6 +100,8 @@ func TestInteropTxUsingL2toL2CDM(t *testing.T) {
 	require.NoError(t, err)
 
 	txA := NewIntent[*InitTrigger, *InteropOutput](optsA)
+	// Topics field is only needed when we call EventLogger contract
+	// We are using L2toL2CDM so make it empty
 	txA.Content.Set(&InitTrigger{
 		Emitter:    eventLogger,
 		Topics:     []common.Hash{},
