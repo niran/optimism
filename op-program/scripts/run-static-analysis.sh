@@ -23,10 +23,6 @@ if [[ "$VM_PROFILE" != "cannon-singlethreaded-32" && "$VM_PROFILE" != "cannon-mu
     usage
 fi
 
-# Detect OS and architecture
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-BIN_DIR="bin"
 ANALYZER_BIN="vm-compat"
 
 # Normalize architecture naming
