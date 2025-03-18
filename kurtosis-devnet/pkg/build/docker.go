@@ -5,7 +5,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
+	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"text/template"
 
@@ -50,7 +53,42 @@ type dockerProvider interface {
 type defaultDockerProvider struct{}
 
 func (p *defaultDockerProvider) newClient() (dockerClient, error) {
-	return client.NewClientWithOpts(client.FromEnv)
+	opts := []client.Opt{client.FromEnv}
+
+	// Check if default docker socket exists
+	hostURL, err := url.Parse(client.DefaultDockerHost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse default docker host: %w", err)
+	}
+
+	// For unix sockets, check if the socket file exists
+	unixOS := runtime.GOOS == "linux" || runtime.GOOS == "darwin"
+	if hostURL.Scheme == "unix" && unixOS {
+		if _, err := os.Stat(hostURL.Path); os.IsNotExist(err) {
+			// Default socket doesn't exist, try to find an alternate location. Docker Desktop uses a socket in the home directory.
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get user home directory: %w", err)
+			}
+			// Try to use the non-privileged socket if available
+			homeSocketPath := fmt.Sprintf("%s/.docker/run/docker.sock", homeDir)
+			if runtime.GOOS == "linux" {
+				homeSocketPath = fmt.Sprintf("%s/.docker/desktop/docker.sock", homeDir)
+			}
+
+			// If that socket exists, make it the default. Otherwise, leave it alone, and hope some environment variable has been set.
+			if _, err := os.Stat(homeSocketPath); err == nil {
+				socketURL := &url.URL{
+					Scheme: "unix",
+					Path:   homeSocketPath,
+				}
+				// prepend the host, so that it can still be overridden by the environment.
+				opts = append([]client.Opt{client.WithHost(socketURL.String())}, opts...)
+			}
+		}
+	}
+
+	return client.NewClientWithOpts(opts...)
 }
 
 // DockerBuilder handles building docker images using just commands

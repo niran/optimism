@@ -1383,7 +1383,7 @@ func assertTime(t helpers.Testing, chain *dsl.Chain, unsafe, crossUnsafe, localS
 func assertUserDepositEmitted(t helpers.Testing, chain *dsl.Chain, number *big.Int, emitter *dsl.EmitterContract) {
 	block, err := chain.SequencerEngine.EthClient().BlockByNumber(t.Ctx(), number)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(block.Transactions()), 3) // l1-attrs + user-deposit + l1-attrs (end deposit contxt) + [txs]
+	require.GreaterOrEqual(t, len(block.Transactions()), 2) // l1-attrs + user-deposit + [txs]
 	userDepositTx := block.Transactions()[1]
 	require.NotNil(t, userDepositTx.To())
 	require.Equal(t, emitter.Address(chain), *userDepositTx.To())
