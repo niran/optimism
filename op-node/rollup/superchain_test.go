@@ -2,6 +2,7 @@ package rollup
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -59,26 +60,30 @@ func TestSuperchainGasLimit(t *testing.T) {
 		{
 			a: sysCfgAddressGetter,
 			f: w3.MustNewFunc("gasLimit()", "uint64"),
-			r: func() any { return new(uint64) },
+			r: func() []any { return []any{new(uint64)} },
 		},
-		// {
-		// 	a: sysCfgAddressGetter,
-		// 	f: w3.MustNewFunc("resourceConfig()", "(uint32,uint8,uint8,uint32,uint32,uint128)"),
-		// 	r: func() any { return []any{new(uint32), new(uint8), new(uint8), new(uint32), new(uint32), new(big.Int)} },
-		// },
+		{
+			a: sysCfgAddressGetter,
+			f: w3.MustNewFunc("resourceConfig()", "uint32,uint8,uint8,uint32,uint32,uint128"),
+			r: func() []any {
+				return []any{new(uint32), new(uint8), new(uint8), new(uint32), new(uint32), new(big.Int)}
+			},
+		},
 	})
 	require.NotNil(t, r)
 
-	gl := *r["op-mainnet"]["gasLimit()"].(*uint64)
+	gl := *r["op-mainnet"]["gasLimit()"][0].(*uint64)
 	t.Logf("%d", gl)
 	for chainID, chainResults := range r {
-		t.Log("Chain:", chainID, "GasLimit", fmt.Sprintf("%.1fM", float64(*chainResults["gasLimit()"].(*uint64))/1000000))
-		assert.GreaterOrEqual(t, *chainResults["gasLimit()"].(*uint64), uint64(30_000_000))
+		t.Log("Chain:", chainID, "GasLimit", fmt.Sprintf("%.1fM", float64(*chainResults["gasLimit()"][0].(*uint64))/1000000))
+		assert.GreaterOrEqual(t, *chainResults["gasLimit()"][0].(*uint64), uint64(30_000_000))
+		t.Log("Chain:", chainID, "ResourceConfig", *chainResults["resourceConfig()"][0].(*uint32))
+		assert.GreaterOrEqual(t, *chainResults["resourceConfig()"][0].(*uint32), uint32(1000))
 	}
 }
 
 type AddressGetter func(superchain.ChainConfig) *common.Address
-type ReturnsMaker func() any
+type ReturnsMaker func() []any
 type call struct {
 	a AddressGetter
 	f *w3.Func
@@ -86,7 +91,7 @@ type call struct {
 }
 
 // maps chain name to function signature to result
-type results map[string]map[string]interface{}
+type results map[string]map[string][]any
 
 func GetL1SuperchainInformation(calls []call) results {
 	results := make(results)
@@ -108,7 +113,7 @@ func GetL1SuperchainInformation(calls []call) results {
 			if ch.Network != sc {
 				continue
 			}
-			results[chain] = make(map[string]any)
+			results[chain] = make(map[string][]any)
 			cfg, err := ch.Config()
 			if err != nil {
 				panic(err)
@@ -124,7 +129,7 @@ func GetL1SuperchainInformation(calls []call) results {
 			// loop over calls
 			for _, call := range calls {
 				results[chain][call.f.Signature] = call.r()
-				rawCalls = append(rawCalls, eth.CallFunc(*(call.a(*cfg)), call.f).Returns(results[chain][call.f.Signature]))
+				rawCalls = append(rawCalls, eth.CallFunc(*(call.a(*cfg)), call.f).Returns(results[chain][call.f.Signature]...))
 			}
 		}
 		fmt.Println("making batch call")
