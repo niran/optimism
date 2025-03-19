@@ -1763,7 +1763,7 @@ workflows:
       - publish-cannon-prestates:
           when:
             condition:
-              equal: ["optimism", <<pipeline.parameters.repo>>]
+              equal: ["optimism", <<pipeline.parameters.repo_name>>]
           context:
             - slack
             - oplabs-network-optimism-io-bucket
