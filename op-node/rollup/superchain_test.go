@@ -54,19 +54,22 @@ func TestSuperchainGasLimit(t *testing.T) {
 		return cfg.Addresses.SystemConfigProxy
 	}
 
-	var callfunc = w3.MustNewFunc("gasLimit()", "uint64")
-
 	r := GetL1SuperchainInformation([]call{
 		{
 			a: sysCfgAddressGetter,
-			f: callfunc,
-			r: new(uint64),
+			f: w3.MustNewFunc("gasLimit()", "uint64"),
+			r: func() any { return new(uint64) },
 		},
+		// {
+		// 	a: sysCfgAddressGetter,
+		// 	f: w3.MustNewFunc("resourceConfig()", "(uint32,uint8,uint8,uint32,uint32,uint128)"),
+		// 	r: func() any { return []any{new(uint32), new(uint8), new(uint8), new(uint32), new(uint32), new(big.Int)} },
+		// },
 	})
 	require.NotNil(t, r)
 
-	// gl := *r[10]["gasLimit()"].(*uint64)
-	// t.Logf("%d", gl)
+	gl := *r["op-mainnet"]["gasLimit()"].(*uint64)
+	t.Logf("%d", gl)
 	for chainID, chainResults := range r {
 		t.Log("Chain:", chainID, "GasLimit", fmt.Sprintf("%.1fM", float64(*chainResults["gasLimit()"].(*uint64))/1000000))
 		require.GreaterOrEqual(t, *chainResults["gasLimit()"].(*uint64), uint64(30_000_000))
@@ -74,14 +77,15 @@ func TestSuperchainGasLimit(t *testing.T) {
 }
 
 type AddressGetter func(superchain.ChainConfig) *common.Address
+type ReturnsMaker func() any
 type call struct {
 	a AddressGetter
 	f *w3.Func
-	r any // return type
+	r ReturnsMaker
 }
 
-// maps chainId to function signature to result
-type results map[uint64]map[string]interface{}
+// maps chain name to function signature to result
+type results map[string]map[string]interface{}
 
 func GetL1SuperchainInformation(calls []call) results {
 	results := make(results)
@@ -106,7 +110,7 @@ func GetL1SuperchainInformation(calls []call) results {
 			if err != nil {
 				panic(err)
 			}
-			results[cfg.ChainID] = make(map[string]interface{})
+			results[chain] = make(map[string]interface{})
 			superC, err := superchain.GetSuperchain(ch.Network)
 			if err != nil {
 				panic(err)
@@ -117,10 +121,10 @@ func GetL1SuperchainInformation(calls []call) results {
 			// loop over calls
 			rawCalls := make([]w3types.RPCCaller, len(calls))
 			for i, call := range calls {
-				results[cfg.ChainID][call.f.Signature] = call.r
-				rawCalls[i] = eth.CallFunc(*(call.a(*cfg)), call.f).Returns(results[cfg.ChainID][call.f.Signature])
+				results[chain][call.f.Signature] = call.r()
+				rawCalls[i] = eth.CallFunc(*(call.a(*cfg)), call.f).Returns(results[chain][call.f.Signature])
 			}
-			fmt.Printf("%+v", rawCalls)
+			err = client.Call(rawCalls...)
 			if err != nil {
 				panic(err)
 			}
