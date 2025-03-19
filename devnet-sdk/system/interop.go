@@ -85,13 +85,8 @@ func (v *ExecTrigger) AccessList() (types.AccessList, error) {
 }
 
 type RelayTrigger struct {
-	Executor common.Address // address of the EventLogger contract
-	Msg      suptypes.Message
-	Payload  []byte
-}
-
-func (v *RelayTrigger) To() (*common.Address, error) {
-	return &v.Executor, nil
+	ExecTrigger
+	Payload []byte
 }
 
 func (v *RelayTrigger) Data() ([]byte, error) {
@@ -119,15 +114,6 @@ func (v *RelayTrigger) Data() ([]byte, error) {
 		return nil, err
 	}
 	return relayMessageCalldata, nil
-}
-
-func (v *RelayTrigger) AccessList() (types.AccessList, error) {
-	access := v.Msg.Access()
-	accessList := types.AccessList{{
-		Address:     constants.CrossL2Inbox,
-		StorageKeys: suptypes.EncodeAccessList([]suptypes.Access{access}),
-	}}
-	return accessList, nil
 }
 
 type Call interface {
@@ -237,9 +223,11 @@ func RelayIndexed(executor common.Address, events *plan.Lazy[*InteropOutput], re
 			return nil, fmt.Errorf("payload hash does not match, want %s but got %s", msg.PayloadHash.Hex(), payloadHash.Hex())
 		}
 		return &RelayTrigger{
-			Executor: executor,
-			Msg:      msg,
-			Payload:  payload,
+			ExecTrigger: ExecTrigger{
+				Executor: executor,
+				Msg:      msg,
+			},
+			Payload: payload,
 		}, nil
 	}
 }
