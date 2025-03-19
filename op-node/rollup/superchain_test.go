@@ -1,11 +1,13 @@
 package rollup
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/superchain"
 	"github.com/lmittmann/w3"
+	"github.com/lmittmann/w3/module/eth"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpgradeTxGas(t *testing.T) {
@@ -25,12 +27,20 @@ func TestUpgradeTxGas(t *testing.T) {
 		}
 
 		sysCfg := cfg.Addresses.SystemConfigProxy
-		funcBalanceOf = w3.MustNewFunc("balanceOf(address)", "uint256")
+		funcGasLimit := w3.MustNewFunc("gasLimit()", "uint64")
+		sc, err := superchain.GetSuperchain(ch.Network)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
 
-		addrA = common.Address{0x0a}
-
-		addrWETH = w3.A("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
-
-		client = w3.MustDial("https://rpc.ankr.com/eth")
+		client := w3.MustDial(sc.L1.PublicRPC)
+		defer client.Close()
+		var gasLimit uint64
+		err = client.Call(eth.CallFunc(*sysCfg, funcGasLimit).Returns(&gasLimit))
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		t.Log("Chain:", chain, "GasLimit", fmt.Sprintf("%.1fM", float64(gasLimit)/1000000))
+		require.GreaterOrEqual(t, gasLimit, uint64(30_000_000))
 	}
 }
