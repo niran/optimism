@@ -131,4 +131,15 @@ library Types {
         CHUGSPLASH,
         RESOLVED
     }
+
+    /// @notice Configuration parameters for fee vault withdrawals.
+    /// @custom:field recipient The address that will receive withdrawn fees.
+    /// @custom:field minWithdrawalAmount The minimum amount of fees (in wei) that must accumulate before a withdrawal
+    ///               can be initiated.
+    /// @custom:field withdrawalNetwork Specifies which network (L1 or L2) the fees should be withdrawn to.
+    struct FeeVaultConfig {
+        address recipient;
+        uint256 minWithdrawalAmount;
+        Types.WithdrawalNetwork withdrawalNetwork;
+    }
 }
