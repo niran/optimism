@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/bindings"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/constants"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/system"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/testing/systest"
@@ -17,12 +18,80 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum-optimism/optimism/op-service/testutils"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/lmittmann/w3"
 	"github.com/stretchr/testify/require"
 )
+
+func eventloggerdeploy(lowLevelSystemGetter validators.LowLevelSystemGetter, chainIdx uint64, sourceWalletGetter validators.WalletGetter) systest.InteropSystemTestFunc {
+	return func(t systest.T, sys system.InteropSystem) {
+		ctx := t.Context()
+		llsys := lowLevelSystemGetter(ctx)
+
+		logger := testlog.Logger(t, log.LevelInfo)
+		chain := llsys.L2s()[chainIdx]
+		client, err := chain.GethClient()
+		require.NoError(t, err)
+
+		wallet := sourceWalletGetter(ctx)
+
+		logger.Info("Deploying EventLogger", "chainID", chain.ID)
+
+		opts, err := bind.NewKeyedTransactorWithChainID(wallet.PrivateKey(), chain.ID())
+		require.NoError(t, err)
+
+		eventLoggerAddress, deployTx, eventLogger, err := bindings.DeployEventlogger(opts, client)
+		require.NoError(t, err)
+
+		_, err = wait.ForReceiptOK(ctx, client, deployTx.Hash())
+		require.NoError(t, err)
+
+		logger.Info("Deployed EventLogger", "address", eventLoggerAddress)
+
+		rng := rand.New(rand.NewSource(1234))
+
+		cnt := 3
+		topics := [][32]byte{}
+		for idx := 0; idx < cnt; idx++ {
+			var topic [32]byte
+			copy(topic[:], testutils.RandomData(rng, 32))
+			topics = append(topics, topic)
+
+			log.Info("input", "idx", idx, "topic", hex.EncodeToString(topics[idx][:]))
+		}
+		data := []byte{0x12, 0x34}
+		log.Info("input", "data", hex.EncodeToString(data))
+
+		tx, err := eventLogger.EmitLog(opts, topics, data)
+		require.NoError(t, err)
+
+		receipt, err := wait.ForReceiptOK(ctx, client, tx.Hash())
+		require.NoError(t, err)
+
+		// we only emit single log
+		require.Equal(t, 1, len(receipt.Logs))
+		log := receipt.Logs[0]
+		for idx, topic := range log.Topics {
+			require.Equal(t, topics[idx][:], topic.Bytes())
+		}
+		require.Equal(t, data, log.Data)
+	}
+}
+
+func TestEventLogger(t *testing.T) {
+	chainIdx := uint64(0)
+	walletGetter, sourcefundsValidator := validators.AcquireL2WalletWithFunds(chainIdx, sdktypes.NewBalance(big.NewInt(1.0*constants.ETH)))
+	lowLevelSystemGetter, lowLevelSystemValidator := validators.AcquireLowLevelSystem()
+
+	systest.InteropSystemTest(t,
+		eventloggerdeploy(lowLevelSystemGetter, chainIdx, walletGetter),
+		sourcefundsValidator,
+		lowLevelSystemValidator,
+	)
+}
 
 func simpleTxWalletV2(lowLevelSystemGetter validators.LowLevelSystemGetter, chainIdx uint64, sourceWalletGetter validators.WalletGetter) systest.InteropSystemTestFunc {
 	return func(t systest.T, sys system.InteropSystem) {
