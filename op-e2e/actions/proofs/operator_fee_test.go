@@ -37,8 +37,6 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 	// The deployed bytecode below is from the contract above
 	testStorageUpdateContractCode := common.FromHex("0x6080604052348015600e575f80fd5b50600436106026575f3560e01c806360fe47b114602a575b5f80fd5b60406004803603810190603c9190607d565b6042565b005b805f8190555050565b5f80fd5b5f819050919050565b605f81604f565b81146068575f80fd5b50565b5f813590506077816058565b92915050565b5f60208284031215608f57608e604b565b5b5f609a84828501606b565b9150509291505056fea26469706673582212201712a1e6e9c5e2ba1f8f7403f5d6e00090c6fa2b70c632beea4be8009331bd2064736f6c63430008190033")
 
-	l1InfoDepositorAddress := common.HexToAddress("0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001")
-
 	runIsthmusDerivationTest := func(gt *testing.T, testCfg *helpers.TestCfg[testCase]) {
 		t := actionsHelpers.NewDefaultTesting(gt)
 		deployConfigOverrides := func(dp *genesis.DeployConfig) {}
@@ -69,15 +67,14 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			return bal
 		}
 
-		getCurrentBalances := func() (alice *big.Int, l1FeeVault *big.Int, baseFeeVault *big.Int, sequencerFeeVault *big.Int, operatorFeeVault *big.Int, depositor *big.Int) {
+		getCurrentBalances := func() (alice *big.Int, l1FeeVault *big.Int, baseFeeVault *big.Int, sequencerFeeVault *big.Int, operatorFeeVault *big.Int) {
 			alice = balanceAt(env.Alice.Address())
 			l1FeeVault = balanceAt(predeploys.L1FeeVaultAddr)
 			baseFeeVault = balanceAt(predeploys.BaseFeeVaultAddr)
 			sequencerFeeVault = balanceAt(predeploys.SequencerFeeVaultAddr)
 			operatorFeeVault = balanceAt(predeploys.OperatorFeeVaultAddr)
-			depositor = balanceAt(l1InfoDepositorAddress)
 
-			return alice, l1FeeVault, baseFeeVault, sequencerFeeVault, operatorFeeVault, depositor
+			return alice, l1FeeVault, baseFeeVault, sequencerFeeVault, operatorFeeVault
 		}
 
 		setStorageInUpdateContractTo := func(value byte) {
@@ -123,13 +120,12 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 		var l1FeeVaultInitialBalance *big.Int
 		var sequencerFeeVaultInitialBalance *big.Int
 		var operatorFeeVaultInitialBalance *big.Int
-		var depositorInitialBalance *big.Int
 
 		var receipt *types.Receipt
 
 		switch testCfg.Custom {
 		case NormalTx, IsthmusTransitionBlock:
-			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance, depositorInitialBalance = getCurrentBalances()
+			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance = getCurrentBalances()
 
 			require.Equal(t, operatorFeeVaultInitialBalance.Sign(), 0)
 
@@ -150,14 +146,14 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			setStorageInUpdateContractTo(1)
 			rSet := env.Alice.L2.LastTxReceipt(t)
 			require.Equal(t, uint64(43696), rSet.GasUsed)
-			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance, depositorInitialBalance = getCurrentBalances()
+			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance = getCurrentBalances()
 			setStorageInUpdateContractTo(0)
 			rUnset := env.Alice.L2.LastTxReceipt(t)
 			// we assert on the exact gas used to show that a refund is happening
 			require.Equal(t, uint64(21784), rUnset.GasUsed)
 
 		case DepositTx:
-			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance, depositorInitialBalance = getCurrentBalances()
+			aliceInitialBalance, l1FeeVaultInitialBalance, baseFeeVaultInitialBalance, sequencerFeeVaultInitialBalance, operatorFeeVaultInitialBalance = getCurrentBalances()
 
 			// regular Deposit, in new L1 block
 			env.Alice.L1.ActResetTxOpts(t)
@@ -178,7 +174,7 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			require.NoError(t, err)
 		}
 
-		aliceFinalBalance, l1FeeVaultFinalBalance, baseFeeVaultFinalBalance, sequencerFeeVaultFinalBalance, operatorFeeVaultFinalBalance, depositorFinalBalance := getCurrentBalances()
+		aliceFinalBalance, l1FeeVaultFinalBalance, baseFeeVaultFinalBalance, sequencerFeeVaultFinalBalance, operatorFeeVaultFinalBalance := getCurrentBalances()
 
 		if receipt == nil {
 			receipt = env.Alice.L2.LastTxReceipt(t)
@@ -222,16 +218,13 @@ func Test_ProgramAction_OperatorFeeConstistency(gt *testing.T) {
 			aliceFinalBalance,
 			new(big.Int).Add(
 				new(big.Int).Add(
-					new(big.Int).Add(
-						new(big.Int).Sub(l1FeeVaultFinalBalance, l1FeeVaultInitialBalance),
-						new(big.Int).Sub(sequencerFeeVaultFinalBalance, sequencerFeeVaultInitialBalance),
-					),
-					new(big.Int).Add(
-						new(big.Int).Sub(operatorFeeVaultFinalBalance, operatorFeeVaultInitialBalance),
-						new(big.Int).Sub(baseFeeVaultFinalBalance, baseFeeVaultInitialBalance),
-					),
+					new(big.Int).Sub(l1FeeVaultFinalBalance, l1FeeVaultInitialBalance),
+					new(big.Int).Sub(sequencerFeeVaultFinalBalance, sequencerFeeVaultInitialBalance),
 				),
-				new(big.Int).Sub(depositorFinalBalance, depositorInitialBalance),
+				new(big.Int).Add(
+					new(big.Int).Sub(operatorFeeVaultFinalBalance, operatorFeeVaultInitialBalance),
+					new(big.Int).Sub(baseFeeVaultFinalBalance, baseFeeVaultInitialBalance),
+				),
 			),
 		)
 
