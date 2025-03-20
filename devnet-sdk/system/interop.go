@@ -20,7 +20,7 @@ import (
 
 type InitTrigger struct {
 	Emitter    common.Address // address of the EventLogger contract
-	Topics     []common.Hash
+	Topics     [][32]byte
 	OpaqueData []byte
 }
 
@@ -29,9 +29,8 @@ func (v *InitTrigger) To() (*common.Address, error) {
 }
 
 func (v *InitTrigger) Data() ([]byte, error) {
-	data := []byte{}
-
-	return data, nil
+	emitLog := w3.MustNewFunc("emitLog(bytes32[] topics, bytes data)", "")
+	return emitLog.EncodeArgs(v.Topics, v.OpaqueData)
 }
 
 func (v *InitTrigger) AccessList() (types.AccessList, error) {

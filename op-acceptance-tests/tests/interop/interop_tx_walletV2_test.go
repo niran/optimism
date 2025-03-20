@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/lmittmann/w3"
@@ -68,17 +67,18 @@ func eventloggerdeploy(lowLevelSystemGetter validators.LowLevelSystemGetter, cha
 		data := []byte{0x12, 0x34}
 		log.Info("input", "data", hex.EncodeToString(data))
 
-		emitLog := w3.MustNewFunc("emitLog(bytes32[] topics, bytes data)", "")
-		emitLogCalldata, err := emitLog.EncodeArgs(topics, data)
-		require.NoError(t, err)
-
 		txplanOpts := txplan.CombineOptions(
 			txplan.WithTo(&eventLoggerAddress),
 			system.DefaultTxSubmitOptions(walletV2),
 			system.DefaultTxInclusionOptions(walletV2),
 		)
-		txSimple := txplan.NewPlannedTx(txplanOpts, txplan.WithData(hexutil.Bytes(emitLogCalldata)))
-		receipt, err := txSimple.Included.Eval(ctx)
+		tx := system.NewIntent[*system.InitTrigger, *system.InteropOutput](txplanOpts)
+		tx.Content.Set(&system.InitTrigger{
+			Emitter:    eventLoggerAddress,
+			Topics:     topics,
+			OpaqueData: data,
+		})
+		receipt, err := tx.PlannedTx.Included.Eval(ctx)
 		require.NoError(t, err)
 
 		// we only emit single log
