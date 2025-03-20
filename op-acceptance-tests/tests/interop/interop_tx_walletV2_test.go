@@ -106,28 +106,35 @@ func eventloggerdeployandEmitandValidate(lowLevelSystemGetter validators.LowLeve
 		// lets execute the message twice
 		txC := system.NewIntent[*system.MultiTrigger, *system.MulticallOutput](optsB)
 
+		multicall3 := common.HexToAddress(predeploys.MultiCall3)
 		calls := make([]system.Call, 0)
 		calls = append(calls, &system.ExecTrigger{Executor: CrossL2InboxAddr, Msg: txB.Content.Value().Msg})
 		calls = append(calls, &system.ExecTrigger{Executor: CrossL2InboxAddr, Msg: txB.Content.Value().Msg})
-		txC.Content.Set(&system.MultiTrigger{Calls: calls})
+		txC.Content.Set(&system.MultiTrigger{Executor: multicall3, Calls: calls})
 
 		recC, err := txC.PlannedTx.Included.Eval(ctx)
 		require.NoError(t, err)
 		logger.Info("included validating message twice", "block", recC.BlockHash)
 
-		// can we multicall inittrigger? do this in chain B
+		// can we multicall inittrigger?
 		topicsE, dataE := randTopicAndData(1, 15)
 		topicsF, dataF := randTopicAndData(2, 13)
 
+		optsAA := optsFunc(walletA)
 		calls2 := make([]system.Call, 0)
 		calls2 = append(calls2, &system.InitTrigger{Emitter: eventLoggerAddress, Topics: topicsE, OpaqueData: dataE})
 		calls2 = append(calls2, &system.InitTrigger{Emitter: eventLoggerAddress, Topics: topicsF, OpaqueData: dataF})
-		txD := system.NewIntent[*system.MultiTrigger, *system.InteropOutput](optsB)
-		txD.Content.Set(&system.MultiTrigger{Calls: calls2})
+		txD := system.NewIntent[*system.MultiTrigger, *system.InteropOutput](optsAA)
+		txD.Content.Set(&system.MultiTrigger{Executor: multicall3, Calls: calls2})
 
 		recD, err := txD.PlannedTx.Included.Eval(ctx)
 		require.NoError(t, err)
 		logger.Info("included initiating message twice", "block", recD.BlockHash)
+
+		interopoutput, err := txD.Result.Eval(ctx)
+		require.NoError(t, err)
+
+		require.Equal(t, len(calls), len(interopoutput.Entries))
 
 	}
 }
