@@ -26,29 +26,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func eventloggerdeploy(lowLevelSystemGetter validators.LowLevelSystemGetter, chainIdx uint64, sourceWalletGetter validators.WalletGetter) systest.InteropSystemTestFunc {
+func eventloggerdeployandEmitandValidate(lowLevelSystemGetter validators.LowLevelSystemGetter, sourceChainIdx, destChainIdx uint64, sourceWalletGetter, destWalletGetter validators.WalletGetter) systest.InteropSystemTestFunc {
 	return func(t systest.T, sys system.InteropSystem) {
 		ctx := t.Context()
 		llsys := lowLevelSystemGetter(ctx)
 
 		logger := testlog.Logger(t, log.LevelInfo)
-		chain := llsys.L2s()[chainIdx]
-		client, err := chain.GethClient()
+		chainA := llsys.L2s()[sourceChainIdx]
+		chainB := llsys.L2s()[destChainIdx]
+
+		clientA, err := chainA.GethClient()
 		require.NoError(t, err)
 
-		wallet := sourceWalletGetter(ctx)
-		walletV2, err := system.NewWalletV2FromWalletAndChain(ctx, sourceWalletGetter(ctx), chain)
+		// walletA is funded at chainA and want to initialize message at chain A
+		walletA, err := system.NewWalletV2FromWalletAndChain(ctx, sourceWalletGetter(ctx), chainA)
+		require.NoError(t, err)
+		// walletB is funded at chainB and want to execute message to chainB
+		walletB, err := system.NewWalletV2FromWalletAndChain(ctx, destWalletGetter(ctx), chainB)
 		require.NoError(t, err)
 
-		logger.Info("Deploying EventLogger", "chainID", chain.ID)
+		logger.Info("Deploying EventLogger", "chainA", chainA.ID)
 
-		opts, err := bind.NewKeyedTransactorWithChainID(wallet.PrivateKey(), chain.ID())
+		opts, err := bind.NewKeyedTransactorWithChainID(walletA.PrivateKey(), chainA.ID())
 		require.NoError(t, err)
 
-		eventLoggerAddress, deployTx, _, err := bindings.DeployEventlogger(opts, client)
+		eventLoggerAddress, deployTx, _, err := bindings.DeployEventlogger(opts, clientA)
 		require.NoError(t, err)
 
-		_, err = wait.ForReceiptOK(ctx, client, deployTx.Hash())
+		_, err = wait.ForReceiptOK(ctx, clientA, deployTx.Hash())
 		require.NoError(t, err)
 
 		logger.Info("Deployed EventLogger", "address", eventLoggerAddress)
@@ -69,36 +74,58 @@ func eventloggerdeploy(lowLevelSystemGetter validators.LowLevelSystemGetter, cha
 
 		txplanOpts := txplan.CombineOptions(
 			txplan.WithTo(&eventLoggerAddress),
-			system.DefaultTxSubmitOptions(walletV2),
-			system.DefaultTxInclusionOptions(walletV2),
+			system.DefaultTxSubmitOptions(walletA),
+			system.DefaultTxInclusionOptions(walletA),
 		)
-		tx := system.NewIntent[*system.InitTrigger, *system.InteropOutput](txplanOpts)
-		tx.Content.Set(&system.InitTrigger{
+		txA := system.NewIntent[*system.InitTrigger, *system.InteropOutput](txplanOpts)
+		txA.Content.Set(&system.InitTrigger{
 			Emitter:    eventLoggerAddress,
 			Topics:     topics,
 			OpaqueData: data,
 		})
-		receipt, err := tx.PlannedTx.Included.Eval(ctx)
+		recA, err := txA.PlannedTx.Included.Eval(ctx)
+		logger.Info("included emitting message", "block", recA.BlockHash)
 		require.NoError(t, err)
 
 		// we only emit single log
-		require.Equal(t, 1, len(receipt.Logs))
-		log := receipt.Logs[0]
+		require.Equal(t, 1, len(recA.Logs))
+		log := recA.Logs[0]
 		for idx, topic := range log.Topics {
 			require.Equal(t, topics[idx][:], topic.Bytes())
 		}
 		require.Equal(t, data, log.Data)
+
+		optsFunc := func(w system.WalletV2) txplan.Option {
+			opts := txplan.CombineOptions(
+				system.DefaultTxSubmitOptions(w),
+				system.DefaultTxInclusionOptions(w),
+			)
+			return opts
+		}
+		optsB := optsFunc(walletB)
+
+		txB := system.NewIntent[*system.ExecTrigger, *system.InteropOutput](optsB)
+		txB.Content.DependOn(&txA.Result)
+
+		CrossL2InboxAddr := common.HexToAddress(predeploys.CrossL2Inbox)
+		txB.Content.Fn(system.ExecuteIndexed(CrossL2InboxAddr, &txA.Result, 0))
+		recB, err := txB.PlannedTx.Included.Eval(ctx)
+		require.NoError(t, err)
+		logger.Info("included validating message", "block", recB.BlockHash)
 	}
 }
 
-func TestEventLogger(t *testing.T) {
-	chainIdx := uint64(0)
-	walletGetter, sourcefundsValidator := validators.AcquireL2WalletWithFunds(chainIdx, sdktypes.NewBalance(big.NewInt(1.0*constants.ETH)))
+func TestEventLoggerDeployAndEmitandValidate(t *testing.T) {
+	sourceChainIdx := uint64(0)
+	destChainIdx := uint64(1)
+	sourceWalletGetter, sourcefundsValidator := validators.AcquireL2WalletWithFunds(sourceChainIdx, sdktypes.NewBalance(big.NewInt(1.0*constants.ETH)))
+	destWalletGetter, destfundsValiator := validators.AcquireL2WalletWithFunds(destChainIdx, sdktypes.NewBalance(big.NewInt(1.0*constants.ETH)))
 	lowLevelSystemGetter, lowLevelSystemValidator := validators.AcquireLowLevelSystem()
 
 	systest.InteropSystemTest(t,
-		eventloggerdeploy(lowLevelSystemGetter, chainIdx, walletGetter),
+		eventloggerdeployandEmitandValidate(lowLevelSystemGetter, sourceChainIdx, destChainIdx, sourceWalletGetter, destWalletGetter),
 		sourcefundsValidator,
+		destfundsValiator,
 		lowLevelSystemValidator,
 	)
 }
