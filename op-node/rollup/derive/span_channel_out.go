@@ -175,7 +175,6 @@ func (co *SpanChannelOut) addSingularBatch(batch *SingularBatch, seqNum uint64) 
 	co.swapRLP()
 	active := co.activeRLP()
 	active.Truncate(co.sealedRLPBytes)
-	fmt.Println("JULIAN 3", co.batchDataOptions)
 	if err = rlp.Encode(active, NewBatchData(rawSpanBatch, co.batchDataOptions...)); err != nil {
 		return fmt.Errorf("failed to encode RawSpanBatch into bytes: %w", err)
 	}
