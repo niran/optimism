@@ -2,8 +2,6 @@ package proofs_test
 
 import (
 	"bytes"
-	"compress/zlib"
-	"encoding/binary"
 	"io"
 	"math/big"
 	"testing"
@@ -13,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm/program"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
@@ -174,10 +171,10 @@ func testInvalidSetCodeTxBatch(gt *testing.T, testCfg *helpers.TestCfg[any]) {
 	rng := rand.New(rand.NewSource(0))
 	setcodetx := testutils.RandomSetCodeTx(rng, types.NewPragueSigner(env.Sd.RollupCfg.L2ChainID))
 	batcher.ActL2BatchBuffer(t)
-	batcher.ActL2BatchBuffer(t, func(block *types.Block) *types.Block {
+	batcher.ActL2BatchBuffer(t, actionsHelpers.WithBlockModifier(func(block *types.Block) *types.Block {
 		// inject user tx into upgrade batch
 		return block.WithBody(types.Body{Transactions: append(block.Transactions(), setcodetx)})
-	})
+	}))
 	batcher.ActL2ChannelClose(t)
 	batcher.ActL2BatchSubmit(t)
 	miner.ActL1StartBlock(12)(t)
@@ -210,25 +207,17 @@ func Test_ProgramAction_SetCodeTxWithContractCreationBitSet(gt *testing.T) {
 	matrix.Run(gt)
 }
 
-type readerWithCurrPos struct {
-	io.Reader
-	currPos uint
+type spanBatchWithContractCreationBits struct {
+	derive.RawSpanBatch
+	overrideContractCreationBits *big.Int
 }
 
-func (r *readerWithCurrPos) Read(p []byte) (n int, err error) {
-	n, err = r.Reader.Read(p)
-	r.currPos += uint(n)
-	return n, err
-}
-
-func (r *readerWithCurrPos) CurrPos() uint {
-	return r.currPos
-}
-
-func (r *readerWithCurrPos) ReadByte() (byte, error) {
-	var b [1]byte
-	_, err := r.Read(b[:])
-	return b[0], err
+func (b *spanBatchWithContractCreationBits) Encode(w io.Writer) error {
+	batchCpy := *b
+	batchTxsCpy := *b.Txs
+	batchCpy.Txs = &batchTxsCpy
+	batchCpy.Txs.ContractCreationBits = b.overrideContractCreationBits
+	return batchCpy.RawSpanBatch.Encode(w)
 }
 
 func runSetCodeTxTypeWithContractCreationBitSetTest(gt *testing.T, testCfg *helpers.TestCfg[any]) {
@@ -285,100 +274,27 @@ func runSetCodeTxTypeWithContractCreationBitSetTest(gt *testing.T, testCfg *help
 	}
 	tx2 := types.MustSignNewTx(env.Alice.L2.Secret(), signer, txdata2)
 
-	batcher.ActL2BatchBuffer(t, func(block *types.Block) *types.Block {
-		// inject user tx into upgrade batch
-		return block.WithBody(types.Body{Transactions: append(block.Transactions(), tx, tx2)})
-	})
+	batcher.ActL2BatchBuffer(
+		t,
+		actionsHelpers.WithBlockModifier(func(block *types.Block) *types.Block {
+			// inject user tx into upgrade batch
+			return block.WithBody(types.Body{Transactions: append(block.Transactions(), tx, tx2)})
+		}),
+		actionsHelpers.WithChannelModifier(
+			derive.WithBatchDataOptions(
+				derive.WithBatchTypeOverride(func(batchData *derive.RawSpanBatch) derive.InnerBatchData {
+					// ensure contract bits are originally set to 0b10
+					require.Equal(t, big.NewInt(0b10), batchData.SpanBatchPayload.Txs.ContractCreationBits, "expected contract creation bits to be 0b10")
+
+					return &spanBatchWithContractCreationBits{
+						RawSpanBatch:                 *batchData,
+						overrideContractCreationBits: big.NewInt(0b01),
+					}
+				}))),
+	)
 	batcher.ActL2ChannelClose(t)
 
-	outputFrame := batcher.ReadNextOutputFrame(t)
-
-	// Zlib decompress
-	require.Equal(t, outputFrame[0], byte(0), "expected zlib compression")
-
-	// extract frame data from frame
-	frameDataLen := binary.BigEndian.Uint32(outputFrame[1+16+2 : 1+16+2+4])
-	frameData := outputFrame[1+16+2+4 : 1+16+2+4+frameDataLen]
-
-	// decompress with zlib
-	bufReader := bytes.NewBuffer(frameData)
-	decompressor, err := zlib.NewReader(bufReader)
-	require.NoError(t, err)
-	decompressedData, err := io.ReadAll(decompressor)
-	require.NoError(t, err)
-
-	// rlp decode
-	var rlpDecoded []byte
-	err = rlp.DecodeBytes(decompressedData, &rlpDecoded)
-	require.NoError(t, err)
-
-	// decode batch data to find contract creation bit offset
-	batchType := rlpDecoded[0]
-	require.Equal(t, batchType, byte(derive.SpanBatchType))
-	batchBuf := &readerWithCurrPos{Reader: bytes.NewReader(rlpDecoded[1:])}
-
-	// read prefix
-	_, err = binary.ReadUvarint(batchBuf)
-	require.NoError(t, err, "failed to read rel timestamp")
-	_, err = binary.ReadUvarint(batchBuf)
-	require.NoError(t, err, "failed to read l1 origin num timestamp")
-	_, err = batchBuf.Read(make([]byte, 40))
-	require.NoError(t, err, "failed to read parent and origin checks")
-
-	// read payload
-	blockCount, err := binary.ReadUvarint(batchBuf)
-	require.NoError(t, err, "failed to read block count")
-
-	originBitfieldSize := (blockCount + 7) / 8
-	originBitfield := make([]byte, originBitfieldSize)
-	_, err = batchBuf.Read(originBitfield)
-	require.NoError(t, err, "failed to read origin bitfield")
-
-	blockTxCounts := make([]uint64, blockCount)
-	totalBlockTxCount := uint64(0)
-
-	for i := uint64(0); i < blockCount; i++ {
-		blockTxCount, err := binary.ReadUvarint(batchBuf)
-		require.NoError(t, err, "failed to read block tx count")
-
-		blockTxCounts[i] = blockTxCount
-		totalBlockTxCount += blockTxCount
-	}
-
-	// read contract creation bits
-	contractCreationBits := make([]byte, (totalBlockTxCount+7)/8)
-	_, err = batchBuf.Read(contractCreationBits)
-	require.NoError(t, err, "failed to read contract creation bits")
-
-	offsetStart := uint64(batchBuf.CurrPos()) - uint64(totalBlockTxCount+7)/8 + 1
-	require.Equal(t, contractCreationBits[0], byte(0b10), "expected contract creation bits to be 0b10")
-
-	// flip the second bit (big endian)
-	rlpDecoded[offsetStart] = 0b01 // unset bit 2 and set bit 1
-
-	// re-encode rlp
-	var buf bytes.Buffer
-	err = rlp.Encode(&buf, rlpDecoded)
-	require.NoError(t, err)
-
-	// re-compress
-	compressedBuf := new(bytes.Buffer)
-	compressor, err := zlib.NewWriterLevel(compressedBuf, zlib.BestCompression)
-	require.NoError(t, err)
-	_, err = compressor.Write(buf.Bytes())
-	require.NoError(t, err)
-	err = compressor.Close()
-	require.NoError(t, err)
-
-	// replace the frame data with the new compressed data
-	newOutputFrame := make([]byte, 1+16+2+4+len(compressedBuf.Bytes())+1)
-	copy(newOutputFrame[:1+16+2], outputFrame[:1+16+2])
-	binary.BigEndian.PutUint32(newOutputFrame[1+16+2:1+16+2+4], uint32(len(compressedBuf.Bytes())))
-	copy(newOutputFrame[1+16+2+4:], compressedBuf.Bytes())
-	newOutputFrame[len(newOutputFrame)-1] = outputFrame[len(outputFrame)-1]
-
-	// submit new batch
-	batcher.ActL2BatchSubmitRaw(t, newOutputFrame)
+	batcher.ActL2BatchSubmit(t)
 
 	miner.ActL1StartBlock(12)(t)
 	miner.ActL1IncludeTxByHash(env.Batcher.LastSubmitted.Hash())(t)

@@ -44,7 +44,8 @@ type SpanChannelOut struct {
 	// to seal full span batches (that have reached the max block count) in the rlp slices.
 	sealedRLPBytes int
 
-	chainSpec *rollup.ChainSpec
+	chainSpec        *rollup.ChainSpec
+	batchDataOptions []BatchDataOption
 }
 
 func (co *SpanChannelOut) ID() ChannelID {
@@ -61,6 +62,12 @@ type SpanChannelOutOption func(co *SpanChannelOut)
 func WithMaxBlocksPerSpanBatch(maxBlock int) SpanChannelOutOption {
 	return func(co *SpanChannelOut) {
 		co.maxBlocksPerSpanBatch = maxBlock
+	}
+}
+
+func WithBatchDataOptions(options ...BatchDataOption) SpanChannelOutOption {
+	return func(co *SpanChannelOut) {
+		co.batchDataOptions = options
 	}
 }
 
@@ -168,7 +175,8 @@ func (co *SpanChannelOut) addSingularBatch(batch *SingularBatch, seqNum uint64) 
 	co.swapRLP()
 	active := co.activeRLP()
 	active.Truncate(co.sealedRLPBytes)
-	if err = rlp.Encode(active, NewBatchData(rawSpanBatch)); err != nil {
+	fmt.Println("JULIAN 3", co.batchDataOptions)
+	if err = rlp.Encode(active, NewBatchData(rawSpanBatch, co.batchDataOptions...)); err != nil {
 		return fmt.Errorf("failed to encode RawSpanBatch into bytes: %w", err)
 	}
 

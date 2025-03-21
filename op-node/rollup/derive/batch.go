@@ -54,11 +54,21 @@ func (b batchWithMetadata) LogContext(l log.Logger) log.Logger {
 	return lgr.With("compression_algo", b.comprAlgo)
 }
 
+type BatchDataOption func(*BatchData) *BatchData
+
+func WithBatchTypeOverride(batchTypeOverride func(*RawSpanBatch) InnerBatchData) BatchDataOption {
+	return func(b *BatchData) *BatchData {
+		b.makeBatch = batchTypeOverride
+		return b
+	}
+}
+
 // BatchData is used to represent the typed encoding & decoding.
 // and wraps around a single interface InnerBatchData.
 // Further fields such as cache can be added in the future, without embedding each type of InnerBatchData.
 // Similar design with op-geth's types.Transaction struct.
 type BatchData struct {
+	makeBatch func(*RawSpanBatch) InnerBatchData
 	inner     InnerBatchData
 	ComprAlgo CompressionAlgo
 }
@@ -67,8 +77,8 @@ type BatchData struct {
 // This is implemented by SingularBatch and RawSpanBatch.
 type InnerBatchData interface {
 	GetBatchType() int
-	encode(w io.Writer) error
-	decode(r *bytes.Reader) error
+	Encode(w io.Writer) error
+	Decode(r *bytes.Reader) error
 }
 
 // EncodeRLP implements rlp.Encoder
@@ -98,7 +108,15 @@ func (b *BatchData) encodeTyped(buf *bytes.Buffer) error {
 	if err := buf.WriteByte(b.GetBatchType()); err != nil {
 		return err
 	}
-	return b.inner.encode(buf)
+
+	if b.makeBatch != nil {
+		if sb, ok := b.inner.(*RawSpanBatch); ok {
+			wrappedBatch := b.makeBatch(sb)
+			return wrappedBatch.Encode(buf)
+		}
+	}
+
+	return b.inner.Encode(buf)
 }
 
 // DecodeRLP implements rlp.Decoder
@@ -135,7 +153,7 @@ func (b *BatchData) decodeTyped(data []byte) error {
 	default:
 		return fmt.Errorf("unrecognized batch type: %d", data[0])
 	}
-	if err := inner.decode(bytes.NewReader(data[1:])); err != nil {
+	if err := inner.Decode(bytes.NewReader(data[1:])); err != nil {
 		return err
 	}
 	b.inner = inner
@@ -143,6 +161,12 @@ func (b *BatchData) decodeTyped(data []byte) error {
 }
 
 // NewBatchData creates a new BatchData
-func NewBatchData(inner InnerBatchData) *BatchData {
-	return &BatchData{inner: inner}
+func NewBatchData(inner InnerBatchData, options ...BatchDataOption) *BatchData {
+	d := &BatchData{inner: inner}
+
+	for _, opt := range options {
+		d = opt(d)
+	}
+
+	return d
 }
