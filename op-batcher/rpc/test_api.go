@@ -20,6 +20,8 @@ type BatcherTestDriver interface {
 	SetL2Scope(ctx context.Context, start, end uint64) error
 	// SubmitNow forces the batcher to submit the current data, even if the buffer is not full
 	SubmitNow(ctx context.Context) error
+	// PublishNow manually triggers the batch publishing process
+	PublishNow(ctx context.Context) error
 	// Cursors returns the current cursor positions (submitted L2 block)
 	Cursors(ctx context.Context) (map[string]uint64, error)
 }
@@ -68,6 +70,18 @@ func (a *testAPI) SubmitNow(ctx context.Context) error {
 		a.log.Error("Failed to submit batch now", "err", err)
 	} else {
 		a.log.Info("Forced batch submission")
+	}
+	return err
+}
+
+// PublishNow manually triggers the batch publishing process
+func (a *testAPI) PublishNow(ctx context.Context) error {
+	a.m.RecordRPCServerRequest("batcher_publishNow")
+	err := a.b.PublishNow(ctx)
+	if err != nil {
+		a.log.Error("Failed to publish batch now", "err", err)
+	} else {
+		a.log.Info("Forced batch publication")
 	}
 	return err
 }
