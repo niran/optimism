@@ -45,11 +45,24 @@ func txInitAndExecMsg(
 	}
 }
 
-func TestTxInitAndExecMsg(t *testing.T) {
+func TestInteropTxTest(t *testing.T) {
 	l2ChainNums := 2
 	chainIdxs, walletGetters, totalValidators, lowLevelSystemGetter := SetupDefaultInteropSystemTest(l2ChainNums)
-	systest.InteropSystemTest(t,
-		txInitAndExecMsg(lowLevelSystemGetter, l2ChainNums, chainIdxs, walletGetters),
-		totalValidators...,
-	)
+
+	tests := []struct {
+		name     string
+		testFunc systest.InteropSystemTestFunc
+	}{
+		{"txInitAndExecMsg", txInitAndExecMsg(lowLevelSystemGetter, l2ChainNums, chainIdxs, walletGetters)},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			systest.InteropSystemTest(t,
+				test.testFunc,
+				totalValidators...,
+			)
+		})
+	}
 }
