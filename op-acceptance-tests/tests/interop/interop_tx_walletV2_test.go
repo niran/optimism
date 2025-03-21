@@ -86,13 +86,11 @@ func eventloggerdeployandEmitandValidate(lowLevelSystemGetter validators.LowLeve
 		logger.Info("included validating message twice", "block", recC.BlockHash)
 
 		// can we multicall inittrigger?
-		randomInitTriggerE := RandomInitTrigger(rng, eventLoggerAddress, 1, 15)
-		randomInitTriggerF := RandomInitTrigger(rng, eventLoggerAddress, 2, 13)
-
 		optsAA := DefaultOpts(walletA)
-		calls2 := make([]system.Call, 0)
-		calls2 = append(calls2, randomInitTriggerE)
-		calls2 = append(calls2, randomInitTriggerF)
+		calls2 := []system.Call{
+			RandomInitTrigger(rng, eventLoggerAddress, 1, 15),
+			RandomInitTrigger(rng, eventLoggerAddress, 2, 13),
+		}
 		txD := system.NewIntent[*system.MultiTrigger, *system.InteropOutput](optsAA)
 		txD.Content.Set(&system.MultiTrigger{Executor: multicall3, Calls: calls2})
 

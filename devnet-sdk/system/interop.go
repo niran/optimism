@@ -287,6 +287,24 @@ func ExecuteIndexed(executor common.Address, events *plan.Lazy[*InteropOutput], 
 	}
 }
 
+func ExecuteIndexeds(multicaller, executor common.Address, events *plan.Lazy[*InteropOutput], indexes []int) func(ctx context.Context) (*MultiTrigger, error) {
+	return func(ctx context.Context) (*MultiTrigger, error) {
+		multiCalls := []Call{}
+		for _, index := range indexes {
+			if x := len(events.Value().Entries); x <= index {
+				return nil, fmt.Errorf("invalid index: %d, only have %d events", index, x)
+			}
+			multiCalls = append(multiCalls,
+				&ExecTrigger{
+					Executor: executor,
+					Msg:      events.Value().Entries[index],
+				},
+			)
+		}
+		return &MultiTrigger{Executor: multicaller, Calls: multiCalls}, nil
+	}
+}
+
 // func MultiIndexed(executor common.Address, events *plan.Lazy[*InteropOutput], indexes []int) func(ctx context.Context) (*MultiTrigger, error) {
 // 	return func(ctx context.Context) (*MultiTrigger, error) {
 // 		var messages []suptypes.Message

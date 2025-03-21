@@ -101,7 +101,6 @@ func RandomInitTrigger(rng *rand.Rand, eventLoggerAddress common.Address, cnt, l
 		Topics:     topics,
 		OpaqueData: data,
 	}
-
 }
 
 func SetupDefaultInteropSystemTest(l2ChainNums int) ([]uint64, []validators.WalletGetter, []systest.PreconditionValidator, validators.LowLevelSystemGetter) {

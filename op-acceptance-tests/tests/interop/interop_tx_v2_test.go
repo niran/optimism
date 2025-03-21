@@ -32,7 +32,7 @@ func txInitAndExecMsg(
 		require.NoError(t, err)
 		logger.Info("initiate message included", "block", receiptA.BlockHash)
 
-		// Intent to validate message(or emit event) on chain B
+		// Intent to validate message on chain B
 		txB := system.NewIntent[*system.ExecTrigger, *system.InteropOutput](opts[1])
 		txB.Content.DependOn(&txA.Result)
 
@@ -45,6 +45,46 @@ func txInitAndExecMsg(
 	}
 }
 
+func txInitAndExecMultipleMsg(
+	lowLevelSystemGetter validators.LowLevelSystemGetter,
+	l2ChainNums int,
+	chainIdxs []uint64,
+	walletGetters []validators.WalletGetter,
+) systest.InteropSystemTestFunc {
+	return func(t systest.T, sys system.InteropSystem) {
+		ctx, rng, logger, _, wallets, opts := DefaultSetup(t, lowLevelSystemGetter, l2ChainNums, chainIdxs, walletGetters)
+
+		eventLoggerAddress, err := DeployEventLogger(ctx, wallets[0], logger)
+		require.NoError(t, err)
+
+		// Intent to initiate two message(or emit event) on chain A
+		initCalls := []system.Call{
+			RandomInitTrigger(rng, eventLoggerAddress, 1, 15),
+			RandomInitTrigger(rng, eventLoggerAddress, 2, 13),
+		}
+		txA := system.NewIntent[*system.MultiTrigger, *system.InteropOutput](opts[0])
+		txA.Content.Set(&system.MultiTrigger{Executor: constants.MultiCall3, Calls: initCalls})
+
+		// Trigger two events
+		receiptA, err := txA.PlannedTx.Included.Eval(ctx)
+		require.NoError(t, err)
+		logger.Info("initiate messages included", "block", receiptA.BlockHash)
+		require.Equal(t, 2, len(receiptA.Logs))
+
+		// Intent to validate messages on chain B
+		txB := system.NewIntent[*system.MultiTrigger, *system.InteropOutput](opts[1])
+		txB.Content.DependOn(&txA.Result)
+
+		// Two events in tx so use every index, 0, 1
+		indexes := []int{0, 1}
+		txB.Content.Fn(system.ExecuteIndexeds(constants.MultiCall3, constants.CrossL2Inbox, &txA.Result, indexes))
+
+		receiptB, err := txB.PlannedTx.Included.Eval(ctx)
+		require.NoError(t, err)
+		logger.Info("validate messages included", "block", receiptB.BlockHash)
+	}
+}
+
 func TestInteropTxTest(t *testing.T) {
 	l2ChainNums := 2
 	chainIdxs, walletGetters, totalValidators, lowLevelSystemGetter := SetupDefaultInteropSystemTest(l2ChainNums)
@@ -54,6 +94,7 @@ func TestInteropTxTest(t *testing.T) {
 		testFunc systest.InteropSystemTestFunc
 	}{
 		{"txInitAndExecMsg", txInitAndExecMsg(lowLevelSystemGetter, l2ChainNums, chainIdxs, walletGetters)},
+		{"txInitAndExecMultipleMsg", txInitAndExecMultipleMsg(lowLevelSystemGetter, l2ChainNums, chainIdxs, walletGetters)},
 	}
 
 	for _, test := range tests {
