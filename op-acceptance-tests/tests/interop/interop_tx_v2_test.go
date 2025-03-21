@@ -117,7 +117,7 @@ func execSameMsgTwice(
 		txB := system.NewIntent[*system.MultiTrigger, *system.InteropOutput](opts[1])
 		txB.Content.DependOn(&txA.Result)
 
-		// Single event in tx so index is 0
+		// Single event in tx so indexes are 0, 0
 		indexes := []int{0, 0}
 		txB.Content.Fn(system.ExecuteIndexeds(constants.MultiCall3, constants.CrossL2Inbox, &txA.Result, indexes))
 
