@@ -27,10 +27,13 @@ type L2 interface {
 	RollupClient() *sources.RollupClient
 }
 
-func WithPreInteropDefaults(t helpers.Testing, l2ClaimBlockNum uint64, l2 *helpers.L2Verifier, l2Eng *helpers.L2Engine) FixtureInputParam {
+func WithPreInteropDefaults(t helpers.Testing, l2ClaimBlockNum uint64, l2 *helpers.L2Verifier, l2Eng *helpers.L2Engine, fromGenesis bool) FixtureInputParam {
 	return func(f *FixtureInputs) {
 		// Fetch the pre and post output roots for the fault proof.
 		l2PreBlockNum := l2ClaimBlockNum - 1
+		if fromGenesis {
+			l2PreBlockNum = uint64(0)
+		}
 		if l2ClaimBlockNum == 0 {
 			// If we are at genesis, we assert that we don't move the chain at all.
 			l2PreBlockNum = 0

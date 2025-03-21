@@ -173,7 +173,8 @@ func WithL1Head(head common.Hash) FixtureInputParam {
 }
 
 func (env *L2FaultProofEnv) RunFaultProofProgram(t helpers.Testing, l2ClaimBlockNum uint64, checkResult CheckResult, fixtureInputParams ...FixtureInputParam) {
-	defaultParam := WithPreInteropDefaults(t, l2ClaimBlockNum, env.Sequencer.L2Verifier, env.Engine)
+	fromGenesis := false
+	defaultParam := WithPreInteropDefaults(t, l2ClaimBlockNum, env.Sequencer.L2Verifier, env.Engine, fromGenesis)
 	combinedParams := []FixtureInputParam{defaultParam}
 	combinedParams = append(combinedParams, fixtureInputParams...)
 	RunFaultProofProgram(t, env.log, env.Miner, checkResult, combinedParams...)

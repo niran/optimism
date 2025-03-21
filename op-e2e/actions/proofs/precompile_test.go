@@ -69,7 +69,7 @@ func runPrecompileTest(gt *testing.T, testCase PrecompileTestFixture) {
 	// Ensure the block is marked as safe before we attempt to fault prove it.
 	require.Equal(t, uint64(1), l2SafeHead.Number.Uint64())
 
-	defaultParam := helpers.WithPreInteropDefaults(t, l2SafeHead.Number.Uint64(), env.Sequencer.L2Verifier, env.Engine)
+	defaultParam := helpers.WithPreInteropDefaults(t, l2SafeHead.Number.Uint64(), env.Sequencer.L2Verifier, env.Engine, false)
 	fixtureInputParams := []helpers.FixtureInputParam{defaultParam, helpers.WithL1Head(l1Head.Hash())}
 	var fixtureInputs helpers.FixtureInputs
 	for _, apply := range fixtureInputParams {
