@@ -104,7 +104,7 @@ func RandomInitTrigger(rng *rand.Rand, eventLoggerAddress common.Address, cnt, l
 
 }
 
-func SetupInteropSystemTest(l2ChainNums int) ([]uint64, []validators.WalletGetter, []systest.PreconditionValidator, validators.LowLevelSystemGetter) {
+func SetupDefaultInteropSystemTest(l2ChainNums int) ([]uint64, []validators.WalletGetter, []systest.PreconditionValidator, validators.LowLevelSystemGetter) {
 	chainIdxs := make([]uint64, l2ChainNums)
 	walletGetters := make([]validators.WalletGetter, l2ChainNums)
 	totalValidators := make([]systest.PreconditionValidator, 0)
