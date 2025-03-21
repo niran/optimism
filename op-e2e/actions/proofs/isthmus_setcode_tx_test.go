@@ -414,8 +414,9 @@ func runSetCodeTxTypeWithContractCreationBitSetTest(gt *testing.T, testCfg *help
 	require.Len(t, s2block.Transactions(), 0, "safe head should not contain either tx")
 	require.Equal(t, u1, l2safe, "expected last block to be reorgd out due to setcode tx")
 
-	// recs := env.Logs.FindLogs(testlog.NewMessageFilter("to address is required for SetCodeTx"))
-	// require.Len(t, recs, 1)
+	// find a log with the error message as an attr
+	recs := env.Logs.FindLogs(testlog.NewErrContainsFilter("to address is required for SetCodeTx"))
+	require.GreaterOrEqual(t, len(recs), 1)
 
 	env.RunFaultProofProgram(t, l2safe.Number, testCfg.CheckResult, testCfg.InputParams...)
 }
