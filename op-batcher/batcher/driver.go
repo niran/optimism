@@ -1130,42 +1130,46 @@ func (l *BatchSubmitter) PublishNow(ctx context.Context) error {
 
 	l.Log.Info("Manual publishing triggered")
 
-	// Create a new goroutine to handle the publishing
-	// This ensures we don't block the caller while publishing
+	// In test mode, we execute synchronously for better control
+	daGroup := &errgroup.Group{}
+	if l.Config.MaxConcurrentDARequests > 0 {
+		daGroup.SetLimit(int(l.Config.MaxConcurrentDARequests))
+	}
+
+	receiptsCh := make(chan txmgr.TxReceipt[txRef])
+	defer close(receiptsCh)
+
+	// For synchronous operation, we process receipts in the same goroutine
+	// after publishing completes
+	receipts := make([]txmgr.TxReceipt[txRef], 0)
 	go func() {
-		daGroup := &errgroup.Group{}
-		if l.Config.MaxConcurrentDARequests > 0 {
-			daGroup.SetLimit(int(l.Config.MaxConcurrentDARequests))
-		}
-
-		receiptsCh := make(chan txmgr.TxReceipt[txRef])
-		defer close(receiptsCh)
-
-		// Start a goroutine to handle receipts
-		go func() {
-			for r := range receiptsCh {
-				l.handleReceipt(r)
-			}
-		}()
-
-		publishCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-
-		txQueue := txmgr.NewQueue[txRef](publishCtx, l.Txmgr, l.Config.MaxPendingTransactions)
-
-		if !l.checkTxpool(txQueue, receiptsCh) {
-			l.Log.Warn("txpool state is not good, aborting manual publishing")
-			return
-		}
-
-		l.publishStateToL1(publishCtx, txQueue, receiptsCh, daGroup)
-
-		if err := txQueue.Wait(); err != nil {
-			if !errors.Is(err, context.Canceled) {
-				l.Log.Error("error waiting for transactions to complete during manual publishing", "err", err)
-			}
+		for r := range receiptsCh {
+			receipts = append(receipts, r)
 		}
 	}()
+
+	publishCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	txQueue := txmgr.NewQueue[txRef](publishCtx, l.Txmgr, l.Config.MaxPendingTransactions)
+
+	if !l.checkTxpool(txQueue, receiptsCh) {
+		l.Log.Warn("txpool state is not good, aborting manual publishing")
+		return nil
+	}
+
+	l.publishStateToL1(publishCtx, txQueue, receiptsCh, daGroup)
+
+	if err := txQueue.Wait(); err != nil {
+		if !errors.Is(err, context.Canceled) {
+			l.Log.Error("error waiting for transactions to complete during manual publishing", "err", err)
+		}
+	}
+
+	// Process all collected receipts
+	for _, r := range receipts {
+		l.handleReceipt(r)
+	}
 
 	return nil
 }
