@@ -1443,7 +1443,7 @@ jobs:
           command: |
             curl -X POST \
               -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer $RV_COMPUTE_TOKEN" \
+              -H "Authorization: Bearer ''" \
               https://api.github.com/repos/runtimeverification/optimism-ci/actions/workflows/optimism-ci.yaml/dispatches \
               -d '{
                 "ref": "master",
