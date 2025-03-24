@@ -10,8 +10,6 @@ abstract contract DeployBase is Script {
     /// The encodedOutput represents a keccak encoded output struct
     event Deployed(bytes encodedOutput);
 
-    error InvalidDeployInputProperty(string propertyName, string reason);
-
     /// @notice For ease of checking the outputs of the deploy script, we store all outputs in this array.
     bytes[] public emittedDeployOutputs;
 
