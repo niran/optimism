@@ -1,13 +1,19 @@
 package interop
 
 import (
+	"math/big"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/constants"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/system"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/testing/systest"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/testing/testlib/validators"
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -128,6 +134,86 @@ func execSameMsgTwice(
 
 		// Check two ExecutingMessage triggered
 		require.Equal(t, 2, len(receiptB.Logs))
+	}
+}
+
+// initAndExecSameTimestamp tests below scenario:
+// Transaction executes message within same block (same timestamp)
+func initAndExecSameTimestamp(
+	l2ChainNums int,
+	walletGetters []validators.WalletGetter,
+) systest.InteropSystemTestFunc {
+	return func(t systest.T, sys system.InteropSystem) {
+		ctx, rng, logger, _, wallets, opts := DefaultInteropSetup(t, sys, l2ChainNums, walletGetters)
+
+		eventLoggerAddress, err := DeployEventLogger(ctx, wallets[0], logger)
+		require.NoError(t, err)
+
+		// Intent to initiate message(or emit event) on chain A
+		txA := txintent.NewIntent[*txintent.InitTrigger, *txintent.InteropOutput](opts[0])
+		randomInitTrigger := RandomInitTrigger(rng, eventLoggerAddress, 3, 10)
+		txA.Content.Set(randomInitTrigger)
+
+		// Fetch chainA's current head to guess where initiate message is included
+		againstBlock, err := txA.PlannedTx.AgainstBlock.Eval(ctx)
+		require.NoError(t, err)
+		logger.Info("againstBlock", "blockNumber", againstBlock.NumberU64())
+		chainID, err := txA.PlannedTx.ChainID.Eval(ctx)
+		require.NoError(t, err)
+
+		// estimate the result blocknumber, logindex, and timestamp
+		receipt := types.Receipt{}
+		receipt.Logs = []*types.Log{}
+		topics := []common.Hash{}
+		for _, topic := range randomInitTrigger.Topics {
+			topics = append(topics, common.Hash(topic))
+		}
+		targetBlockNumber := againstBlock.NumberU64() + 2
+		logger.Info("guessing initiate message included", "blockNumber", targetBlockNumber)
+		log := &types.Log{
+			Address:     eventLoggerAddress,
+			BlockNumber: targetBlockNumber,
+			Topics:      topics,
+			Data:        randomInitTrigger.OpaqueData,
+			Index:       0,
+		}
+		receipt.Logs = append(receipt.Logs, log)
+		includedIn := eth.BlockRefFromHeader(&types.Header{Time: againstBlock.Time() + 2*2, Number: new(big.Int).SetUint64(uint64(targetBlockNumber))})
+
+		// never use opts to preserve sets
+		txB := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput]()
+		txB.PlannedTx.IncludedBlock.Set(*includedIn)
+		txB.PlannedTx.Included.Set(&receipt)
+		txB.PlannedTx.ChainID.Set(chainID)
+		txB.Content.Set(&txintent.ExecTrigger{})
+
+		txC := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput](opts[1])
+		txC.Content.DependOn(&txB.Result)
+
+		// Single event in tx so index is 0
+		txC.Content.Fn(txintent.ExecuteIndexed(constants.CrossL2Inbox, &txB.Result, 0))
+
+		var wg sync.WaitGroup
+
+		// waitTime must be zero for making initiate/validate message land on same timestamp
+		waitTime := 4
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			receiptA, err := txA.PlannedTx.Included.Eval(ctx)
+			require.NoError(t, err)
+			logger.Info("initiate message included", "block", receiptA.BlockHash, "blockNumber", receiptA.BlockNumber)
+			require.Equal(t, targetBlockNumber, receiptA.BlockNumber.Uint64())
+			logger.Info("guessed block number is correct")
+		}()
+		go func() {
+			time.Sleep(time.Duration(waitTime) * time.Second)
+			defer wg.Done()
+			receiptC, err := txC.PlannedTx.Included.Eval(ctx)
+			require.NoError(t, err)
+			logger.Info("validate message included", "block", receiptC.BlockHash, "blockNumber", receiptC.BlockNumber)
+		}()
+		wg.Wait()
 	}
 }
 
@@ -284,6 +370,7 @@ func TestInteropTxTest(t *testing.T) {
 		{"initAndExecMsg", initAndExecMsg(l2ChainNums, walletGetters)},
 		{"initAndExecMultipleMsg", initAndExecMultipleMsg(l2ChainNums, walletGetters)},
 		{"execSameMsgTwice", execSameMsgTwice(l2ChainNums, walletGetters)},
+		{"initAndExecSameTimestamp", initAndExecSameTimestamp(l2ChainNums, walletGetters)},
 
 		{"execMsgDifferentTopicCount", execMsgDifferentTopicCount(l2ChainNums, walletGetters)},
 		{"execMsgOpagueData", execMsgOpagueData(l2ChainNums, walletGetters)},
