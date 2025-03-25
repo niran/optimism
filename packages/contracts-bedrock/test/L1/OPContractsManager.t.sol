@@ -1441,10 +1441,16 @@ contract OPContractsManager_InteropMigrator_Test is OPContractsManager_TestInit 
 
         IOPContractsManager.OpChainConfig[] memory opChainConfigs = new IOPContractsManager.OpChainConfig[](2);
         opChainConfigs[0] = IOPContractsManager.OpChainConfig(
-            chainDeployOutput1.systemConfigProxy, chainDeployOutput1.opChainProxyAdmin, absolutePrestate1
+            chainDeployOutput1.systemConfigProxy,
+            chainDeployOutput1.opChainProxyAdmin,
+            absolutePrestate1,
+            address(0x1234)
         );
         opChainConfigs[1] = IOPContractsManager.OpChainConfig(
-            chainDeployOutput2.systemConfigProxy, chainDeployOutput2.opChainProxyAdmin, absolutePrestate1
+            chainDeployOutput2.systemConfigProxy,
+            chainDeployOutput2.opChainProxyAdmin,
+            absolutePrestate1,
+            address(0x1234)
         );
 
         return IOPContractsManagerInteropMigrator.MigrateInput({
