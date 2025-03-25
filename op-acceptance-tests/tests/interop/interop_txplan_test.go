@@ -169,7 +169,8 @@ func initAndExecSameTimestamp(
 			topics = append(topics, common.Hash(topic))
 		}
 		targetBlockNumber := againstBlock.NumberU64() + 2
-		logger.Info("guessing initiate message included", "blockNumber", targetBlockNumber)
+		targetBlockTime := againstBlock.Time() + 2*2
+		logger.Info("guessing initiate message included", "blockNumber", targetBlockNumber, "blockTime", targetBlockTime)
 		log := &types.Log{
 			Address:     eventLoggerAddress,
 			BlockNumber: targetBlockNumber,
@@ -178,7 +179,7 @@ func initAndExecSameTimestamp(
 			Index:       0,
 		}
 		receipt.Logs = append(receipt.Logs, log)
-		includedIn := eth.BlockRefFromHeader(&types.Header{Time: againstBlock.Time() + 2*2, Number: new(big.Int).SetUint64(uint64(targetBlockNumber))})
+		includedIn := eth.BlockRefFromHeader(&types.Header{Time: targetBlockTime, Number: new(big.Int).SetUint64(uint64(targetBlockNumber))})
 
 		// never use opts to preserve sets
 		txB := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput]()
@@ -186,6 +187,10 @@ func initAndExecSameTimestamp(
 		txB.PlannedTx.Included.Set(&receipt)
 		txB.PlannedTx.ChainID.Set(chainID)
 		txB.Content.Set(&txintent.ExecTrigger{})
+		// make sure that txB produces interopOutput
+		output, err := txB.Result.Eval(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(output.Entries))
 
 		txC := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput](opts[1])
 		txC.Content.DependOn(&txB.Result)
@@ -196,22 +201,28 @@ func initAndExecSameTimestamp(
 		var wg sync.WaitGroup
 
 		// waitTime must be zero for making initiate/validate message land on same timestamp
-		waitTime := 4
+		waitTime := 1000
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
+			logger.Info("Goroutine for txA")
 			receiptA, err := txA.PlannedTx.Included.Eval(ctx)
 			require.NoError(t, err)
-			logger.Info("initiate message included", "block", receiptA.BlockHash, "blockNumber", receiptA.BlockNumber)
+			blockA, err := txA.PlannedTx.IncludedBlock.Eval(ctx)
+			require.NoError(t, err)
+			logger.Info("initiate message included", "block", receiptA.BlockHash, "blockNumber", receiptA.BlockNumber, "blockTime", blockA.Time)
 			require.Equal(t, targetBlockNumber, receiptA.BlockNumber.Uint64())
 			logger.Info("guessed block number is correct")
 		}()
 		go func() {
-			time.Sleep(time.Duration(waitTime) * time.Second)
 			defer wg.Done()
+			time.Sleep(time.Duration(waitTime) * time.Millisecond)
+			logger.Info("Goroutine for txC")
 			receiptC, err := txC.PlannedTx.Included.Eval(ctx)
 			require.NoError(t, err)
-			logger.Info("validate message included", "block", receiptC.BlockHash, "blockNumber", receiptC.BlockNumber)
+			blockC, err := txC.PlannedTx.IncludedBlock.Eval(ctx)
+			require.NoError(t, err)
+			logger.Info("validate message included", "block", receiptC.BlockHash, "blockNumber", receiptC.BlockNumber, "blockTime", blockC.Time)
 		}()
 		wg.Wait()
 	}

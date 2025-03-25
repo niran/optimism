@@ -90,7 +90,7 @@ func DeployEventLogger(ctx context.Context, wallet system.WalletV2, logger log.L
 		return common.Address{}, err
 	}
 	eventLoggerAddress := res.ContractAddress
-	logger.Info("Deployed EventLogger", "address", eventLoggerAddress)
+	logger.Info("Deployed EventLogger", "address", eventLoggerAddress, "txHash", res.TxHash.Hex())
 	return eventLoggerAddress, err
 }
 
