@@ -42,7 +42,7 @@ func (m *BinaryTreeIndex) Invalidate(addr Word) {
 	for gindex > 0 {
 		n := m.nodes[gindex]
 		if n != nil {
-			PutByte32(n)
+			ReleaseByte32(n)
 		}
 		m.nodes[gindex] = nil
 		gindex >>= 1
@@ -119,7 +119,7 @@ func (m *BinaryTreeIndex) AddPage(pageIndex Word) {
 	for k > 0 {
 		n := m.nodes[k]
 		if n != nil {
-			PutByte32(n)
+			ReleaseByte32(n)
 		}
 		m.nodes[k] = nil
 		k >>= 1

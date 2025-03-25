@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// Byte32Pool is a sync.Pool for [32]byte slices
-var Byte32Pool = sync.Pool{
+// byte32Pool is a sync.Pool for [32]byte slices
+var byte32Pool = sync.Pool{
 	New: func() interface{} {
 		var b [32]byte
 		return &b // Return a pointer to avoid extra allocations
@@ -16,14 +16,14 @@ var Byte32Pool = sync.Pool{
 
 // GetByte32 retrieves a *[32]byte from the pool
 func GetByte32() *[32]byte {
-	return Byte32Pool.Get().(*[32]byte)
+	return byte32Pool.Get().(*[32]byte)
 }
 
-// PutByte32 returns a *[32]byte to the pool
-func PutByte32(b *[32]byte) {
+// ReleaseByte32 returns a *[32]byte to the pool
+func ReleaseByte32(b *[32]byte) {
 	// Optional: Zero the array before putting it back
 	*b = [32]byte{}
-	Byte32Pool.Put(b)
+	byte32Pool.Put(b)
 }
 
 var hashPool = sync.Pool{
@@ -45,7 +45,7 @@ func HashPairNodes(out *[32]byte, left, right *[32]byte) {
 	h := GetHasher()
 	h.Write(left[:])
 	h.Write(right[:])
-	h.Read(out[:])
+	_, _ = h.Read(out[:])
 	PutHasher(h)
 }
 
@@ -54,7 +54,7 @@ func HashData(out *[32]byte, data ...[]byte) {
 	for _, b := range data {
 		h.Write(b)
 	}
-	h.Read(out[:])
+	_, _ = h.Read(out[:])
 	PutHasher(h)
 }
 
