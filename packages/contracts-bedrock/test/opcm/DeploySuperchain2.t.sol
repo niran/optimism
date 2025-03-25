@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
-import { stdToml } from "forge-std/StdToml.sol";
+import { Test } from "forge-std/Test.sol";
 
-import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 import { Proxy } from "src/universal/Proxy.sol";
-import { SuperchainConfig } from "src/L1/SuperchainConfig.sol";
-import { IProtocolVersions, ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
+import { ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
 import { DeploySuperchain } from "scripts/deploy/DeploySuperchain2.s.sol";
 
 contract DeploySuperchain2_Test is Test {
-    using stdStorage for StdStorage;
-
     DeploySuperchain deploySuperchain;
 
     // Define default input variables for testing.

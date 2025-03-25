@@ -1,29 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
-import { stdToml } from "forge-std/StdToml.sol";
+import { Test } from "forge-std/Test.sol";
 
-import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
-import { Proxy } from "src/universal/Proxy.sol";
-import { SuperchainConfig } from "src/L1/SuperchainConfig.sol";
-import { IProtocolVersions, ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
 import { BaseDeploy } from "scripts/deploy/BaseDeploy.sol";
 
-contract DeployBase_Test is Test {
+contract BaseDeploy_Test is Test {
     event Deployed(bytes encodedOutput);
 
-    using stdStorage for StdStorage;
-
-    BaseDeploy baseDeploy;
-
-    // Define default input variables for testing.
-    address defaultProxyAdminOwner = makeAddr("defaultProxyAdminOwner");
-    address defaultProtocolVersionsOwner = makeAddr("defaultProtocolVersionsOwner");
-    address defaultGuardian = makeAddr("defaultGuardian");
-    bool defaultPaused = false;
-    ProtocolVersion defaultRequiredProtocolVersion = ProtocolVersion.wrap(1);
-    ProtocolVersion defaultRecommendedProtocolVersion = ProtocolVersion.wrap(2);
+    BaseDeploy internal baseDeploy;
 
     function setUp() public {
         baseDeploy = new MyBaseDeploy();
