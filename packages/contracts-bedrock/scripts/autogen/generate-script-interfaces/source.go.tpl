@@ -4,13 +4,9 @@
 package {{.Package}}
 
 import (
-	"https://github.com/lmittmann/w3"
+	"github.com/lmittmann/w3"
 )
 
-{{range .Abi.Methods}}
-	var {{.Name}} = w3.MustNewFunc("{{.Signature}}")
-{{end}}
-
-{{range .Abi..Events}}
-	var {{.Name}} = w3.MustNewEvent("{{.Signature}}")
+{{range .Methods}}
+	var {{.Name}} = w3.MustNewFunc("{{.Name}}({{.Inputs}})", "{{.Outputs}}")
 {{end}}

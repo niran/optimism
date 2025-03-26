@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"go/format"
 	"os"
+	"strings"
 	"text/template"
 
-	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
 	"github.com/ethereum-optimism/optimism/packages/contracts-bedrock/scripts/checks/common"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 )
 
 //go:embed source.go.tpl
@@ -19,7 +20,13 @@ var templateString string
 
 type templateData struct {
 	Package string
-	Abi     *solc.AbiType
+	Methods []templateMethod
+}
+
+type templateMethod struct {
+	Name    string
+	Inputs  string
+	Outputs string
 }
 
 type processedFile struct {
@@ -37,7 +44,7 @@ func main() {
 	// Grab all the forge script artifacts
 	results, err := common.ProcessFilesGlob(
 		// FIXME
-		[]string{"forge-artifacts/*.s.sol/*.json"},
+		[]string{"forge-artifacts/DeploySuperchain2.s.sol/*.json"},
 		[]string{},
 		processFile,
 	)
@@ -63,11 +70,33 @@ func processFile(file string) (*processedFile, []error) {
 		fmt.Printf("Processing %s: Event %s: %v\n", file, name, event)
 	}
 
+	methods := []templateMethod{}
+	for name, method := range artifact.Abi.Parsed.Methods {
+		fmt.Printf("\tMethod: %s", method.String())
+		methodInputs := []string{}
+		for _, input := range method.Inputs {
+			methodInputs = append(methodInputs, fmt.Sprintf("%s %s", input.Type.String(), input.Name))
+		}
+
+		methodOutputs := []string{}
+		for _, output := range method.Outputs {
+			methodOutputs = append(methodOutputs, fmt.Sprintf("%s %s", output.Type.String(), output.Name))
+		}
+
+		methods = append(methods, templateMethod{
+			Name:    method.RawName,
+			Inputs:  strings.Join(methodInputs, ","),
+			Outputs: strings.Join(methodOutputs, ","),
+		})
+
+		fmt.Printf("Processing %s: Method %s: %v\n", file, name, method)
+	}
+
 	buffer := new(bytes.Buffer)
 	tmpl := template.Must(template.New("").Parse(templateString))
 	data := &templateData{
 		Package: "fixme",
-		Abi:     &artifact.Abi,
+		Methods: methods,
 	}
 	if err := tmpl.Execute(buffer, data); err != nil {
 		return nil, []error{err}
@@ -84,4 +113,14 @@ func processFile(file string) (*processedFile, []error) {
 		File: file,
 		Code: string(code),
 	}, nil
+}
+
+func formatMethod(m abi.Method) string {
+	return fmt.Sprintf("%s()", m.RawName)
+}
+
+func formatArgument(a abi.Argument) string {
+	if a.Indexed {
+		return fmt.Sprintf("%s indexed %s", a.Name)
+	}
 }
