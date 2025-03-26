@@ -10,6 +10,7 @@ import (
 	"os"
 	"text/template"
 
+	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
 	"github.com/ethereum-optimism/optimism/packages/contracts-bedrock/scripts/checks/common"
 )
 
@@ -18,8 +19,7 @@ var templateString string
 
 type templateData struct {
 	Package string
-	Events  []string
-	Methods []string
+	Abi     *solc.AbiType
 }
 
 type processedFile struct {
@@ -67,6 +67,7 @@ func processFile(file string) (*processedFile, []error) {
 	tmpl := template.Must(template.New("").Parse(templateString))
 	data := &templateData{
 		Package: "fixme",
+		Abi:     &artifact.Abi,
 	}
 	if err := tmpl.Execute(buffer, data); err != nil {
 		return nil, []error{err}
