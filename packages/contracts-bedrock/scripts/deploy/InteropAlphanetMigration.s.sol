@@ -10,6 +10,7 @@ import { Claim, Duration, Proposal, Hash } from "src/dispute/lib/Types.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
+import { console2 as console } from "forge-std/console2.sol";
 
 contract InteropAlphanetMigration is Script {
     function run() public {
@@ -52,7 +53,11 @@ contract InteropAlphanetMigration is Script {
             opChainConfigs: opChainConfigs
         });
 
-        vm.broadcast(msg.sender);
-        opcm.migrate(inputs);
+        bytes memory cd = abi.encodeWithSelector(IOPContractsManager.migrate.selector, inputs);
+        console.log("calldata: ");
+        console.logBytes(cd);
+
+        //vm.broadcast(msg.sender);
+        //opcm.migrate(inputs);
     }
 }
