@@ -122,8 +122,8 @@ contract DeploySuperchain2_Test is Test {
         assertNotEq(address(output0.superchainConfigProxy), address(output1.superchainConfigProxy), "300");
     }
 
-    function defaultInput() internal view returns (DeploySuperchain2.Input memory input) {
-        input = DeploySuperchain2.Input(
+    function defaultInput() internal view returns (DeploySuperchain2.Input memory input_) {
+        input_ = DeploySuperchain2.Input(
             defaultGuardian,
             defaultProtocolVersionsOwner,
             defaultProxyAdminOwner,

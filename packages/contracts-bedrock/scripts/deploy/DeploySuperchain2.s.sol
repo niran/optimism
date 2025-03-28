@@ -40,7 +40,7 @@ contract DeploySuperchain2 is Script {
 
     // -------- Core Deployment Methods --------
 
-    function run(Input memory _input) public returns (Output memory _output) {
+    function run(Input memory _input) public returns (Output memory output_) {
         assertValidInput(_input);
 
         // Notice that we do not do any explicit verification here that inputs are set. This is because
@@ -53,18 +53,18 @@ contract DeploySuperchain2 is Script {
         // additional verification logic.
 
         // Deploy the proxy admin, with the owner set to the deployer.
-        deploySuperchainProxyAdmin(_input, _output);
+        deploySuperchainProxyAdmin(_input, output_);
 
         // Deploy and initialize the superchain contracts.
-        deploySuperchainImplementationContracts(_input, _output);
-        deployAndInitializeSuperchainConfig(_input, _output);
-        deployAndInitializeProtocolVersions(_input, _output);
+        deploySuperchainImplementationContracts(_input, output_);
+        deployAndInitializeSuperchainConfig(_input, output_);
+        deployAndInitializeProtocolVersions(_input, output_);
 
         // Transfer ownership of the ProxyAdmin from the deployer to the specified owner.
-        transferProxyAdminOwnership(_input, _output);
+        transferProxyAdminOwnership(_input, output_);
 
         // Output assertions, to make sure outputs were assigned correctly.
-        assertValidOutput(_input, _output);
+        assertValidOutput(_input, output_);
     }
 
     // -------- Deployment Steps --------
