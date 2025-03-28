@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -305,6 +306,9 @@ func CompleteL1(l1Host *script.Host, cfg *L1Config) (*L1Output, error) {
 		L2InitializationConfig: genesis.L2InitializationConfig{
 			L2CoreDeployConfig: genesis.L2CoreDeployConfig{
 				L1ChainID: cfg.ChainID.Uint64(),
+			},
+			UpgradeScheduleDeployConfig: genesis.UpgradeScheduleDeployConfig{
+				L1CancunTimeOffset: new(hexutil.Uint64),
 			},
 		},
 		DevL1DeployConfig: cfg.DevL1DeployConfig,
