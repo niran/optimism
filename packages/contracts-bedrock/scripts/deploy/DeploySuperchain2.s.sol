@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import { Script } from "forge-std/Script.sol";
 import { stdToml } from "forge-std/StdToml.sol";
 
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -8,7 +9,6 @@ import { IProtocolVersions, ProtocolVersion } from "interfaces/L1/IProtocolVersi
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 
-import { BaseDeploy } from "scripts/deploy/BaseDeploy.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 
@@ -16,7 +16,7 @@ import { Solarray } from "scripts/libraries/Solarray.sol";
 // testing we deploy this script from a test contract. If we provide no argument, the foundry
 // default sender would be the broadcaster during test, but the broadcaster needs to be the deployer
 // since they are set to the initial proxy admin owner.
-contract DeploySuperchain is BaseDeploy {
+contract DeploySuperchain2 is Script {
     struct Input {
         // Role inputs.
         address guardian;
@@ -41,7 +41,6 @@ contract DeploySuperchain is BaseDeploy {
     // -------- Core Deployment Methods --------
 
     function run(Input memory _input) public returns (Output memory _output) {
-        // FIXME Assert valid input
         assertValidInput(_input);
 
         // Notice that we do not do any explicit verification here that inputs are set. This is because
@@ -66,14 +65,11 @@ contract DeploySuperchain is BaseDeploy {
 
         // Output assertions, to make sure outputs were assigned correctly.
         assertValidOutput(_input, _output);
-
-        // Emit the deployer output
-        emitDeployed(abi.encode(_output));
     }
 
     // -------- Deployment Steps --------
 
-    function deploySuperchainProxyAdmin(Input memory, Output memory _output) public {
+    function deploySuperchainProxyAdmin(Input memory, Output memory _output) internal {
         // Deploy the proxy admin, with the owner set to the deployer.
         // We explicitly specify the deployer as `msg.sender` because for testing we deploy this script from a test
         // contract. If we provide no argument, the foundry default sender would be the broadcaster during test, but the
@@ -90,7 +86,7 @@ contract DeploySuperchain is BaseDeploy {
         _output.superchainProxyAdmin = superchainProxyAdmin;
     }
 
-    function deploySuperchainImplementationContracts(Input memory, Output memory _output) public {
+    function deploySuperchainImplementationContracts(Input memory, Output memory _output) internal {
         // Deploy implementation contracts.
         ISuperchainConfig superchainConfigImpl = ISuperchainConfig(
             DeployUtils.createDeterministic({
@@ -114,7 +110,7 @@ contract DeploySuperchain is BaseDeploy {
         _output.protocolVersionsImpl = protocolVersionsImpl;
     }
 
-    function deployAndInitializeSuperchainConfig(Input memory _input, Output memory _output) public {
+    function deployAndInitializeSuperchainConfig(Input memory _input, Output memory _output) internal {
         assertValidGuardianInput(_input);
 
         address guardian = _input.guardian;
@@ -143,7 +139,7 @@ contract DeploySuperchain is BaseDeploy {
         _output.superchainConfigProxy = superchainConfigProxy;
     }
 
-    function deployAndInitializeProtocolVersions(Input memory _input, Output memory _output) public {
+    function deployAndInitializeProtocolVersions(Input memory _input, Output memory _output) internal {
         assertValidProtocolInput(_input);
 
         address protocolVersionsOwner = _input.protocolVersionsOwner;
@@ -176,7 +172,7 @@ contract DeploySuperchain is BaseDeploy {
         _output.protocolVersionsProxy = protocolVersionsProxy;
     }
 
-    function transferProxyAdminOwnership(Input memory _input, Output memory _output) public {
+    function transferProxyAdminOwnership(Input memory _input, Output memory _output) internal {
         assertValidProxyInput(_input);
 
         address superchainProxyAdminOwner = _input.superchainProxyAdminOwner;

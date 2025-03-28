@@ -5,10 +5,10 @@ import { Test } from "forge-std/Test.sol";
 
 import { Proxy } from "src/universal/Proxy.sol";
 import { ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
-import { DeploySuperchain } from "scripts/deploy/DeploySuperchain2.s.sol";
+import { DeploySuperchain2 } from "scripts/deploy/DeploySuperchain2.s.sol";
 
 contract DeploySuperchain2_Test is Test {
-    DeploySuperchain deploySuperchain;
+    DeploySuperchain2 deploySuperchain;
 
     // Define default input variables for testing.
     address defaultProxyAdminOwner = makeAddr("defaultProxyAdminOwner");
@@ -19,7 +19,7 @@ contract DeploySuperchain2_Test is Test {
     ProtocolVersion defaultRecommendedProtocolVersion = ProtocolVersion.wrap(2);
 
     function setUp() public {
-        deploySuperchain = new DeploySuperchain();
+        deploySuperchain = new DeploySuperchain2();
     }
 
     function unwrap(ProtocolVersion _pv) internal pure returns (uint256) {
@@ -46,7 +46,7 @@ contract DeploySuperchain2_Test is Test {
         vm.assume(unwrap(_recommendedProtocolVersion) != 0);
         vm.assume(unwrap(_requiredProtocolVersion) != 0);
 
-        DeploySuperchain.Input memory dsi = DeploySuperchain.Input(
+        DeploySuperchain2.Input memory dsi = DeploySuperchain2.Input(
             _guardian,
             _protocolVersionsOwner,
             _superchainProxyAdminOwner,
@@ -56,15 +56,7 @@ contract DeploySuperchain2_Test is Test {
         );
 
         // Run the deployment script.
-        DeploySuperchain.Output memory dso = deploySuperchain.run(dsi);
-
-        // Check that the Deployed event has been emitted
-        //
-        // Since we dont know the event payload until after the call,
-        // we can't call expectEmit directly. Instead, we rely on the BaseDeploy contract
-        // to emit & store the event payload
-        assertEq(deploySuperchain.numEmittedDeployOutputs(), 1, "0");
-        assertEq(deploySuperchain.emittedDeployOutputs(0), abi.encode(dso), "0");
+        DeploySuperchain2.Output memory dso = deploySuperchain.run(dsi);
 
         // Assert inputs were properly passed through to the contract initializers.
         assertEq(address(dso.superchainProxyAdmin.owner()), _superchainProxyAdminOwner, "100");
@@ -88,7 +80,7 @@ contract DeploySuperchain2_Test is Test {
     }
 
     function test_run_nullInput_reverts() public {
-        DeploySuperchain.Input memory input;
+        DeploySuperchain2.Input memory input;
 
         input = defaultInput();
         input.superchainProxyAdminOwner = address(0);
@@ -116,29 +108,22 @@ contract DeploySuperchain2_Test is Test {
         deploySuperchain.run(input);
     }
 
-    function test_deploySuperchainImplementationContracts_reuseAddresses_succeeds() public {
-        DeploySuperchain.Input memory input;
-        DeploySuperchain.Output memory output;
+    function test_reuseAddresses_succeeds() public {
+        DeploySuperchain2.Input memory input = defaultInput();
 
-        input = defaultInput();
-        output = deploySuperchain.run(input);
-
-        address originalConfigImpl = address(output.superchainConfigImpl);
-        address originalConfigProxy = address(output.superchainConfigProxy);
-        address originalProtocolVersions = address(output.protocolVersionsImpl);
-
-        deploySuperchain.deploySuperchainImplementationContracts(input, output);
+        DeploySuperchain2.Output memory output0 = deploySuperchain.run(input);
+        DeploySuperchain2.Output memory output1 = deploySuperchain.run(input);
 
         // We make sure that the implementation contracts are reused.
-        assertEq(address(output.superchainConfigImpl), originalConfigImpl, "100");
-        assertEq(address(output.protocolVersionsImpl), originalProtocolVersions, "200");
+        assertEq(address(output0.superchainConfigImpl), address(output1.superchainConfigImpl), "100");
+        assertEq(address(output0.protocolVersionsImpl), address(output1.protocolVersionsImpl), "200");
 
         // And we make sure that the proxy ones are redeployed
-        assertNotEq(address(output.superchainConfigProxy), originalConfigProxy, "300");
+        assertNotEq(address(output0.superchainConfigProxy), address(output1.superchainConfigProxy), "300");
     }
 
-    function defaultInput() internal view returns (DeploySuperchain.Input memory input) {
-        input = DeploySuperchain.Input(
+    function defaultInput() internal view returns (DeploySuperchain2.Input memory input) {
+        input = DeploySuperchain2.Input(
             defaultGuardian,
             defaultProtocolVersionsOwner,
             defaultProxyAdminOwner,
