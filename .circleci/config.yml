@@ -736,7 +736,7 @@ jobs:
   contracts-bedrock-coverage:
     circleci_ip_ranges: true
     docker:
-        - image: <<pipeline.parameters.default_docker_image>>
+      - image: <<pipeline.parameters.default_docker_image>>
     resource_class: xlarge
     parameters:
       test_flags:
@@ -906,6 +906,8 @@ jobs:
           command: unused-imports-check-no-build
       - run-contracts-check:
           command: validate-spacers-no-build
+      - run-contracts-check:
+          command: opcm-upgrade-checks
 
   todo-issues:
     parameters:
@@ -1091,7 +1093,6 @@ jobs:
           name: Sanitize op-program client
           command: make sanitize-program GUEST_PROGRAM=../op-program/bin/op-program-client.elf
           working_directory: cannon
-
 
   cannon-prestate-quick:
     machine: true
@@ -1389,19 +1390,18 @@ jobs:
             goreleaser release --clean -f ./<<parameters.module>>/<<parameters.filename>>
 
   stale-check:
-      machine:
-        image: ubuntu-2204:2024.08.1
-      steps:
-        - utils/github-stale:
-            stale-issue-message: 'This issue has been automatically marked as stale and will be closed in 5 days if no updates'
-            stale-pr-message: 'This pr has been automatically marked as stale and will be closed in 5 days if no updates'
-            close-issue-message: 'This issue was closed as stale.  Please reopen if this is a mistake'
-            close-pr-message: 'This PR was closed as stale.  Please reopen if this is a mistake'
-            days-before-issue-stale: 999
-            days-before-pr-stale: 14
-            days-before-issue-close: 5
-            days-before-pr-close: 5
-
+    machine:
+      image: ubuntu-2204:2024.08.1
+    steps:
+      - utils/github-stale:
+          stale-issue-message: "This issue has been automatically marked as stale and will be closed in 5 days if no updates"
+          stale-pr-message: "This pr has been automatically marked as stale and will be closed in 5 days if no updates"
+          close-issue-message: "This issue was closed as stale.  Please reopen if this is a mistake"
+          close-pr-message: "This PR was closed as stale.  Please reopen if this is a mistake"
+          days-before-issue-stale: 999
+          days-before-pr-stale: 14
+          days-before-issue-close: 5
+          days-before-pr-close: 5
 
 workflows:
   main:
