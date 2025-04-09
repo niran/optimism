@@ -171,6 +171,111 @@ func DeployEventLogger(t helpers.Testing, opts txplan.Option) common.Address {
 	return eventLoggerAddress
 }
 
+// TestMsgLoopback tests below scenario:
+// Execute message and Initiate message are both included in same chain.
+func TestMsgLoopback(gt *testing.T) {
+	t := helpers.NewDefaultTesting(gt)
+	rng := rand.New(rand.NewSource(1234))
+	is := dsl.SetupInterop(t)
+	actors := is.CreateActors()
+	actors.PrepareChainState(t)
+	alice := setupUser(t, is, actors.ChainA, 0)
+
+	optsA := DefaultTxOpts(t, alice, actors.ChainA)
+	actors.ChainA.Sequencer.ActL2StartBlock(t)
+
+	// chain A progressed single unsafe block
+	eventLoggerAddress := DeployEventLogger(t, optsA)
+
+	// Intent to initiate message(or emit event) on chain A
+	txInit := txintent.NewIntent[*txintent.InitTrigger, *txintent.InteropOutput](optsA)
+	randomInitTrigger := interop.RandomInitTrigger(rng, eventLoggerAddress, 3, 10)
+	txInit.Content.Set(randomInitTrigger)
+
+	// Trigger single event
+	actors.ChainA.Sequencer.ActL2StartBlock(t)
+	_, err := txInit.PlannedTx.Included.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	assertHeads(t, actors.ChainA, 2, 0, 0, 0)
+
+	// Ingest the new unsafe-block event
+	actors.ChainA.Sequencer.SyncSupervisor(t)
+	// Verify as cross-unsafe with supervisor
+	actors.Supervisor.ProcessFull(t)
+	actors.ChainA.Sequencer.ActL2PipelineFull(t)
+	assertHeads(t, actors.ChainA, 2, 0, 2, 0)
+
+	// Intent to validate message on chain A
+	txExec := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput](optsA)
+	txExec.Content.DependOn(&txInit.Result)
+
+	// Single event in tx so index is 0
+	txExec.Content.Fn(txintent.ExecuteIndexed(constants.CrossL2Inbox, &txInit.Result, 0))
+
+	actors.ChainA.Sequencer.ActL2StartBlock(t)
+	_, err = txExec.PlannedTx.Included.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	includedA, err := txInit.PlannedTx.IncludedBlock.Eval(t.Ctx())
+	require.NoError(t, err)
+	includedB, err := txExec.PlannedTx.IncludedBlock.Eval(t.Ctx())
+	require.NoError(t, err)
+
+	// executing message time >= initiating messages time
+	require.GreaterOrEqual(t, includedB.Time, includedA.Time)
+
+	assertHeads(t, actors.ChainA, 3, 0, 2, 0)
+
+	// Ingest the new unsafe-block event
+	actors.ChainA.Sequencer.SyncSupervisor(t)
+	// Verify as cross-unsafe with supervisor
+	actors.Supervisor.ProcessFull(t)
+	actors.ChainA.Sequencer.ActL2PipelineFull(t)
+
+	assertHeads(t, actors.ChainA, 3, 0, 3, 0)
+
+	// store unsafe head of chain A to compare after consolidation
+	chainAUnsafeHead := actors.ChainA.Sequencer.SyncStatus().UnsafeL2
+
+	// Batch L2 blocks of chain A and submit to L1 to ensure safe head advances without a reorg.
+	// Checking cross-unsafe consolidation is sufficient for sanity check but lets add safe check as well.
+	actors.ChainA.Batcher.ActSubmitAll(t)
+	actors.L1Miner.ActL1StartBlock(12)(t)
+	actors.L1Miner.ActL1IncludeTx(actors.ChainA.BatcherAddr)(t)
+	actors.L1Miner.ActL1EndBlock(t)
+
+	actors.Supervisor.SignalLatestL1(t)
+
+	t.Log("awaiting L1-exhaust event")
+	actors.ChainA.Sequencer.ActL2PipelineFull(t)
+	assertHeads(t, actors.ChainA, 3, 0, 3, 0)
+
+	t.Log("awaiting supervisor to provide L1 data")
+	actors.ChainA.Sequencer.SyncSupervisor(t)
+	assertHeads(t, actors.ChainA, 3, 0, 3, 0)
+
+	t.Log("awaiting node to sync: unsafe to local-safe")
+	actors.ChainA.Sequencer.ActL2PipelineFull(t)
+	assertHeads(t, actors.ChainA, 3, 3, 3, 0)
+
+	t.Log("expecting supervisor to sync")
+	actors.ChainA.Sequencer.SyncSupervisor(t)
+	assertHeads(t, actors.ChainA, 3, 3, 3, 0)
+
+	t.Log("supervisor promotes safe")
+	actors.Supervisor.ProcessFull(t)
+
+	t.Log("awaiting node to sync: local-safe to safe")
+	actors.ChainA.Sequencer.ActL2PipelineFull(t)
+	assertHeads(t, actors.ChainA, 3, 3, 3, 3)
+
+	// unsafe head of chain A did not get updated
+	require.Equal(t, chainAUnsafeHead, actors.ChainA.Sequencer.SyncStatus().UnsafeL2)
+	// unsafe head of chain A consolidated to safe
+	require.Equal(t, chainAUnsafeHead, actors.ChainA.Sequencer.SyncStatus().SafeL2)
+}
+
 func TestInitAndExecMsgSameTimestamp(gt *testing.T) {
 	t := helpers.NewDefaultTesting(gt)
 	rng := rand.New(rand.NewSource(1234))
