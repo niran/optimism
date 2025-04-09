@@ -48,7 +48,7 @@ var excludeSourceContracts = []string{
 
 	// Special exclusions for specific reasons
 	"SafeCall", "ResourceMetering", "Transactor", "AddressManager", "AddressResolver",
-	"L1Block", "GasPriceOracle", "Burn", "WETH9",
+	"L1Block", "GasPriceOracle", "Burn",
 	"AutoRedeem", "Initializable", "Predeploys", "Proxy",
 	"SchemaRegistry", "AttestationStation", "EAS",
 
@@ -58,8 +58,13 @@ var excludeSourceContracts = []string{
 	"CallContextHelper", "ImmutableProxy", "ResolvedDelegateProxy",
 
 	// L1 contracts
-	"DataAvailabilityChallenge", "ETHLockbox", "L1CrossDomainMessenger", "L1ERC721Bridge",
-	"L1StandardBridge", "OPContractsManagerContractsContainer", "OPContractsManagerBase",
+	// NOTE: The following contracts should have interfaces and are intentionally NOT excluded:
+	// - ETHLockbox
+	// - DataAvailabilityChallenge
+	// - L1CrossDomainMessenger
+	// - L1ERC721Bridge
+	// - L1StandardBridge
+	"OPContractsManagerContractsContainer", "OPContractsManagerBase",
 	"OPContractsManagerGameTypeAdder", "OPContractsManagerUpgrader", "OPContractsManagerDeployer",
 	"OPContractsManagerInteropMigrator", "OPContractsManager", "OptimismPortal2",
 	"ProtocolVersions", "ProxyAdminOwnedBase", "StandardValidatorBase", "StandardValidatorV180",
@@ -71,7 +76,7 @@ var excludeSourceContracts = []string{
 	"L2StandardBridge", "L2StandardBridgeInterop", "L2ToL1MessagePasser", "L2ToL2CrossDomainMessenger",
 	"OperatorFeeVault", "OptimismMintableERC721", "OptimismMintableERC721Factory",
 	"OptimismSuperchainERC20", "OptimismSuperchainERC20Beacon", "OptimismSuperchainERC20Factory",
-	"SequencerFeeVault", "SuperchainERC20", "SuperchainTokenBridge", "SuperchainWETH", "WETH",
+	"SequencerFeeVault", "SuperchainERC20", "SuperchainTokenBridge", "SuperchainWETH",
 
 	// Cannon contracts
 	"MIPS2", "MIPS64",
@@ -478,18 +483,13 @@ func isExcludedSourceContract(contractName string) bool {
 
 // Function to verify that all contracts in the src directory have corresponding interfaces
 func verifyAllContractsHaveInterfaces() error {
-	reporter := common.NewErrorReporter()
-
 	// Get the current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
-	srcDir := filepath.Join(cwd, "src")
-
 	var interfaceTracker = make(map[string]bool)
-	var contractTracker = make(map[string]bool)
 
 	// First, get all interface files to track which interfaces exist
 	interfaceFiles, err := common.FindFiles([]string{"forge-artifacts/**/*.json"}, []string{})
@@ -513,54 +513,49 @@ func verifyAllContractsHaveInterfaces() error {
 		}
 	}
 
-	// Now find all contract files in the src directory
-	err = filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+	// Process contract files using common.ProcessFilesGlob
+	processContract := func(path string) (*common.Void, []error) {
+		// Read the file to determine if it's a contract
+		file, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			return nil, []error{fmt.Errorf("failed to read file %s: %w", path, err)}
 		}
 
-		// Only process .sol files
-		if !info.IsDir() && strings.HasSuffix(path, ".sol") {
-			// Read the file to determine if it's a contract
-			file, err := os.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("failed to read file %s: %w", path, err)
-			}
+		// Simple regex to find contract definitions
+		contractRegex := regexp.MustCompile(`(?m)^\s*(contract|abstract contract)\s+(\w+)`)
+		matches := contractRegex.FindAllStringSubmatch(string(file), -1)
 
-			// Simple regex to find contract definitions
-			// This is a simplified approach - a proper parser would be better for production code
-			contractRegex := regexp.MustCompile(`(?m)^\s*(contract|abstract contract)\s+(\w+)`)
-			matches := contractRegex.FindAllStringSubmatch(string(file), -1)
+		var errs []error
+		for _, match := range matches {
+			if len(match) >= 3 {
+				contractName := match[2]
 
-			for _, match := range matches {
-				if len(match) >= 3 {
-					contractName := match[2]
-					contractTracker[contractName] = true
+				// Skip contracts that are excluded
+				if isExcludedSourceContract(contractName) {
+					continue
+				}
 
-					// Skip contracts that are excluded
-					if isExcludedSourceContract(contractName) {
-						continue
-					}
-
-					// Check if interface exists
-					if !interfaceTracker[contractName] {
-						relativePath, _ := filepath.Rel(cwd, path)
-						reporter.Fail("Contract %s in %s does not have a corresponding interface I%s",
-							contractName, relativePath, contractName)
-					}
+				// Check if interface exists
+				if !interfaceTracker[contractName] {
+					relativePath, _ := filepath.Rel(cwd, path)
+					errs = append(errs, fmt.Errorf("Contract %s in %s does not have a corresponding interface I%s",
+						contractName, relativePath, contractName))
 				}
 			}
 		}
 
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("error walking the src directory: %w", err)
+		return nil, errs
 	}
 
-	if reporter.HasError() {
-		return fmt.Errorf("some contracts do not have corresponding interfaces")
+	// Find and process only .sol files in src/L1 directory as suggested by smartcontracts
+	_, err = common.ProcessFilesGlob(
+		[]string{"src/L1/**/*.sol"},
+		[]string{},
+		processContract,
+	)
+
+	if err != nil {
+		return fmt.Errorf("error processing src/L1 directory: %w", err)
 	}
 
 	return nil
