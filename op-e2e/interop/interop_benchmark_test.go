@@ -165,7 +165,8 @@ func BenchmarkCheckMessages(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			// select a random access list
 			randomAccessList := allAccessLists[rand.Intn(len(allAccessLists))]
-			super.CheckAccessList(context.Background(), randomAccessList, types.CrossUnsafe, executingDescriptor)
+			err := super.CheckAccessList(context.Background(), randomAccessList, types.CrossUnsafe, executingDescriptor)
+			require.NoError(b, err)
 		}
 	})
 
@@ -181,7 +182,8 @@ func BenchmarkCheckMessages(b *testing.B) {
 				go func() {
 					defer wg.Done()
 					randomAccessList := allAccessLists[rand.Intn(len(allAccessLists))]
-					super.CheckAccessList(context.Background(), randomAccessList, types.CrossUnsafe, executingDescriptor)
+					err := super.CheckAccessList(context.Background(), randomAccessList, types.CrossUnsafe, executingDescriptor)
+					require.NoError(b, err)
 				}()
 			}
 
@@ -201,7 +203,8 @@ func BenchmarkCheckMessages(b *testing.B) {
 				go func() {
 					defer wg.Done()
 					randomAccessList := allAccessLists[rand.Intn(len(allAccessLists))]
-					super.CheckAccessList(context.Background(), randomAccessList, types.CrossUnsafe, executingDescriptor)
+					err := super.CheckAccessList(context.Background(), randomAccessList, types.CrossUnsafe, executingDescriptor)
+					require.NoError(b, err)
 				}()
 			}
 
