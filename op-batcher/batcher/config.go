@@ -113,6 +113,9 @@ type CLIConfig struct {
 	// PreferLocalSafeL2 triggers the batcher to load blocks from the sequencer based on the LocalSafeL2 SyncStatus field (instead of the SafeL2 field).
 	PreferLocalSafeL2 bool
 
+	// TestUseMaxTxSizeForBlobs forces using the MaxL1TxSize value even for blobs in test mode
+	TestUseMaxTxSizeForBlobs bool
+
 	// TestMode enables testing APIs for controlling the batcher
 	TestMode bool
 
@@ -218,6 +221,7 @@ func NewConfig(ctx *cli.Context) *CLIConfig {
 		ThrottleBlockSize:            ctx.Uint64(flags.ThrottleBlockSizeFlag.Name),
 		ThrottleAlwaysBlockSize:      ctx.Uint64(flags.ThrottleAlwaysBlockSizeFlag.Name),
 		PreferLocalSafeL2:            ctx.Bool(flags.PreferLocalSafeL2Flag.Name),
+		TestUseMaxTxSizeForBlobs:     false,
 		TestMode:                     ctx.Bool(flags.TestModeFlag.Name),
 	}
 }
