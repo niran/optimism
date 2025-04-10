@@ -13,7 +13,7 @@ import (
 )
 
 type surfaceGetter func() (surface.ControlSurface, error)
-type controllerFactory func(string) surfaceGetter
+type controllerFactory func(*descriptors.DevnetEnvironment) surfaceGetter
 
 type DevnetEnv struct {
 	Env *descriptors.DevnetEnvironment
@@ -30,9 +30,9 @@ type schemeBackend struct {
 	ctrlFactory controllerFactory
 }
 
-func getKurtosisController(enclave string) surfaceGetter {
+func getKurtosisController(env *descriptors.DevnetEnvironment) surfaceGetter {
 	return func() (surface.ControlSurface, error) {
-		return kt.NewKurtosisControllerSurface(enclave)
+		return kt.NewKurtosisControllerSurface(env)
 	}
 }
 
@@ -79,7 +79,7 @@ func LoadDevnetFromURL(devnetURL string) (*DevnetEnv, error) {
 	var ctrl surfaceGetter
 	ctrlFactory := schemeToBackend[parsedURL.Scheme].ctrlFactory
 	if ctrlFactory != nil {
-		ctrl = ctrlFactory(parsedURL.Host)
+		ctrl = ctrlFactory(env)
 	}
 
 	return &DevnetEnv{
