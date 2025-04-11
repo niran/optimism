@@ -511,17 +511,16 @@ func verifyAllContractsHaveInterfaces() error {
 					continue
 				}
 
-				// Get the relative path in the src directory
-				relativePath, _ := filepath.Rel(filepath.Join(cwd, "src"), path)
-				relativeDir := filepath.Dir(relativePath)
-
+				// For contracts in src/L1, interfaces should be at interfaces/L1
 				// Check if interface exists at the predictable location
-				// For src/path/to/my/Contract.sol, interface should be at interfaces/path/to/my/IContract.sol
-				interfacePath := filepath.Join(cwd, "interfaces", relativeDir, "I"+contractName+".sol")
-				if _, err := os.Stat(interfacePath); os.IsNotExist(err) {
+				interfacePath := filepath.Join(cwd, "interfaces", "L1", "I"+contractName+".sol")
+				_, err := os.Stat(interfacePath)
+
+				if os.IsNotExist(err) {
 					// Get relative paths for error message
 					contractRelPath, _ := filepath.Rel(cwd, path)
-					interfaceRelPath := filepath.Join("interfaces", relativeDir, "I"+contractName+".sol")
+					// Use the correct path structure for the error message
+					interfaceRelPath := filepath.Join("interfaces", "L1", "I"+contractName+".sol")
 					errs = append(errs, fmt.Errorf("Contract %s in %s does not have a corresponding interface at %s",
 						contractName, contractRelPath, interfaceRelPath))
 				}
