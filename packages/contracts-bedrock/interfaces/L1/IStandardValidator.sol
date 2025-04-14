@@ -51,44 +51,6 @@ interface IStandardValidatorBase {
     function withdrawalDelaySeconds() external view returns (uint256);
 }
 
-interface IStandardValidatorV180 is IStandardValidatorBase {
-    struct InputV180 {
-        address proxyAdmin;
-        address sysCfg;
-        bytes32 absolutePrestate;
-        uint256 l2ChainID;
-    }
-
-    function validate(InputV180 memory _input, bool _allowFailure) external view returns (string memory);
-
-    function __constructor__(
-        IStandardValidatorBase.ImplementationsBase memory _implementations,
-        ISuperchainConfig _superchainConfig,
-        address _l1PAOMultisig,
-        address _challenger,
-        uint256 _withdrawalDelaySeconds
-    ) external;
-}
-
-interface IStandardValidatorV200 is IStandardValidatorBase {
-    struct InputV200 {
-        address proxyAdmin;
-        address sysCfg;
-        bytes32 absolutePrestate;
-        uint256 l2ChainID;
-    }
-
-    function validate(InputV200 memory _input, bool _allowFailure) external view returns (string memory);
-
-    function __constructor__(
-        IStandardValidatorBase.ImplementationsBase memory _implementations,
-        ISuperchainConfig _superchainConfig,
-        address _l1PAOMultisig,
-        address _challenger,
-        uint256 _withdrawalDelaySeconds
-    ) external;
-}
-
 interface IStandardValidatorV300 is IStandardValidatorBase {
     struct InputV300 {
         address proxyAdmin;
