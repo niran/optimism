@@ -558,6 +558,11 @@ func (l *BatchSubmitter) setMaxDASizeOnEndpoint(ctx context.Context, endpoint st
 	return nil
 }
 
+// distributeThrottlingToEndpoints configures throttling parameters across all DA endpoints.
+//
+// The function returns true if throttling configuration was successfully distributed to all
+// endpoints. If any endpoint fails, it returns false and resets the retry timer to attempt
+// again after the retry interval.
 func (l *BatchSubmitter) distributeThrottlingToEndpoints(ctx context.Context, maxTxSize, maxBlockSize uint64, daClients map[string]*rpc.Client, retryTimer *time.Timer, retryInterval time.Duration) bool {
 	l.Log.Info("Distributing throttling configuration",
 		"tx_size", maxTxSize,
