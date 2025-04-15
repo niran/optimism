@@ -426,11 +426,11 @@ func testMTSysReadPreimage(t *testing.T, preimageValue []byte, cases []testMTSys
 	}
 }
 
-func testNoopSyscall(t *testing.T, syscalls map[string]uint32) {
+func testNoopSyscall(t *testing.T, version VersionedVMTestCase, syscalls map[string]uint32) {
 	for noopName, noopVal := range syscalls {
-		t.Run(noopName, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%v-%v", version.Name, noopName), func(t *testing.T) {
 			t.Parallel()
-			goVm, state, contracts := setup(t, int(noopVal), nil)
+			goVm, state, contracts := setupWithTestCase(t, version, int(noopVal), nil)
 
 			testutil.StoreInstruction(state.Memory, state.GetPC(), syscallInsn)
 			state.GetRegistersRef()[2] = Word(noopVal) // Set syscall number
@@ -453,14 +453,14 @@ func testNoopSyscall(t *testing.T, syscalls map[string]uint32) {
 	}
 }
 
-func testUnsupportedSyscall(t *testing.T, unsupportedSyscalls []uint32) {
+func testUnsupportedSyscall(t *testing.T, version VersionedVMTestCase, unsupportedSyscalls []uint32) {
 	for i, syscallNum := range unsupportedSyscalls {
-		testName := fmt.Sprintf("Unsupported syscallNum %v", syscallNum)
+		testName := fmt.Sprintf("%v Unsupported syscallNum %v", version.Name, syscallNum)
 		i := i
 		syscallNum := syscallNum
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
-			goVm, state, contracts := setup(t, i*3434, nil)
+			goVm, state, contracts := setupWithTestCase(t, version, i*3434, nil)
 			// Setup basic getThreadId syscall instruction
 			testutil.StoreInstruction(state.Memory, state.GetPC(), syscallInsn)
 			state.GetRegistersRef()[2] = Word(syscallNum)

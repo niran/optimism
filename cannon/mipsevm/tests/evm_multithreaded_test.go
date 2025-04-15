@@ -948,7 +948,7 @@ var NoopSyscalls = map[string]uint32{
 
 func TestEVM_NoopSyscall32(t *testing.T) {
 	testutil.Cannon32OnlyTest(t, "These tests are fully covered for 64-bits in TestEVM_NoopSyscall64")
-	testNoopSyscall(t, NoopSyscalls)
+	testNoopSyscall(t, GetMultiThreadedTestCase(t, versions.VersionMultiThreaded), NoopSyscalls)
 }
 
 func TestEVM_UnsupportedSyscall32(t *testing.T) {
@@ -966,7 +966,7 @@ func TestEVM_UnsupportedSyscall32(t *testing.T) {
 		unsupportedSyscalls = append(unsupportedSyscalls, candidate)
 	}
 
-	testUnsupportedSyscall(t, unsupportedSyscalls)
+	testUnsupportedSyscall(t, GetMultiThreadedTestCase(t, versions.VersionMultiThreaded), unsupportedSyscalls)
 }
 
 func TestEVM_EmptyThreadStacks(t *testing.T) {
@@ -1096,26 +1096,15 @@ func TestEVM_SchedQuantumThreshold(t *testing.T) {
 }
 
 func setup(t require.TestingT, randomSeed int, preimageOracle mipsevm.PreimageOracle, opts ...testutil.StateOption) (mipsevm.FPVM, *multithreaded.State, *testutil.ContractMetadata) {
-	// Find the most recent supported multithreaded version
-	for i := len(versions.StateVersionTypes) - 1; i >= 0; i-- {
-		version := versions.StateVersionTypes[i]
-		if arch.IsMips32 && versions.IsSupportedMultiThreaded(version) {
-			return setupWithVersion(t, version, randomSeed, preimageOracle, opts...)
-		}
-		if !arch.IsMips32 && versions.IsSupportedMultiThreaded64(version) {
-			return setupWithVersion(t, version, randomSeed, preimageOracle, opts...)
-		}
-	}
-	require.Fail(t, "no supported version available")
-	return nil, nil, nil
+	cases := GetMultiThreadedTestCases(t)
+	require.NotZero(t, len(cases), "must have at least one supported multithreaded test case")
+	// Use the most recent supported version
+	return setupWithTestCase(t, cases[len(cases)-1], randomSeed, preimageOracle, opts...)
 }
 
-func setupWithVersion(t require.TestingT, version versions.StateVersion, randomSeed int, preimageOracle mipsevm.PreimageOracle, opts ...testutil.StateOption) (mipsevm.FPVM, *multithreaded.State, *testutil.ContractMetadata) {
-	v := GetMultiThreadedTestCase(t, version)
+func setupWithTestCase(t require.TestingT, v VersionedVMTestCase, randomSeed int, preimageOracle mipsevm.PreimageOracle, opts ...testutil.StateOption) (mipsevm.FPVM, *multithreaded.State, *testutil.ContractMetadata) {
 	allOpts := append([]testutil.StateOption{testutil.WithRandomization(int64(randomSeed))}, opts...)
 	vm := v.VMFactory(preimageOracle, os.Stdout, os.Stderr, testutil.CreateLogger(), allOpts...)
 	state := mttestutil.GetMtState(t, vm)
-
 	return vm, state, v.Contracts
-
 }

@@ -93,6 +93,7 @@ type VersionedVMTestCase struct {
 	VMFactory      VMFactory
 	ElfVMFactory   ElfVMFactory
 	ProofGenerator ProofGenerator
+	Version        versions.StateVersion
 }
 
 func GetSingleThreadedTestCase(t require.TestingT) VersionedVMTestCase {
@@ -103,6 +104,7 @@ func GetSingleThreadedTestCase(t require.TestingT) VersionedVMTestCase {
 		VMFactory:      singleThreadedVmFactory,
 		ElfVMFactory:   singleThreadElfVmFactory,
 		ProofGenerator: singleThreadedProofGenerator,
+		Version:        versions.VersionSingleThreaded2,
 	}
 }
 
@@ -119,6 +121,7 @@ func GetMultiThreadedTestCase(t require.TestingT, version versions.StateVersion)
 			return multiThreadElfVmFactory(t, elfFile, po, stdOut, stdErr, log, features)
 		},
 		ProofGenerator: multiThreadedProofGenerator,
+		Version:        version,
 	}
 }
 
