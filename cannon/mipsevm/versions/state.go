@@ -10,25 +10,21 @@ import (
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/multithreaded"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/singlethreaded"
-	"github.com/ethereum-optimism/optimism/op-service/jsonutil"
 	"github.com/ethereum-optimism/optimism/op-service/serialize"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
 	ErrUnknownVersion      = errors.New("unknown version")
+	ErrUnsupportedVersion  = errors.New("unsupported version")
 	ErrJsonNotSupported    = errors.New("json not supported")
 	ErrUnsupportedMipsArch = errors.New("mips architecture is not supported")
 )
 
 func LoadStateFromFile(path string) (*VersionedState, error) {
 	if !serialize.IsBinaryFile(path) {
-		// Always use singlethreaded for JSON states
-		state, err := jsonutil.LoadJSON[singlethreaded.State](path)
-		if err != nil {
-			return nil, err
-		}
-		return NewFromState(VersionSingleThreaded, state)
+		// JSON states are always singlethreaded v1 which is no longer supported
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedVersion, VersionSingleThreaded)
 	}
 	return serialize.LoadSerializedBinary[VersionedState](path)
 }
@@ -36,6 +32,9 @@ func LoadStateFromFile(path string) (*VersionedState, error) {
 func NewFromState(vers StateVersion, state mipsevm.FPVMState) (*VersionedState, error) {
 	switch state := state.(type) {
 	case *singlethreaded.State:
+		if !IsSupportedSingleThreaded(vers) {
+			return nil, fmt.Errorf("%w: %v", ErrUnsupportedVersion, vers)
+		}
 		if !arch.IsMips32 {
 			return nil, ErrUnsupportedMipsArch
 		}
@@ -45,11 +44,17 @@ func NewFromState(vers StateVersion, state mipsevm.FPVMState) (*VersionedState, 
 		}, nil
 	case *multithreaded.State:
 		if arch.IsMips32 {
+			if !IsSupportedMultiThreaded(vers) {
+				return nil, fmt.Errorf("%w: %v", ErrUnsupportedVersion, vers)
+			}
 			return &VersionedState{
 				Version:   vers,
 				FPVMState: state,
 			}, nil
 		} else {
+			if !IsSupportedMultiThreaded64(vers) {
+				return nil, fmt.Errorf("%w: %v", ErrUnsupportedVersion, vers)
+			}
 			return &VersionedState{
 				Version:   vers,
 				FPVMState: state,

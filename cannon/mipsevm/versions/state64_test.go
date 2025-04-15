@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ethereum-optimism/optimism/cannon/mipsevm/singlethreaded"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm"
@@ -17,14 +18,22 @@ import (
 func TestNewFromState(t *testing.T) {
 	for _, version := range StateVersionTypes {
 		if !IsSupportedMultiThreaded64(version) {
-			continue
+			t.Run(version.String()+"-unsupported", func(t *testing.T) {
+				_, err := NewFromState(version, multithreaded.CreateEmptyState())
+				require.ErrorIs(t, err, ErrUnsupportedVersion)
+			})
+		} else {
+			t.Run(version.String(), func(t *testing.T) {
+				actual, err := NewFromState(version, multithreaded.CreateEmptyState())
+				require.NoError(t, err)
+				require.IsType(t, &multithreaded.State{}, actual.FPVMState)
+				require.Equal(t, version, actual.Version)
+			})
+			t.Run(version.String()+"-st-unsupported", func(t *testing.T) {
+				_, err := NewFromState(version, singlethreaded.CreateEmptyState())
+				require.ErrorIs(t, err, ErrUnsupportedVersion)
+			})
 		}
-		t.Run(version.String(), func(t *testing.T) {
-			actual, err := NewFromState(version, multithreaded.CreateEmptyState())
-			require.NoError(t, err)
-			require.IsType(t, &multithreaded.State{}, actual.FPVMState)
-			require.Equal(t, version, actual.Version)
-		})
 	}
 }
 

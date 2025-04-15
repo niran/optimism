@@ -4,7 +4,9 @@
 package versions
 
 import (
+	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +16,39 @@ import (
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/singlethreaded"
 	"github.com/ethereum-optimism/optimism/op-service/serialize"
 )
+
+func TestNewFromState(t *testing.T) {
+	for _, version := range StateVersionTypes {
+		if IsSupportedSingleThreaded(version) {
+			t.Run(version.String(), func(t *testing.T) {
+				actual, err := NewFromState(version, singlethreaded.CreateEmptyState())
+				require.NoError(t, err)
+				require.IsType(t, &singlethreaded.State{}, actual.FPVMState)
+				require.Equal(t, version, actual.Version)
+			})
+			t.Run(version.String()+"-mt-unsupported", func(t *testing.T) {
+				_, err := NewFromState(version, multithreaded.CreateEmptyState())
+				require.ErrorIs(t, err, ErrUnsupportedVersion)
+			})
+		} else if IsSupportedMultiThreaded(version) {
+			t.Run(version.String(), func(t *testing.T) {
+				actual, err := NewFromState(version, multithreaded.CreateEmptyState())
+				require.NoError(t, err)
+				require.IsType(t, &multithreaded.State{}, actual.FPVMState)
+				require.Equal(t, version, actual.Version)
+			})
+			t.Run(version.String()+"-st-unsupported", func(t *testing.T) {
+				_, err := NewFromState(version, singlethreaded.CreateEmptyState())
+				require.ErrorIs(t, err, ErrUnsupportedVersion)
+			})
+		} else {
+			t.Run(version.String()+"-unsupported", func(t *testing.T) {
+				_, err := NewFromState(version, multithreaded.CreateEmptyState())
+				require.ErrorIs(t, err, ErrUnsupportedVersion)
+			})
+		}
+	}
+}
 
 func TestLoadStateFromFile(t *testing.T) {
 	for _, version := range StateVersionTypes {
@@ -40,6 +75,18 @@ func TestLoadStateFromFile(t *testing.T) {
 			})
 		}
 	}
+
+	t.Run("JSONUnsupported", func(t *testing.T) {
+		filename := strconv.Itoa(int(VersionSingleThreaded)) + ".json"
+		dir := t.TempDir()
+		path := filepath.Join(dir, filename)
+		in, err := historicStates.ReadFile(filepath.Join(statesPath, filename))
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, in, 0o644))
+
+		_, err = LoadStateFromFile(path)
+		require.ErrorIs(t, err, ErrUnsupportedVersion)
+	})
 }
 
 type versionAndStateCreator struct {
