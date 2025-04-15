@@ -75,9 +75,6 @@ func (s *VersionedState) CreateVM(logger log.Logger, po mipsevm.PreimageOracle, 
 func FeaturesForVersion(version StateVersion) mipsevm.FeatureToggles {
 	features := mipsevm.FeatureToggles{}
 	// Set any required feature toggles based on the state version here.
-	if version >= VersionMultiThreaded64_v4 {
-		features.SupportSysEventFd2 = true
-	}
 	return features
 }
 
