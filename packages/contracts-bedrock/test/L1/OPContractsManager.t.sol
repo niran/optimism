@@ -1320,6 +1320,16 @@ contract OPContractsManager_UpdatePrestate_Test is OPContractsManager_TestInit {
         fdg.weth().balanceOf(address(0));
     }
 
+    function test_updatePrestate_notDelegateCall_reverts() public {
+        IOPContractsManager.OpChainConfig[] memory inputs = new IOPContractsManager.OpChainConfig[](1);
+        inputs[0] = IOPContractsManager.OpChainConfig(
+            chainDeployOutput1.systemConfigProxy, chainDeployOutput1.opChainProxyAdmin, Claim.wrap(bytes32(hex"ABBA"))
+        );
+
+        vm.expectRevert(IOPContractsManager.OnlyDelegatecall.selector);
+        opcm.updatePrestate(inputs);
+    }
+
     function test_updatePrestate_whenPDGPrestateIsZero_reverts() public {
         IOPContractsManager.OpChainConfig[] memory inputs = new IOPContractsManager.OpChainConfig[](1);
         inputs[0] = IOPContractsManager.OpChainConfig({
