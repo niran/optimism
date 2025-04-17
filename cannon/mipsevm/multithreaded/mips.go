@@ -206,7 +206,7 @@ func (m *InstrumentedState) handleSyscall() error {
 	return nil
 }
 
-func (m *InstrumentedState) handleUnrecognizedSyscall(syscallNum uint64) {
+func (m *InstrumentedState) handleUnrecognizedSyscall(syscallNum Word) {
 	m.Traceback()
 	panic(fmt.Sprintf("unrecognized syscall: %d", syscallNum))
 }
