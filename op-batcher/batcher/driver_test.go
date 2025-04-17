@@ -436,11 +436,3 @@ func TestBatchSubmitter_ThrottlingEndpoints(t *testing.T) {
 	cancel3()
 	wg3.Wait()
 }
-
-// Helper struct for parsing JSON-RPC requests
-type jsonrpcRequest struct {
-	JSONRPC string        `json:"jsonrpc"`
-	Method  string        `json:"method"`
-	Params  []interface{} `json:"params"`
-	ID      interface{}   `json:"id"`
-}
