@@ -17,6 +17,7 @@ import (
 )
 
 var ErrReorg = errors.New("block does not extend existing chain")
+var ErrNoTxData = errors.New("no tx data available to submit")
 
 type ChannelOutFactory func(cfg ChannelConfig, rollupCfg *rollup.Config) (derive.ChannelOut, error)
 
@@ -203,7 +204,7 @@ func (s *channelManager) handleChannelInvalidated(c *channel) {
 func (s *channelManager) nextTxData(channel *channel) (txData, error) {
 	if channel == nil || !channel.HasTxData() {
 		s.log.Trace("no next tx data")
-		return txData{}, io.EOF // TODO: not enough data error instead
+		return txData{}, ErrNoTxData
 	}
 	tx := channel.NextTxData()
 
