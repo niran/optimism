@@ -3,6 +3,8 @@ pragma solidity 0.8.15;
 
 // Testing
 import { Test } from "forge-std/Test.sol";
+import { CommonTest } from "test/setup/CommonTest.sol";
+import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 // Scripts
 import { Config } from "scripts/libraries/Config.sol";
@@ -38,6 +40,8 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
 
 contract StandardValidatorTest is Test {
+    CommonTest commonTest;
+
     StandardValidator validator;
     ISuperchainConfig superchainConfig;
     address l1PAOMultisig;
@@ -67,6 +71,9 @@ contract StandardValidatorTest is Test {
     address preimageOracle;
 
     function setUp() public virtual {
+        commonTest = new CommonTest();
+        commonTest.setUp();
+
         // Setup test addresses
         superchainConfig = ISuperchainConfig(makeAddr("superchainConfig"));
         l1PAOMultisig = makeAddr("l1PAOMultisig");
