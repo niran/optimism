@@ -84,7 +84,18 @@ func (store *BlobsStore) GetAllSidecars(ctx context.Context, l1Timestamp uint64)
 	if !ok {
 		return nil, fmt.Errorf("no blobs known with given time: %w", ethereum.NotFound)
 	}
-	out := make([]*eth.BlobSidecar, len(m))
+
+	// Find the maximum index to properly size the slice
+	maxIndex := uint64(0)
+	for h := range m {
+		if h.Index > maxIndex {
+			maxIndex = h.Index
+		}
+	}
+
+	// Create a slice with appropriate size
+	out := make([]*eth.BlobSidecar, maxIndex+1)
+
 	for h, b := range m {
 		if b == nil {
 			return nil, fmt.Errorf("blob %d %s is nil, cannot copy: %w", h.Index, h.Hash, ethereum.NotFound)
@@ -105,7 +116,16 @@ func (store *BlobsStore) GetAllSidecars(ctx context.Context, l1Timestamp uint64)
 			KZGProof:      eth.Bytes48(proof),
 		}
 	}
-	return out, nil
+
+	// Remove any nil elements from the slice
+	result := make([]*eth.BlobSidecar, 0, len(m))
+	for _, sidecar := range out {
+		if sidecar != nil {
+			result = append(result, sidecar)
+		}
+	}
+
+	return result, nil
 }
 
 var _ derive.L1BlobsFetcher = (*BlobsStore)(nil)
