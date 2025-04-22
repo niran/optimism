@@ -91,12 +91,19 @@ func (actors *InteropActors) PrepareChainState(t helpers.Testing) {
 	actors.ChainA.Sequencer.ActL2PipelineFull(t)
 	actors.ChainB.Sequencer.ActL2PipelineFull(t)
 	t.Log("Processed!")
+}
 
+func (actors *InteropActors) VerifyInitialState(t helpers.Testing) {
 	// Verify initial state
 	statusA := actors.ChainA.Sequencer.SyncStatus()
 	statusB := actors.ChainB.Sequencer.SyncStatus()
 	require.Equal(t, uint64(0), statusA.UnsafeL2.Number)
 	require.Equal(t, uint64(0), statusB.UnsafeL2.Number)
+}
+
+func (actors *InteropActors) PrepareAndVerifyInitialState(t helpers.Testing) {
+	actors.PrepareChainState(t)
+	actors.VerifyInitialState(t)
 }
 
 // messageExpiryTime is the time in seconds that a message will be valid for on the L2 chain.
@@ -120,6 +127,14 @@ func SetBlockTimeForChainB(blockTime uint64) setupOption {
 func SetMessageExpiryTime(expiryTime uint64) setupOption {
 	return func(recipe *interopgen.InteropDevRecipe) {
 		recipe.ExpiryTime = expiryTime
+	}
+}
+
+func SetInteropOffsetForAllL2s(offset uint64) setupOption {
+	return func(recipe *interopgen.InteropDevRecipe) {
+		for _, l2 := range recipe.L2s {
+			l2.InteropOffset = offset
+		}
 	}
 }
 
@@ -306,4 +321,17 @@ func createL2Services(
 		SequencerEngine: eng,
 		Batcher:         batcher,
 	}
+}
+
+// Creates a new L2 block, submits it to L1, and mines the L1 block.
+func (actors *InteropActors) ActBatchAllAndMine(t helpers.Testing) {
+	// Submit all and mine for both chains
+	actors.ChainA.Batcher.ActSubmitAll(t)
+	actors.ChainB.Batcher.ActSubmitAll(t)
+	batchTxA := actors.ChainA.Batcher.LastSubmitted
+	batchTxB := actors.ChainB.Batcher.LastSubmitted
+	actors.L1Miner.ActL1StartBlock(12)(t)
+	actors.L1Miner.ActL1IncludeTxByHash(batchTxA.Hash())(t)
+	actors.L1Miner.ActL1IncludeTxByHash(batchTxB.Hash())(t)
+	actors.L1Miner.ActL1EndBlock(t)
 }
