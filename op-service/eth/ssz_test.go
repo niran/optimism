@@ -622,3 +622,26 @@ func TestFailsWrongVersionWithWithdrawalRoot(t *testing.T) {
 	err = payload.UnmarshalSSZ(BlockV3, uint32(len(data)), bytes.NewReader(data))
 	require.ErrorContains(t, err, ErrBadExtraDataOffset.Error())
 }
+
+func TestInferVersion(t *testing.T) {
+	zero := uint64(0)
+	payload := &ExecutionPayloadEnvelope{
+		ExecutionPayload: &ExecutionPayload{
+			WithdrawalsRoot: &types.EmptyWithdrawalsHash, // Should be V3 even if an Isthmus block
+			BlobGasUsed:     (*Uint64Quantity)(&zero),
+			ExcessBlobGas:   (*Uint64Quantity)(&zero),
+		},
+	}
+	inferredVersion := payload.ExecutionPayload.InferVersion()
+	assert.Equal(t, BlockV3, inferredVersion)
+
+	payload = &ExecutionPayloadEnvelope{
+		ExecutionPayload: &ExecutionPayload{
+			WithdrawalsRoot: &common.MaxHash,
+			BlobGasUsed:     (*Uint64Quantity)(&zero),
+			ExcessBlobGas:   (*Uint64Quantity)(&zero),
+		},
+	}
+	inferredVersion = payload.ExecutionPayload.InferVersion()
+	assert.Equal(t, BlockV4, inferredVersion)
+}
