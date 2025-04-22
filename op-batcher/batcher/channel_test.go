@@ -2,7 +2,6 @@ package batcher
 
 import (
 	"fmt"
-	"io"
 	"testing"
 
 	"github.com/ethereum-optimism/optimism/op-batcher/compressor"
