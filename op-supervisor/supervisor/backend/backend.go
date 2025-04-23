@@ -301,6 +301,8 @@ func (su *SupervisorBackend) AttachSyncNode(ctx context.Context, src syncnode.Sy
 	if !su.depSet.HasChain(chainID) {
 		return nil, fmt.Errorf("chain %s is not part of the interop dependency set: %w", chainID, types.ErrUnknownChain)
 	}
+	// TODO anchor point should not block node addition
+
 	// before attaching the sync source to the backend at all,
 	// query the anchor point to initialize the database
 	if err := su.QueryAnchorpoint(chainID, src); err != nil {

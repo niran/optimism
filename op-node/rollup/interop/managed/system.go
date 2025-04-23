@@ -341,6 +341,12 @@ func (m *ManagedMode) Reset(ctx context.Context, lUnsafe, xUnsafe, lSafe, xSafe,
 	return nil
 }
 
+func (m *ManagedMode) ResetPreInterop(ctx context.Context) error {
+	// todo log
+	m.emitter.Emit(engine.ResetEngineRequestEvent{})
+	return nil
+}
+
 func (m *ManagedMode) ProvideL1(ctx context.Context, nextL1 eth.BlockRef) error {
 	m.log.Info("Received next L1 block", "nextL1", nextL1)
 	m.emitter.Emit(derive.ProvideL1Traversal{

@@ -276,6 +276,8 @@ func (m *ManagedNode) onNodeEvent(ev *types.ManagedEvent) {
 // onResetEvent handles a reset event from the node
 func (m *ManagedNode) onResetEvent(errStr string) {
 	m.log.Warn("Node sent us a reset error", "err", errStr)
+	// TODO: pre-interop we need to run the resetPreInterop call.
+	//  Or maybe have the op-node side hide it from us.
 	m.resetFullRange()
 }
 
@@ -349,6 +351,7 @@ func (m *ManagedNode) onFinalizedL2(seal types.BlockSeal) {
 
 func (m *ManagedNode) onUnsafeBlock(unsafeRef eth.BlockRef) {
 	m.log.Info("Node has new unsafe block", "unsafeBlock", unsafeRef)
+	// TODO Pre-interop we need to drop the unsafe block updates, and not index the data
 	m.emitter.Emit(superevents.LocalUnsafeReceivedEvent{
 		ChainID:        m.chainID,
 		NewLocalUnsafe: unsafeRef,
@@ -360,6 +363,10 @@ func (m *ManagedNode) onUnsafeBlock(unsafeRef eth.BlockRef) {
 func (m *ManagedNode) onDerivationUpdate(pair types.DerivedBlockRefPair) {
 	m.log.Info("Node derived new block", "derived", pair.Derived,
 		"derivedParent", pair.Derived.ParentID(), "source", pair.Source)
+	// TODO Pre-interop we need to drop the derivation updates, and not index the data
+
+	// TODO Post-interop: filter down events to only accept the actively traversed L1 block that we provided earlier.
+	// No reason to accept anything else.
 	m.emitter.Emit(superevents.LocalDerivedEvent{
 		ChainID: m.chainID,
 		Derived: pair,

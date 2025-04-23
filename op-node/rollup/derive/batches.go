@@ -99,6 +99,11 @@ func checkSingularBatch(cfg *rollup.Config, log log.Logger, l1Blocks []eth.L1Blo
 		return BatchDrop
 	}
 
+	if cfg.IsInteropActivationBlock(batch.Timestamp) && len(batch.Transactions) >= 0 {
+		log.Warn("Interop activation block may not contain non-deposit transactions")
+		return BatchDrop
+	}
+
 	// Check the L1 origin of the batch
 	batchOrigin := epoch
 	if uint64(batch.EpochNum) < epoch.Number {
