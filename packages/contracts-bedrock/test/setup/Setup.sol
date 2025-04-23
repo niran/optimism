@@ -92,28 +92,28 @@ contract Setup {
     Fork l2Fork = LATEST_FORK;
 
     // L1 contracts - dispute
-    IDisputeGameFactory disputeGameFactory;
-    IAnchorStateRegistry anchorStateRegistry;
-    IFaultDisputeGame faultDisputeGame;
-    IDelayedWETH delayedWeth;
-    IPermissionedDisputeGame permissionedDisputeGame;
-    IDelayedWETH delayedWETHPermissionedGameProxy;
+    IDisputeGameFactory public disputeGameFactory;
+    IAnchorStateRegistry public anchorStateRegistry;
+    IFaultDisputeGame public faultDisputeGame;
+    IDelayedWETH public delayedWeth;
+    IPermissionedDisputeGame public permissionedDisputeGame;
+    IDelayedWETH public delayedWETHPermissionedGameProxy;
 
     // L1 contracts - core
     address proxyAdminOwner;
     IProxyAdmin proxyAdmin;
-    IOptimismPortal optimismPortal2;
-    IETHLockbox ethLockbox;
-    ISystemConfig systemConfig;
-    IL1StandardBridge l1StandardBridge;
-    IL1CrossDomainMessenger l1CrossDomainMessenger;
-    IAddressManager addressManager;
-    IL1ERC721Bridge l1ERC721Bridge;
-    IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
-    IProtocolVersions protocolVersions;
-    ISuperchainConfig superchainConfig;
-    IDataAvailabilityChallenge dataAvailabilityChallenge;
-    IOPContractsManager opcm;
+    IOptimismPortal public optimismPortal2;
+    IETHLockbox public ethLockbox;
+    ISystemConfig public systemConfig;
+    IL1StandardBridge public l1StandardBridge;
+    IL1CrossDomainMessenger public l1CrossDomainMessenger;
+    IAddressManager public addressManager;
+    IL1ERC721Bridge public l1ERC721Bridge;
+    IOptimismMintableERC20Factory public l1OptimismMintableERC20Factory;
+    IProtocolVersions public protocolVersions;
+    ISuperchainConfig public superchainConfig;
+    IDataAvailabilityChallenge public dataAvailabilityChallenge;
+    IOPContractsManager public opcm;
 
     // L2 contracts
     ICrossL2Inbox crossL2Inbox = ICrossL2Inbox(payable(Predeploys.CROSS_L2_INBOX));
