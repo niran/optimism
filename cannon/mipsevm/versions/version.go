@@ -13,15 +13,15 @@ const (
 	// VersionMultiThreaded is the original implementation of 32-bit multithreaded cannon, tagged at cannon/v1.3.0
 	VersionMultiThreaded
 	// VersionSingleThreaded2 is based on VersionSingleThreaded with the addition of support for fcntl(F_GETFD) syscall
-	// This is the latest 32-bit single-threaded vm
+	// This is the latest 32-bit single-threaded vm, tagged at cannon/v1.4.0
 	VersionSingleThreaded2
 	// VersionMultiThreaded64 is the original 64-bit MTCannon implementation (pre-audit), tagged at cannon/v1.2.0
 	VersionMultiThreaded64
 	// VersionMultiThreaded64_v2 includes an audit fix to ensure futex values are always 32-bit, tagged at cannon/v1.3.0
 	VersionMultiThreaded64_v2
-	// VersionMultiThreaded_v2 is the latest 32-bit multithreaded vm
+	// VersionMultiThreaded_v2 is the latest 32-bit multithreaded vm, tagged at cannon/v1.4.0
 	VersionMultiThreaded_v2
-	// VersionMultiThreaded64_v3 includes futex handling simplification, tagged at cannon/v1.4.0
+	// VersionMultiThreaded64_v3 includes futex handling simplification
 	VersionMultiThreaded64_v3
 	// VersionMultiThreaded64_v4 is the latest 64-bit multithreaded vm, includes support for new syscall eventfd2
 	VersionMultiThreaded64_v4
