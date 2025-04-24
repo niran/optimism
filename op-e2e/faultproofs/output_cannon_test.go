@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/trace/utils"
 	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/types"
 	gameTypes "github.com/ethereum-optimism/optimism/op-challenger/game/types"
-	op_e2e "github.com/ethereum-optimism/optimism/op-e2e"
 	"github.com/ethereum-optimism/optimism/op-e2e/config"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/challenger"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/disputegame"
@@ -20,16 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOutputCannonGame_Standard(t *testing.T) {
-	testOutputCannonGame(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonGame_Multithreaded(t *testing.T) {
-	testOutputCannonGame(t, config.AllocTypeMTCannon)
+func TestOutputCannonGame(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonGame)
 }
 
 func testOutputCannonGame(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -40,17 +34,12 @@ func testOutputCannonGame(t *testing.T, allocType config.AllocType) {
 	testCannonGame(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestOutputCannon_ChallengeAllZeroClaim_Standard(t *testing.T) {
-	testOutputCannonChallengeAllZeroClaim(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannon_ChallengeAllZeroClaim_Multithreaded(t *testing.T) {
-	testOutputCannonChallengeAllZeroClaim(t, config.AllocTypeMTCannon)
+func TestOutputCannon_ChallengeAllZeroClaim(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonChallengeAllZeroClaim)
 }
 
 func testOutputCannonChallengeAllZeroClaim(t *testing.T, allocType config.AllocType) {
 	// The dishonest actor always posts claims with all zeros.
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -61,16 +50,11 @@ func testOutputCannonChallengeAllZeroClaim(t *testing.T, allocType config.AllocT
 	testCannonChallengeAllZeroClaim(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestOutputCannon_PublishCannonRootClaim_Standard(t *testing.T) {
-	testOutputCannonPublishCannonRootClaim(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannon_PublishCannonRootClaim_Multithreaded(t *testing.T) {
-	testOutputCannonPublishCannonRootClaim(t, config.AllocTypeMTCannon)
+func TestOutputCannon_PublishCannonRootClaim(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonPublishCannonRootClaim)
 }
 
 func testOutputCannonPublishCannonRootClaim(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	tests := []struct {
 		disputeL2BlockNumber uint64
 	}{
@@ -80,8 +64,6 @@ func testOutputCannonPublishCannonRootClaim(t *testing.T, allocType config.Alloc
 	for _, test := range tests {
 		test := test
 		t.Run(fmt.Sprintf("Dispute_%v", test.disputeL2BlockNumber), func(t *testing.T) {
-			op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 			ctx := context.Background()
 			sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 
@@ -98,17 +80,11 @@ func testOutputCannonPublishCannonRootClaim(t *testing.T, allocType config.Alloc
 	}
 }
 
-func TestOutputCannonDisputeGame_Standard(t *testing.T) {
-	testOutputCannonDisputeGame(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonDisputeGame_Multithreaded(t *testing.T) {
-	testOutputCannonDisputeGame(t, config.AllocTypeMTCannon)
+func TestOutputCannonDisputeGame(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonDisputeGame)
 }
 
 func testOutputCannonDisputeGame(t *testing.T, allocType config.AllocType) {
-
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	tests := []struct {
 		name             string
 		defendClaimDepth types.Depth
@@ -120,8 +96,6 @@ func testOutputCannonDisputeGame(t *testing.T, allocType config.AllocType) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 			ctx := context.Background()
 			sys, l1Client := StartFaultDisputeSystem(t, WithAllocType(allocType))
 			t.Cleanup(sys.Close)
@@ -156,17 +130,11 @@ func testOutputCannonDisputeGame(t *testing.T, allocType config.AllocType) {
 	}
 }
 
-func TestOutputCannonDefendStep_Standard(t *testing.T) {
-	testOutputCannonDefendStep(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonDefendStep_Multithreaded(t *testing.T) {
-	testOutputCannonDefendStep(t, config.AllocTypeMTCannon)
+func TestOutputCannonDefendStep(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonDefendStep)
 }
 
 func testOutputCannonDefendStep(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -177,17 +145,11 @@ func testOutputCannonDefendStep(t *testing.T, allocType config.AllocType) {
 	testCannonDefendStep(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestOutputCannonStepWithLargePreimage_Standard(t *testing.T) {
-	testOutputCannonStepWithLargePreimage(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonStepWithLargePreimage_Multithreaded(t *testing.T) {
-	testOutputCannonStepWithLargePreimage(t, config.AllocTypeMTCannon)
+func TestOutputCannonStepWithLargePreimage(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonStepWithLargePreimage)
 }
 
 func testOutputCannonStepWithLargePreimage(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithBatcherStopped(), WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -227,19 +189,12 @@ func testOutputCannonStepWithLargePreimage(t *testing.T, allocType config.AllocT
 	// So we don't waste time resolving the game - that's tested elsewhere.
 }
 
-func TestOutputCannonStepWithPreimage_Standard(t *testing.T) {
-	testOutputCannonStepWithPreimage(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonStepWithPreimage_Multithreaded(t *testing.T) {
-	testOutputCannonStepWithPreimage(t, config.AllocTypeMTCannon)
+func TestOutputCannonStepWithPreimage(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonStepWithPreimage)
 }
 
 func testOutputCannonStepWithPreimage(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	testPreimageStep := func(t *testing.T, preimageOptConfig utils.PreimageOptConfig, preloadPreimage bool, opts ...disputegame.FindPreimageStepOpt) {
-		op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 		ctx := context.Background()
 		sys, _ := StartFaultDisputeSystem(t, WithBlobBatches(), WithAllocType(allocType))
 		t.Cleanup(sys.Close)
@@ -308,20 +263,12 @@ func testOutputCannonStepWithPreimage(t *testing.T, allocType config.AllocType) 
 	})
 }
 
-func TestOutputCannonStepWithKZGPointEvaluation_Standard(t *testing.T) {
-	testOutputCannonStepWithKzgPointEvaluation(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonStepWithKZGPointEvaluation_Multithreaded(t *testing.T) {
-	testOutputCannonStepWithKzgPointEvaluation(t, config.AllocTypeMTCannon)
+func TestOutputCannonStepWithKZGPointEvaluation(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonStepWithKzgPointEvaluation)
 }
 
 func testOutputCannonStepWithKzgPointEvaluation(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	testPreimageStep := func(t *testing.T, preloadPreimage bool) {
-		op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 		ctx := context.Background()
 		sys, _ := StartFaultDisputeSystem(t, WithEcotone(), WithAllocType(allocType))
 		t.Cleanup(sys.Close)
@@ -365,16 +312,11 @@ func testOutputCannonStepWithKzgPointEvaluation(t *testing.T, allocType config.A
 	})
 }
 
-func TestOutputCannonProposedOutputRootValid_AttackWithCorrectTrace_Standard(t *testing.T) {
-	testOutputCannonProposedOutputRootValid_AttackWithCorrectTrace(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonProposedOutputRootValid_Multithreaded(t *testing.T) {
-	testOutputCannonProposedOutputRootValid_AttackWithCorrectTrace(t, config.AllocTypeMTCannon)
+func TestOutputCannonProposedOutputRootValid(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonProposedOutputRootValid_AttackWithCorrectTrace)
 }
 
 func testOutputCannonProposedOutputRootValid_AttackWithCorrectTrace(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -385,16 +327,11 @@ func testOutputCannonProposedOutputRootValid_AttackWithCorrectTrace(t *testing.T
 	testCannonProposalValid_AttackWithCorrectTrace(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestOutputCannonProposedOutputRootValid_DefendWithCorrectTrace_Standard(t *testing.T) {
-	testOutputCannonProposedOutputRootValid_DefendWithCorrectTrace(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonProposedOutputRootValid_DefendWithCorrectTrace_Multithreaded(t *testing.T) {
-	testOutputCannonProposedOutputRootValid_DefendWithCorrectTrace(t, config.AllocTypeMTCannon)
+func TestOutputCannonProposedOutputRootValid_DefendWithCorrectTrace(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonProposedOutputRootValid_DefendWithCorrectTrace)
 }
 
 func testOutputCannonProposedOutputRootValid_DefendWithCorrectTrace(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -405,17 +342,11 @@ func testOutputCannonProposedOutputRootValid_DefendWithCorrectTrace(t *testing.T
 	testCannonProposalValid_DefendWithCorrectTrace(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestOutputCannonPoisonedPostState_Standard(t *testing.T) {
-	testOutputCannonPoisonedPostState(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonPoisonedPostState_Multithreaded(t *testing.T) {
-	testOutputCannonPoisonedPostState(t, config.AllocTypeMTCannon)
+func TestOutputCannonPoisonedPostState(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonPoisonedPostState)
 }
 
 func testOutputCannonPoisonedPostState(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -427,17 +358,11 @@ func testOutputCannonPoisonedPostState(t *testing.T, allocType config.AllocType)
 	testCannonPoisonedPostState(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestDisputeOutputRootBeyondProposedBlock_ValidOutputRoot_Standard(t *testing.T) {
-	testDisputeOutputRootBeyondProposedBlockValidOutputRoot(t, config.AllocTypeStandard)
-}
-
-func TestDisputeOutputRootBeyondProposedBlock_ValidOutputRoot_Multithreaded(t *testing.T) {
-	testDisputeOutputRootBeyondProposedBlockValidOutputRoot(t, config.AllocTypeMTCannon)
+func TestDisputeOutputRootBeyondProposedBlock_ValidOutputRoot(t *testing.T) {
+	RunTestAcrossVmTypes(t, testDisputeOutputRootBeyondProposedBlockValidOutputRoot)
 }
 
 func testDisputeOutputRootBeyondProposedBlockValidOutputRoot(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -449,17 +374,11 @@ func testDisputeOutputRootBeyondProposedBlockValidOutputRoot(t *testing.T, alloc
 	testDisputeRootBeyondProposedBlockValidOutputRoot(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestDisputeOutputRootBeyondProposedBlock_InvalidOutputRoot_Standard(t *testing.T) {
-	testDisputeOutputRootBeyondProposedBlockInvalidOutputRoot(t, config.AllocTypeStandard)
-}
-
-func TestDisputeOutputRootBeyondProposedBlock_InvalidOutputRoot_Multithreaded(t *testing.T) {
-	testDisputeOutputRootBeyondProposedBlockInvalidOutputRoot(t, config.AllocTypeMTCannon)
+func TestDisputeOutputRootBeyondProposedBlock_InvalidOutputRoot(t *testing.T) {
+	RunTestAcrossVmTypes(t, testDisputeOutputRootBeyondProposedBlockInvalidOutputRoot)
 }
 
 func testDisputeOutputRootBeyondProposedBlockInvalidOutputRoot(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -471,17 +390,11 @@ func testDisputeOutputRootBeyondProposedBlockInvalidOutputRoot(t *testing.T, all
 	testDisputeRootBeyondProposedBlockInvalidOutputRoot(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestTestDisputeOutputRoot_ChangeClaimedOutputRoot_Standard(t *testing.T) {
-	testTestDisputeOutputRootChangeClaimedOutputRoot(t, config.AllocTypeStandard)
-}
-
-func TestTestDisputeOutputRoot_ChangeClaimedOutputRoot_Multithreaded(t *testing.T) {
-	testTestDisputeOutputRootChangeClaimedOutputRoot(t, config.AllocTypeMTCannon)
+func TestTestDisputeOutputRoot_ChangeClaimedOutputRoot(t *testing.T) {
+	RunTestAcrossVmTypes(t, testTestDisputeOutputRootChangeClaimedOutputRoot)
 }
 
 func testTestDisputeOutputRootChangeClaimedOutputRoot(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -493,16 +406,11 @@ func testTestDisputeOutputRootChangeClaimedOutputRoot(t *testing.T, allocType co
 	testDisputeRootChangeClaimedRoot(t, ctx, arena, &game.SplitGameHelper)
 }
 
-func TestInvalidateUnsafeProposal_Standard(t *testing.T) {
-	testInvalidateUnsafeProposal(t, config.AllocTypeStandard)
-}
-
-func TestInvalidateUnsafeProposal_Multithreaded(t *testing.T) {
-	testInvalidateUnsafeProposal(t, config.AllocTypeMTCannon)
+func TestInvalidateUnsafeProposal(t *testing.T) {
+	RunTestAcrossVmTypes(t, testInvalidateUnsafeProposal)
 }
 
 func testInvalidateUnsafeProposal(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -532,7 +440,6 @@ func testInvalidateUnsafeProposal(t *testing.T, allocType config.AllocType) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			op_e2e.InitParallel(t, op_e2e.UsesCannon)
 			sys, l1Client := StartFaultDisputeSystem(t, WithSequencerWindowSize(100000), WithBatcherStopped(), WithAllocType(allocType))
 			t.Cleanup(sys.Close)
 
@@ -563,16 +470,11 @@ func testInvalidateUnsafeProposal(t *testing.T, allocType config.AllocType) {
 	}
 }
 
-func TestInvalidateProposalForFutureBlock_Standard(t *testing.T) {
-	testInvalidateProposalForFutureBlock(t, config.AllocTypeStandard)
-}
-
-func TestInvalidateProposalForFutureBlock_Multithreaded(t *testing.T) {
-	testInvalidateProposalForFutureBlock(t, config.AllocTypeMTCannon)
+func TestInvalidateProposalForFutureBlock(t *testing.T) {
+	RunTestAcrossVmTypes(t, testInvalidateProposalForFutureBlock)
 }
 
 func testInvalidateProposalForFutureBlock(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -602,7 +504,6 @@ func testInvalidateProposalForFutureBlock(t *testing.T, allocType config.AllocTy
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			op_e2e.InitParallel(t, op_e2e.UsesCannon)
 			sys, l1Client := StartFaultDisputeSystem(t, WithSequencerWindowSize(100000), WithAllocType(allocType))
 			t.Cleanup(sys.Close)
 
@@ -633,16 +534,11 @@ func testInvalidateProposalForFutureBlock(t *testing.T, allocType config.AllocTy
 	}
 }
 
-func TestInvalidateCorrectProposalFutureBlock_Standard(t *testing.T) {
-	testInvalidateCorrectProposalFutureBlock(t, config.AllocTypeStandard)
-}
-
-func TestInvalidateCorrectProposalFutureBlock_Multithreaded(t *testing.T) {
-	testInvalidateCorrectProposalFutureBlock(t, config.AllocTypeMTCannon)
+func TestInvalidateCorrectProposalFutureBlock(t *testing.T) {
+	RunTestAcrossVmTypes(t, testInvalidateCorrectProposalFutureBlock)
 }
 
 func testInvalidateCorrectProposalFutureBlock(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
 	ctx := context.Background()
 	// Spin up the system without the batcher so the safe head doesn't advance
 	sys, l1Client := StartFaultDisputeSystem(t, WithBatcherStopped(), WithSequencerWindowSize(100000), WithAllocType(allocType))
@@ -673,17 +569,11 @@ func testInvalidateCorrectProposalFutureBlock(t *testing.T, allocType config.All
 	game.LogGameData(ctx)
 }
 
-func TestOutputCannonHonestSafeTraceExtension_ValidRoot_Standard(t *testing.T) {
-	testOutputCannonHonestSafeTraceExtensionValidRoot(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonHonestSafeTraceExtension_ValidRoot_Multithreaded(t *testing.T) {
-	testOutputCannonHonestSafeTraceExtensionValidRoot(t, config.AllocTypeMTCannon)
+func TestOutputCannonHonestSafeTraceExtension_ValidRoot(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonHonestSafeTraceExtensionValidRoot)
 }
 
 func testOutputCannonHonestSafeTraceExtensionValidRoot(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, l1Client := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -733,17 +623,11 @@ func testOutputCannonHonestSafeTraceExtensionValidRoot(t *testing.T, allocType c
 	game.WaitForGameStatus(ctx, gameTypes.GameStatusDefenderWon)
 }
 
-func TestOutputCannonHonestSafeTraceExtension_InvalidRoot_Standard(t *testing.T) {
-	testOutputCannonHonestSafeTraceExtensionInvalidRoot(t, config.AllocTypeStandard)
-}
-
-func TestOutputCannonHonestSafeTraceExtension_InvalidRoot_Multithreaded(t *testing.T) {
-	testOutputCannonHonestSafeTraceExtensionInvalidRoot(t, config.AllocTypeMTCannon)
+func TestOutputCannonHonestSafeTraceExtension_InvalidRoot(t *testing.T) {
+	RunTestAcrossVmTypes(t, testOutputCannonHonestSafeTraceExtensionInvalidRoot)
 }
 
 func testOutputCannonHonestSafeTraceExtensionInvalidRoot(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, l1Client := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)
@@ -780,17 +664,11 @@ func testOutputCannonHonestSafeTraceExtensionInvalidRoot(t *testing.T, allocType
 	game.WaitForGameStatus(ctx, gameTypes.GameStatusChallengerWon)
 }
 
-func TestAgreeFirstBlockWithOriginOf1_Standard(t *testing.T) {
-	testAgreeFirstBlockWithOriginOf1(t, config.AllocTypeStandard)
-}
-
-func TestAgreeFirstBlockWithOriginOf1_Multithreaded(t *testing.T) {
-	testAgreeFirstBlockWithOriginOf1(t, config.AllocTypeMTCannon)
+func TestAgreeFirstBlockWithOriginOf1(t *testing.T) {
+	RunTestAcrossVmTypes(t, testAgreeFirstBlockWithOriginOf1)
 }
 
 func testAgreeFirstBlockWithOriginOf1(t *testing.T, allocType config.AllocType) {
-	op_e2e.InitParallel(t, op_e2e.UsesCannon)
-
 	ctx := context.Background()
 	sys, _ := StartFaultDisputeSystem(t, WithAllocType(allocType))
 	t.Cleanup(sys.Close)

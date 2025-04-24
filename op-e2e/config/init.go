@@ -49,10 +49,11 @@ const (
 type AllocType string
 
 const (
-	AllocTypeStandard AllocType = "standard"
-	AllocTypeAltDA    AllocType = "alt-da"
-	AllocTypeL2OO     AllocType = "l2oo"
-	AllocTypeMTCannon AllocType = "mt-cannon"
+	AllocTypeStandard     AllocType = "standard"
+	AllocTypeAltDA        AllocType = "alt-da"
+	AllocTypeL2OO         AllocType = "l2oo"
+	AllocTypeMTCannon     AllocType = "mt-cannon"
+	AllocTypeMTCannonNext AllocType = "mt-cannon-next"
 
 	DefaultAllocType = AllocTypeStandard
 )
@@ -66,14 +67,14 @@ func (a AllocType) Check() error {
 
 func (a AllocType) UsesProofs() bool {
 	switch a {
-	case AllocTypeStandard, AllocTypeMTCannon, AllocTypeAltDA:
+	case AllocTypeStandard, AllocTypeMTCannon, AllocTypeMTCannonNext, AllocTypeAltDA:
 		return true
 	default:
 		return false
 	}
 }
 
-var allocTypes = []AllocType{AllocTypeStandard, AllocTypeAltDA, AllocTypeL2OO, AllocTypeMTCannon}
+var allocTypes = []AllocType{AllocTypeStandard, AllocTypeAltDA, AllocTypeL2OO, AllocTypeMTCannon, AllocTypeMTCannonNext}
 
 var (
 	// All of the following variables are set in the init function
@@ -507,7 +508,9 @@ func decompressGzipJSON(p string, thing any) {
 
 func cannonVMType(allocType AllocType) state.VMType {
 	if allocType == AllocTypeMTCannon {
-		return state.VMTypeCannon2
+		return state.VMTypeCannon6
+	} else if allocType == AllocTypeMTCannonNext {
+		return state.VMTypeCannon7
 	}
 	return state.VMTypeCannon1
 }

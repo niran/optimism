@@ -33,12 +33,8 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 )
 
-func TestPrecompiles_Standard(t *testing.T) {
-	testPrecompiles(t, e2e_config.AllocTypeStandard)
-}
-
-func TestPrecompiles_Multithreaded(t *testing.T) {
-	testPrecompiles(t, e2e_config.AllocTypeMTCannon)
+func TestPrecompiles(t *testing.T) {
+	RunTestAcrossVmTypes(t, testPrecompiles)
 }
 
 func testPrecompiles(t *testing.T, allocType e2e_config.AllocType) {
@@ -142,12 +138,8 @@ func testPrecompiles(t *testing.T, allocType e2e_config.AllocType) {
 	}
 }
 
-func TestGranitePrecompiles_Standard(t *testing.T) {
-	testGranitePrecompiles(t, e2e_config.AllocTypeStandard)
-}
-
-func TestGranitePrecompiles_Multithreaded(t *testing.T) {
-	testGranitePrecompiles(t, e2e_config.AllocTypeMTCannon)
+func TestGranitePrecompiles(t *testing.T) {
+	RunTestAcrossVmTypes(t, testGranitePrecompiles)
 }
 
 func testGranitePrecompiles(t *testing.T, allocType e2e_config.AllocType) {
