@@ -379,10 +379,6 @@ contract Deploy is Deployer {
         setSuperPermissionedGameImplementation();
         setFastFaultGameImplementation();
         setCannonFaultGameImplementation();
-
-        transferDisputeGameFactoryOwnership();
-        transferDelayedWETHOwnership();
-        transferPermissionedDelayedWETHOwnership();
     }
 
     /// @notice Add AltDA setup to the OP chain
