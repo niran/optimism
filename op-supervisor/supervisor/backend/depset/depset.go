@@ -2,6 +2,7 @@ package depset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -25,6 +26,9 @@ type DependencySet interface {
 
 	// MessageExpiryWindow returns the message expiry window to use for this dependency set.
 	MessageExpiryWindow() uint64
+
+	json.Marshaler
+	json.Unmarshaler
 }
 
 // FromRegistry loads a dependency set from the superchain-registry.

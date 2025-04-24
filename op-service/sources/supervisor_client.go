@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
@@ -120,6 +121,12 @@ func (cl *SupervisorClient) AllSafeDerivedAt(ctx context.Context, derivedFrom et
 
 func (cl *SupervisorClient) SyncStatus(ctx context.Context) (result eth.SupervisorSyncStatus, err error) {
 	err = cl.client.CallContext(ctx, &result, "supervisor_syncStatus")
+	return result, err
+}
+
+func (cl *SupervisorClient) DependencySet(ctx context.Context) (depset.DependencySet, error) {
+	var result *depset.StaticConfigDependencySet
+	err := cl.client.CallContext(ctx, &result, "supervisor_dependencySet")
 	return result, err
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
@@ -61,6 +62,10 @@ func (q *QueryFrontend) AllSafeDerivedAt(ctx context.Context, derivedFrom eth.Bl
 
 func (q *QueryFrontend) SyncStatus(ctx context.Context) (eth.SupervisorSyncStatus, error) {
 	return q.Supervisor.SyncStatus(ctx)
+}
+
+func (q *QueryFrontend) DependencySet(ctx context.Context) (depset.DependencySet, error) {
+	return q.Supervisor.DependencySet(ctx)
 }
 
 type AdminFrontend struct {

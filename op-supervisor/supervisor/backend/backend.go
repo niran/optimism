@@ -462,13 +462,6 @@ func (su *SupervisorBackend) AddL2RPC(ctx context.Context, rpc string, jwtSecret
 	return err
 }
 
-// Internal methods, for processors
-// ----------------------------
-
-func (su *SupervisorBackend) DependencySet() depset.DependencySet {
-	return su.cfgSet
-}
-
 // Query methods
 // ----------------------------
 
@@ -799,6 +792,10 @@ func (su *SupervisorBackend) SuperRootAtTimestamp(ctx context.Context, timestamp
 
 func (su *SupervisorBackend) SyncStatus(ctx context.Context) (eth.SupervisorSyncStatus, error) {
 	return su.statusTracker.SyncStatus()
+}
+
+func (su *SupervisorBackend) DependencySet(ctx context.Context) (depset.DependencySet, error) {
+	return su.cfgSet, nil
 }
 
 // PullLatestL1 makes the supervisor aware of the latest L1 block. Exposed for testing purposes.

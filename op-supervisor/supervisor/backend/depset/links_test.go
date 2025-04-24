@@ -1,6 +1,7 @@
 package depset
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
@@ -47,6 +48,14 @@ func (m *mockLinkCfg) IsInteropActivationBlock(chainID eth.ChainID, ts uint64) b
 
 func (m *mockLinkCfg) MessageExpiryWindow() uint64 {
 	return m.window
+}
+
+func (m *mockLinkCfg) MarshalJSON() ([]byte, error) {
+	return nil, fmt.Errorf("MarshalJSON not implemented for mockLinkCfg")
+}
+
+func (m *mockLinkCfg) UnmarshalJSON(data []byte) error {
+	return fmt.Errorf("UnmarshalJSON not implemented for mockLinkCfg")
 }
 
 var _ LinkerConfig = (*mockLinkCfg)(nil)
