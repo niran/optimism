@@ -18,10 +18,10 @@ type TopicScores struct {
 }
 
 type GossipScores struct {
-	Total              float64     `json:"total"`
-	Blocks             TopicScores `json:"blocks"` // fully zeroed if the peer has not been in the mesh on the topic
-	IPColocationFactor float64     `json:"IPColocationFactor"`
-	BehavioralPenalty  float64     `json:"behavioralPenalty"`
+	Total              float64                `json:"total"`
+	Blocks             map[string]TopicScores `json:"blocks"` // fully zeroed if the peer has not been in the mesh on the topic
+	IPColocationFactor float64                `json:"IPColocationFactor"`
+	BehavioralPenalty  float64                `json:"behavioralPenalty"`
 }
 
 func (g GossipScores) Apply(rec *scoreRecord) {

@@ -245,7 +245,7 @@ func NewMetrics(procName string) *Metrics {
 			Name:      "peer_scores",
 			Help:      "Histogram of currently connected peer scores",
 			Buckets:   []float64{-100, -40, -20, -10, -5, -2, -1, -0.5, -0.05, 0, 0.05, 0.5, 1, 2, 5, 10, 20, 40},
-		}, []string{"type"}),
+		}, []string{"type", "topic"}),
 		StreamCount: factory.NewGauge(prometheus.GaugeOpts{
 			Namespace: ns,
 			Subsystem: "p2p",
@@ -403,17 +403,21 @@ func NewMetrics(procName string) *Metrics {
 // Accepts a slice of peer scores in any order.
 func (m *Metrics) SetPeerScores(allScores []store.PeerScores) {
 	for _, scores := range allScores {
-		m.PeerScores.WithLabelValues("total").Observe(scores.Gossip.Total)
-		m.PeerScores.WithLabelValues("ipColocation").Observe(scores.Gossip.IPColocationFactor)
-		m.PeerScores.WithLabelValues("behavioralPenalty").Observe(scores.Gossip.BehavioralPenalty)
-		m.PeerScores.WithLabelValues("blocksFirstMessage").Observe(scores.Gossip.Blocks.FirstMessageDeliveries)
-		m.PeerScores.WithLabelValues("blocksTimeInMesh").Observe(scores.Gossip.Blocks.TimeInMesh)
-		m.PeerScores.WithLabelValues("blocksMessageDeliveries").Observe(scores.Gossip.Blocks.MeshMessageDeliveries)
-		m.PeerScores.WithLabelValues("blocksInvalidMessageDeliveries").Observe(scores.Gossip.Blocks.InvalidMessageDeliveries)
+		m.PeerScores.WithLabelValues("total", "global").Observe(scores.Gossip.Total)
+		m.PeerScores.WithLabelValues("ipColocation", "global").Observe(scores.Gossip.IPColocationFactor)
+		m.PeerScores.WithLabelValues("behavioralPenalty", "global").Observe(scores.Gossip.BehavioralPenalty)
 
-		m.PeerScores.WithLabelValues("reqRespValidResponses").Observe(scores.ReqResp.ValidResponses)
-		m.PeerScores.WithLabelValues("reqRespErrorResponses").Observe(scores.ReqResp.ErrorResponses)
-		m.PeerScores.WithLabelValues("reqRespRejectedPayloads").Observe(scores.ReqResp.RejectedPayloads)
+		m.PeerScores.WithLabelValues("reqRespValidResponses", "global").Observe(scores.ReqResp.ValidResponses)
+		m.PeerScores.WithLabelValues("reqRespErrorResponses", "global").Observe(scores.ReqResp.ErrorResponses)
+		m.PeerScores.WithLabelValues("reqRespRejectedPayloads", "global").Observe(scores.ReqResp.RejectedPayloads)
+
+		for topic, scores := range scores.Gossip.Blocks {
+			m.PeerScores.WithLabelValues("blocksFirstMessage", topic).Observe(scores.FirstMessageDeliveries)
+			m.PeerScores.WithLabelValues("blocksTimeInMesh", topic).Observe(scores.TimeInMesh)
+			m.PeerScores.WithLabelValues("blocksMessageDeliveries", topic).Observe(scores.MeshMessageDeliveries)
+			m.PeerScores.WithLabelValues("blocksInvalidMessageDeliveries", topic).Observe(scores.InvalidMessageDeliveries)
+		}
+
 	}
 }
 

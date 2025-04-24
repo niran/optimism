@@ -174,7 +174,7 @@ func TestPrune(t *testing.T) {
 	hasScoreRecorded := func(id peer.ID) bool {
 		scores, err := book.GetPeerScores(id)
 		require.NoError(t, err)
-		return scores != PeerScores{}
+		return scores.Gossip.Total != 0
 	}
 
 	firstStore := clock.Now()
@@ -228,7 +228,7 @@ func TestPruneMultipleBatches(t *testing.T) {
 	hasScoreRecorded := func(id peer.ID) bool {
 		scores, err := book.GetPeerScores(id)
 		require.NoError(t, err)
-		return scores != PeerScores{}
+		return scores.Gossip.Total != 0
 	}
 
 	// Set scores for more peers than the max batch size
