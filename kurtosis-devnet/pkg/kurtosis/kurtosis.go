@@ -7,13 +7,14 @@ import (
 	"io"
 
 	"github.com/ethereum-optimism/optimism/devnet-sdk/descriptors"
-	"github.com/ethereum-optimism/optimism/devnet-sdk/types"
+	devnetTypes "github.com/ethereum-optimism/optimism/devnet-sdk/types"
 	apiInterfaces "github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/api/interfaces"
 	"github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/api/run"
 	"github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/api/wrappers"
 	"github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/sources/deployer"
 	srcInterfaces "github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/sources/interfaces"
 	"github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/kurtosis/sources/spec"
+	autofixTypes "github.com/ethereum-optimism/optimism/kurtosis-devnet/pkg/types"
 )
 
 const (
@@ -49,6 +50,9 @@ type KurtosisDeployer struct {
 
 	// interface for kurtosis interactions
 	kurtosisCtx apiInterfaces.KurtosisContextInterface
+
+	// autofix mode
+	autofixMode autofixTypes.AutofixMode
 }
 
 type KurtosisDeployerOptions func(*KurtosisDeployer)
@@ -113,6 +117,12 @@ func WithKurtosisKurtosisContext(kurtosisCtx apiInterfaces.KurtosisContextInterf
 	}
 }
 
+func WithKurtosisAutofixMode(autofixMode autofixTypes.AutofixMode) KurtosisDeployerOptions {
+	return func(d *KurtosisDeployer) {
+		d.autofixMode = autofixMode
+	}
+}
+
 // NewKurtosisDeployer creates a new KurtosisDeployer instance
 func NewKurtosisDeployer(opts ...KurtosisDeployerOptions) (*KurtosisDeployer, error) {
 	d := &KurtosisDeployer{
@@ -147,7 +157,7 @@ func (d *KurtosisDeployer) getWallets(wallets deployer.WalletList) descriptors.W
 	walletMap := make(descriptors.WalletMap)
 	for _, wallet := range wallets {
 		walletMap[wallet.Name] = &descriptors.Wallet{
-			Address:    types.Address(wallet.Address),
+			Address:    devnetTypes.Address(wallet.Address),
 			PrivateKey: wallet.PrivateKey,
 		}
 	}
@@ -174,7 +184,7 @@ func (d *KurtosisDeployer) GetEnvironmentInfo(ctx context.Context, s *spec.Encla
 	}
 
 	// Get dependency set
-	var depsets []descriptors.DepSet
+	var depsets map[string]descriptors.DepSet
 	if s.Features.Contains(spec.FeatureInterop) {
 		depsets, err = d.depsetExtractor.ExtractData(ctx, d.enclave)
 		if err != nil {
@@ -193,12 +203,12 @@ func (d *KurtosisDeployer) GetEnvironmentInfo(ctx context.Context, s *spec.Encla
 		},
 	}
 
-	// Find L1 endpoint
-	networks := make([]string, len(s.Chains))
-	for idx, chainSpec := range s.Chains {
-		networks[idx] = chainSpec.Name
+	l2Networks := make([]ChainSpec, 0, len(s.Chains))
+	for _, chainSpec := range s.Chains {
+		l2Networks = append(l2Networks, ChainSpec{ChainSpec: chainSpec, DepSets: depsets})
 	}
-	finder := NewServiceFinder(inspectResult.UserServices, WithL2Networks(networks))
+	// Find L1 endpoint
+	finder := NewServiceFinder(inspectResult.UserServices, WithL2Networks(l2Networks))
 	if nodes, services := finder.FindL1Services(); len(nodes) > 0 {
 		chain := &descriptors.Chain{
 			ID:        deployerData.L1ChainID,
@@ -219,7 +229,7 @@ func (d *KurtosisDeployer) GetEnvironmentInfo(ctx context.Context, s *spec.Encla
 
 	// Find L2 endpoints
 	for _, chainSpec := range s.Chains {
-		nodes, services := finder.FindL2Services(chainSpec.Name)
+		nodes, services := finder.FindL2Services(ChainSpec{ChainSpec: chainSpec, DepSets: depsets})
 
 		chain := &descriptors.L2Chain{
 			Chain: &descriptors.Chain{
