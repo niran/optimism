@@ -123,7 +123,7 @@ type MockTxQueue struct {
 	m sync.Map
 }
 
-func (q *MockTxQueue) Send(ref txRef, candidate txmgr.TxCandidate, receiptCh chan txmgr.TxReceipt[txRef]) {
+func (q *MockTxQueue) Send(ref TxRef, candidate txmgr.TxCandidate, receiptCh chan txmgr.TxReceipt[TxRef]) {
 	q.m.Store(ref.id.String(), candidate)
 }
 
@@ -153,7 +153,7 @@ func TestBatchSubmitter_sendTx_FloorDataGas(t *testing.T) {
 		false,
 		&candidate,
 		q,
-		make(chan txmgr.TxReceipt[txRef]))
+		make(chan txmgr.TxReceipt[TxRef]))
 
 	candidateOut := q.Load(txData.ID().String())
 
