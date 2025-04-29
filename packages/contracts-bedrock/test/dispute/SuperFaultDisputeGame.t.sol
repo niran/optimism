@@ -32,10 +32,7 @@ import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 
 contract SuperFaultDisputeGame_Init is DisputeGameFactory_Init {
     /// @dev The type of the game being tested.
-    GameType internal immutable GAME_TYPE = GameTypes.SUPER_CANNON;
-
-    /// @dev The initial bond for the game.
-    uint256 internal initBond;
+    GameType internal constant GAME_TYPE = GameType.wrap(4);
 
     /// @dev The implementation of the game.
     ISuperFaultDisputeGame internal gameImpl;
@@ -59,10 +56,47 @@ contract SuperFaultDisputeGame_Init is DisputeGameFactory_Init {
         // Set the extra data for the game creation
         extraData = abi.encode(l2SequenceNumber);
 
-        (address _impl, AlphabetVM _vm,) = setupSuperFaultDisputeGame(absolutePrestate);
-        gameImpl = ISuperFaultDisputeGame(_impl);
+        // Set preimage oracle challenge period to something arbitrary (4 seconds) just so we can
+        // actually test the clock extensions later on. This is not a realistic value.
+        AlphabetVM _vm = new AlphabetVM(
+            absolutePrestate,
+            IPreimageOracle(
+                DeployUtils.create1({
+                    _name: "PreimageOracle",
+                    _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 4)))
+                })
+            )
+        );
 
-        initBond = disputeGameFactory.initBonds(GAME_TYPE);
+        // Deploy an implementation of the fault game
+        gameImpl = ISuperFaultDisputeGame(
+            DeployUtils.create1({
+                _name: "SuperFaultDisputeGame",
+                _args: DeployUtils.encodeConstructor(
+                    abi.encodeCall(
+                        ISuperFaultDisputeGame.__constructor__,
+                        (
+                            ISuperFaultDisputeGame.GameConstructorParams({
+                                gameType: GAME_TYPE,
+                                absolutePrestate: absolutePrestate,
+                                maxGameDepth: 2 ** 3,
+                                splitDepth: 2 ** 2,
+                                clockExtension: Duration.wrap(3 hours),
+                                maxClockDuration: Duration.wrap(3.5 days),
+                                vm: _vm,
+                                weth: delayedWeth,
+                                anchorStateRegistry: anchorStateRegistry,
+                                l2ChainId: 0
+                            })
+                        )
+                    )
+                )
+            })
+        );
+
+        // Register the game implementation with the factory.
+        disputeGameFactory.setImplementation(GAME_TYPE, gameImpl, "");
+        uint256 bondAmount = disputeGameFactory.initBonds(GAME_TYPE);
 
         vm.prank(superchainConfig.guardian());
         anchorStateRegistry.setRespectedGameType(GAME_TYPE);
@@ -74,7 +108,7 @@ contract SuperFaultDisputeGame_Init is DisputeGameFactory_Init {
 
         // Create a new game.
         gameProxy = ISuperFaultDisputeGame(
-            payable(address(disputeGameFactory.create{ value: initBond }(GAME_TYPE, rootClaim, extraData)))
+            payable(address(disputeGameFactory.create{ value: bondAmount }(GAME_TYPE, rootClaim, extraData)))
         );
 
         // Check immutables
@@ -429,7 +463,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         Claim claim = _dummyClaim();
         vm.expectRevert(abi.encodeWithSelector(UnexpectedRootClaim.selector, claim));
         gameProxy = ISuperFaultDisputeGame(
-            payable(address(disputeGameFactory.create{ value: initBond }(GAME_TYPE, claim, abi.encode(_blockNumber))))
+            payable(address(disputeGameFactory.create(GAME_TYPE, claim, abi.encode(_blockNumber))))
         );
     }
 
@@ -456,9 +490,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
     function test_initialize_invalidRoot_reverts() public {
         Claim claim = Claim.wrap(keccak256("invalid"));
         vm.expectRevert(bytes4(keccak256("SuperFaultDisputeGameInvalidRootClaim()")));
-        gameProxy = ISuperFaultDisputeGame(
-            payable(address(disputeGameFactory.create{ value: initBond }(GAME_TYPE, claim, extraData)))
-        );
+        gameProxy = ISuperFaultDisputeGame(payable(address(disputeGameFactory.create(GAME_TYPE, claim, extraData))));
     }
 
     /// @dev Tests that the game cannot be initialized with extra data of the incorrect length (must be 32 bytes)
@@ -482,9 +514,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
 
         Claim claim = _dummyClaim();
         vm.expectRevert(abi.encodeWithSelector(BadExtraData.selector));
-        gameProxy = ISuperFaultDisputeGame(
-            payable(address(disputeGameFactory.create{ value: initBond }(GAME_TYPE, claim, _extraData)))
-        );
+        gameProxy = ISuperFaultDisputeGame(payable(address(disputeGameFactory.create(GAME_TYPE, claim, _extraData))));
     }
 
     /// @dev Tests that the game is initialized with the correct data.
@@ -502,7 +532,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         assertEq(parentIndex, type(uint32).max);
         assertEq(counteredBy, address(0));
         assertEq(claimant, address(this));
-        assertEq(bond, initBond);
+        assertEq(bond, 0);
         assertEq(claim.raw(), ROOT_CLAIM.raw());
         assertEq(position.raw(), 1);
         assertEq(clock.raw(), LibClock.wrap(Duration.wrap(0), Timestamp.wrap(uint64(block.timestamp))).raw());
@@ -525,9 +555,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
 
         // Creation should fail.
         vm.expectRevert(AnchorRootNotFound.selector);
-        gameProxy = ISuperFaultDisputeGame(
-            payable(address(disputeGameFactory.create{ value: initBond }(GAME_TYPE, _dummyClaim(), hex"")))
-        );
+        gameProxy = ISuperFaultDisputeGame(payable(address(disputeGameFactory.create(GAME_TYPE, _dummyClaim(), hex""))));
     }
 
     /// @dev Tests that the game cannot be initialized twice.
@@ -909,7 +937,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         assertEq(parentIndex, type(uint32).max);
         assertEq(counteredBy, address(0));
         assertEq(claimant, address(this));
-        assertEq(bond, initBond);
+        assertEq(bond, 0);
         assertEq(claim.raw(), ROOT_CLAIM.raw());
         assertEq(position.raw(), 1);
         assertEq(clock.raw(), LibClock.wrap(Duration.wrap(0), Timestamp.wrap(uint64(block.timestamp - 5))).raw());
@@ -1416,7 +1444,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         // Ensure we bonded the correct amounts
         assertEq(address(this).balance, bal - totalBonded);
         assertEq(address(gameProxy).balance, 0);
-        assertEq(delayedWeth.balanceOf(address(gameProxy)), initBond + totalBonded);
+        assertEq(delayedWeth.balanceOf(address(gameProxy)), totalBonded);
 
         // Resolve all claims
         vm.warp(block.timestamp + 3 days + 12 hours);
@@ -1442,12 +1470,12 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         gameProxy.claimCredit(address(this));
 
         // Ensure that bonds were paid out correctly.
-        assertEq(address(this).balance, bal + initBond);
+        assertEq(address(this).balance, bal);
         assertEq(address(gameProxy).balance, 0);
         assertEq(delayedWeth.balanceOf(address(gameProxy)), 0);
 
         // Ensure that the init bond for the game is 0, in case we change it in the test suite in the future.
-        assertEq(disputeGameFactory.initBonds(GAME_TYPE), initBond);
+        assertEq(disputeGameFactory.initBonds(GAME_TYPE), 0);
     }
 
     /// @dev Static unit test asserting that resolve pays out bonds on step, output bisection, and execution trace
@@ -1516,7 +1544,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         assertEq(address(this).balance, 1000 ether - thisBonded);
         assertEq(bob.balance, 1000 ether - bobBonded);
         assertEq(address(gameProxy).balance, 0);
-        assertEq(delayedWeth.balanceOf(address(gameProxy)), initBond + thisBonded + bobBonded);
+        assertEq(delayedWeth.balanceOf(address(gameProxy)), thisBonded + bobBonded);
 
         // Resolve all claims
         vm.warp(block.timestamp + 3 days + 12 hours);
@@ -1549,13 +1577,13 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         gameProxy.claimCredit(bob);
 
         // Ensure that bonds were paid out correctly.
-        assertEq(address(this).balance, 1000 ether + initBond + bobBonded);
+        assertEq(address(this).balance, 1000 ether + bobBonded);
         assertEq(bob.balance, 1000 ether - bobBonded);
         assertEq(address(gameProxy).balance, 0);
         assertEq(delayedWeth.balanceOf(address(gameProxy)), 0);
 
         // Ensure that the init bond for the game is 0, in case we change it in the test suite in the future.
-        assertEq(disputeGameFactory.initBonds(GAME_TYPE), initBond);
+        assertEq(disputeGameFactory.initBonds(GAME_TYPE), 0);
     }
 
     /// @dev Static unit test asserting that resolve pays out bonds on moves to the leftmost actor
@@ -1626,14 +1654,14 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         // Ensure that bonds were paid out correctly.
         uint256 aliceLosses = firstBond;
         uint256 charlieLosses = secondBond;
-        assertEq(address(this).balance, bal + aliceLosses + initBond, "incorrect this balance");
+        assertEq(address(this).balance, bal + aliceLosses, "incorrect this balance");
         assertEq(alice.balance, bal - aliceLosses + charlieLosses, "incorrect alice balance");
         assertEq(bob.balance, bal, "incorrect bob balance");
         assertEq(charlie.balance, bal - charlieLosses, "incorrect charlie balance");
         assertEq(address(gameProxy).balance, 0);
 
         // Ensure that the init bond for the game is 0, in case we change it in the test suite in the future.
-        assertEq(disputeGameFactory.initBonds(GAME_TYPE), initBond);
+        assertEq(disputeGameFactory.initBonds(GAME_TYPE), 0);
     }
 
     /// @dev Static unit test asserting that the anchor state updates when the game resolves in
@@ -1814,7 +1842,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         // Ensure the game proxy has 1 ether in it.
         assertEq(address(gameProxy).balance, 1 ether);
         // Ensure the game has a balance of reenterBond in the delayedWeth contract.
-        assertEq(delayedWeth.balanceOf(address(gameProxy)), initBond + reenterBond);
+        assertEq(delayedWeth.balanceOf(address(gameProxy)), reenterBond);
 
         // Resolve the claim at index 2 first so that index 1 can be resolved.
         gameProxy.resolveClaim(2, 0);
@@ -1853,7 +1881,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         assertEq(reenter.numCalls(), 2);
         assertEq(address(reenter).balance, reenterBond);
         assertEq(address(gameProxy).balance, 1 ether);
-        assertEq(delayedWeth.balanceOf(address(gameProxy)), initBond);
+        assertEq(delayedWeth.balanceOf(address(gameProxy)), 0);
 
         vm.stopPrank();
     }
@@ -2042,7 +2070,7 @@ contract SuperFaultDisputeGame_Test is SuperFaultDisputeGame_Init {
         // the leaves in our output bisection test tree, at SPLIT_DEPTH = 2 ** 2
         ISuperFaultDisputeGame game = ISuperFaultDisputeGame(
             address(
-                disputeGameFactory.create{ value: initBond }(
+                disputeGameFactory.create(
                     GAME_TYPE, Claim.wrap(bytes32(uint256(0xFF))), abi.encode(uint256(validl2SequenceNumber))
                 )
             )
