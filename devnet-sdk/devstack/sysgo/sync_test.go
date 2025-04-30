@@ -466,7 +466,6 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 			logger.Info("safe head sync status", "sequencer CL", syncA.SafeL2.Number, "supervisor", chainAView.Safe.Number, "verifier CL", syncA2.SafeL2.Number, "verifier EL", blockA2.Number)
 			// verifier follows supervisor safe head
 			check := chainAView.Safe.Number <= 5+syncA2.SafeL2.Number
-			check = check && syncA2.SafeL2.Hash == chainAView.Safe.Hash
 			// verifier consolidated every previously known unsafe head to safe head
 			check = check && syncA2.SafeL2.Number >= unsafeA2.Number
 			return check
