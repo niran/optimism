@@ -220,6 +220,32 @@ func TestL2CLSyncP2P(gt *testing.T) {
 	}
 }
 
+func queryBlockFromEL(el stack.ELNode, label eth.BlockLabel) eth.BlockRef {
+	ctx, cancel := context.WithTimeout(el.T().Ctx(), dsl.DefaultTimeout)
+	defer cancel()
+	block, err := el.EthClient().BlockRefByLabel(ctx, label)
+	el.T().Require().NoError(err)
+	return block
+}
+
+func querySyncStatusFromCL(cl stack.L2CLNode) *eth.SyncStatus {
+	ctx, cancel := context.WithTimeout(cl.T().Ctx(), dsl.DefaultTimeout)
+	defer cancel()
+	block, err := cl.RollupAPI().SyncStatus(ctx)
+	cl.T().Require().NoError(err)
+	return block
+}
+
+func querySyncStatusFromSupervisor(supervisor stack.Supervisor, chainID eth.ChainID) *eth.SupervisorChainSyncStatus {
+	ctx, cancel := context.WithTimeout(supervisor.T().Ctx(), dsl.DefaultTimeout)
+	defer cancel()
+	viewAll, err := supervisor.QueryAPI().SyncStatus(ctx)
+	supervisor.T().Require().NoError(err)
+	view, ok := viewAll.Chains[chainID]
+	supervisor.T().Require().True(ok, "chain sync status not found from supervisor sync status")
+	return view
+}
+
 // TestUnsafeChainUnknownToL2CL tests the below scenario:
 // supervisor unsafe ahead of L2CL unsafe, aka L2CL processes new blocks first.
 // To create this out-of-sync scenario, we follow the steps below:
@@ -266,44 +292,13 @@ func TestUnsafeChainUnknownToL2CL(gt *testing.T) {
 		clA2 := system.L2Network(ids.L2A).L2CLNode(ids.L2A2CL)
 		supervisor := system.Supervisor(ids.Supervisor)
 
-		queryEL := func(label eth.BlockLabel) (eth.BlockRef, eth.BlockRef) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			blockA, err := elA.EthClient().BlockRefByLabel(ctx, label)
-			require.NoError(t, err)
-			blockA2, err := elA2.EthClient().BlockRefByLabel(ctx, label)
-			require.NoError(t, err)
-			cancel()
-			logger.Info("chain A", "blockNum", blockA.Number, "block", blockA)
-			logger.Info("chain A2", "blockNum", blockA2.Number, "block", blockA2)
-			return blockA, blockA2
-		}
-
-		queryCL := func() (*eth.SyncStatus, *eth.SyncStatus) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			syncA, err := clA.RollupAPI().SyncStatus(ctx)
-			require.NoError(t, err)
-			syncA2, err := clA2.RollupAPI().SyncStatus(ctx)
-			require.NoError(t, err)
-			cancel()
-			logger.Info("chain A", "sync", syncA)
-			logger.Info("chain A2", "sync", syncA2)
-			return syncA, syncA2
-		}
-
-		querySupervisor := func(chainID eth.ChainID) *eth.SupervisorChainSyncStatus {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			viewAll, err := supervisor.QueryAPI().SyncStatus(ctx)
-			require.NoError(t, err)
-			view, ok := viewAll.Chains[chainID]
-			require.True(t, ok)
-			cancel()
-			return view
-		}
-
 		targetBlockNum1 := uint64(10)
 		logger.Info("wait until reaching target block", "blockNum", targetBlockNum1)
 		require.Eventually(t, func() bool {
-			blockA, blockA2 := queryEL(eth.Unsafe)
+			blockA := queryBlockFromEL(elA, eth.Unsafe)
+			blockA2 := queryBlockFromEL(elA2, eth.Unsafe)
+			logger.Info("chain A", "blockNum", blockA.Number, "block", blockA)
+			logger.Info("chain A2", "blockNum", blockA2.Number, "block", blockA2)
 			return blockA.Number >= targetBlockNum1 && blockA2.Number >= targetBlockNum1
 		}, 30*time.Second, waitTime)
 
@@ -311,19 +306,23 @@ func TestUnsafeChainUnknownToL2CL(gt *testing.T) {
 		DisconnectL2CLP2P(ids.L2ACL, ids.L2A2CL).AfterDeploy(orch)
 
 		// verifier lost its P2P connection with sequencer, and will advance its unsafe head by reading L1 but not by P2P
-		_, prevblockA2 := queryEL(eth.Unsafe)
+		prevblockA2 := queryBlockFromEL(elA2, eth.Unsafe)
 		targetBlockNum2 := prevblockA2.Number + 5
 		logger.Info("make sure verifier advances safe head by reading L1", "blockNum", targetBlockNum2)
 		require.Eventually(t, func() bool {
-			_, syncA2 := queryCL()
+			syncA := querySyncStatusFromCL(clA)
+			syncA2 := querySyncStatusFromCL(clA2)
+			logger.Info("chain A", "sync", syncA)
+			logger.Info("chain A2", "sync", syncA2)
 			// unsafe head and safe head both advanced from last observed unsafe head
 			return syncA2.SafeL2.Number == syncA2.UnsafeL2.Number && syncA2.SafeL2.Number > targetBlockNum2
 		}, 60*time.Second, waitTime)
 
 		logger.Info("verifier heads will lag compared from sequencer heads and supervisor view")
 		require.Never(t, func() bool {
-			syncA, syncA2 := queryCL()
-			chainAView := querySupervisor(elA2.ChainID())
+			syncA := querySyncStatusFromCL(clA)
+			syncA2 := querySyncStatusFromCL(clA2)
+			chainAView := querySyncStatusFromSupervisor(supervisor, elA2.ChainID())
 			// unsafe head will always lagged
 			check := syncA.UnsafeL2.Number > syncA2.UnsafeL2.Number
 			// safe head may be matched or lagged
@@ -339,7 +338,8 @@ func TestUnsafeChainUnknownToL2CL(gt *testing.T) {
 
 		logger.Info("verifier catchs up sequencer unsafe chain with was unknown for verifier")
 		require.Eventually(t, func() bool {
-			blockA, blockA2 := queryEL(eth.Unsafe)
+			blockA := queryBlockFromEL(elA, eth.Unsafe)
+			blockA2 := queryBlockFromEL(elA2, eth.Unsafe)
 			return blockA.Number == blockA2.Number && blockA.Hash == blockA2.Hash
 		}, 10*time.Second, waitTime)
 	}
@@ -392,56 +392,24 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 	{
 		logger := system.T().Logger()
 
-		elA := system.L2Network(ids.L2A).L2ELNode(ids.L2AEL)
 		elA2 := system.L2Network(ids.L2A).L2ELNode(ids.L2A2EL)
 		clA := system.L2Network(ids.L2A).L2CLNode(ids.L2ACL)
 		clA2 := system.L2Network(ids.L2A).L2CLNode(ids.L2A2CL)
 		supervisor := system.Supervisor(ids.Supervisor)
 
-		queryEL := func(label eth.BlockLabel) (eth.BlockRef, eth.BlockRef) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			blockA, err := elA.EthClient().BlockRefByLabel(ctx, label)
-			require.NoError(t, err)
-			blockA2, err := elA2.EthClient().BlockRefByLabel(ctx, label)
-			require.NoError(t, err)
-			cancel()
-			logger.Info("chain A", "blockNum", blockA.Number, "block", blockA)
-			logger.Info("chain A2", "blockNum", blockA2.Number, "block", blockA2)
-			return blockA, blockA2
-		}
-
-		queryCL := func() (*eth.SyncStatus, *eth.SyncStatus) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			syncA, err := clA.RollupAPI().SyncStatus(ctx)
-			require.NoError(t, err)
-			syncA2, err := clA2.RollupAPI().SyncStatus(ctx)
-			require.NoError(t, err)
-			cancel()
-			logger.Info("chain A", "sync", syncA)
-			logger.Info("chain A2", "sync", syncA2)
-			return syncA, syncA2
-		}
-
-		querySupervisor := func(chainID eth.ChainID) *eth.SupervisorChainSyncStatus {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			viewAll, err := supervisor.QueryAPI().SyncStatus(ctx)
-			require.NoError(t, err)
-			view, ok := viewAll.Chains[chainID]
-			require.True(t, ok)
-			cancel()
-			return view
-		}
-
 		logger.Info("make sure verifier safe head advances")
 		targetBlockNum1 := uint64(5)
 		require.Eventually(t, func() bool {
-			_, syncA2 := queryCL()
+			syncA := querySyncStatusFromCL(clA)
+			syncA2 := querySyncStatusFromCL(clA2)
+			logger.Info("chain A", "sync", syncA)
+			logger.Info("chain A2", "sync", syncA2)
 			return syncA2.SafeL2.Number > targetBlockNum1
 		}, 60*time.Second, waitTime)
 
-		_, safeA2 := queryEL(eth.Safe)
+		safeA2 := queryBlockFromEL(elA2, eth.Safe)
 		logger.Info("verifier advanced safe head", "number", safeA2.Number)
-		_, unsafeA2 := queryEL(eth.Unsafe)
+		unsafeA2 := queryBlockFromEL(elA2, eth.Unsafe)
 		logger.Info("verifier advanced unsafe head", "number", unsafeA2.Number)
 
 		// For making verifier stop advancing unsafe head via P2P
@@ -455,7 +423,7 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 		logger.Info("wait until supervisor reaches safe head", "target", targetBlockNum2)
 		var chainAView *eth.SupervisorChainSyncStatus
 		require.Eventually(t, func() bool {
-			chainAView = querySupervisor(clA2.ID().ChainID)
+			chainAView := querySyncStatusFromSupervisor(supervisor, elA2.ChainID())
 			logger.Info("supervisor safe head", "number", chainAView.Safe.Number)
 			return chainAView.Safe.Number > targetBlockNum2
 		}, 60*time.Second, waitTime)
@@ -465,9 +433,9 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 		control.L2CLNodeState(ids.L2A2CL, stack.Start)
 
 		// Query from EL because initializing CL may return null sync status
-		_, safeA2 = queryEL(eth.Safe)
+		safeA2 = queryBlockFromEL(elA2, eth.Safe)
 		logger.Info("verifier safe head after restart", "number", safeA2.Number)
-		_, unsafeA2 = queryEL(eth.Unsafe)
+		unsafeA2 = queryBlockFromEL(elA2, eth.Unsafe)
 		logger.Info("verifier unsafe head after restart", "number", unsafeA2.Number)
 
 		// Make sure there are unsafe blocks to be consolidated:
@@ -475,11 +443,10 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 		require.Greater(t, unsafeA2.Number, safeA2.Number)
 
 		logger.Info("make sure verifier safe head synced with supervisor")
-		var syncA2 *eth.SyncStatus
 		require.Eventually(t, func() bool {
-			_, syncA2 = queryCL()
-			chainAView = querySupervisor(clA2.ID().ChainID)
-			_, blockA2 := queryEL(eth.Safe)
+			syncA2 := querySyncStatusFromCL(clA2)
+			chainAView = querySyncStatusFromSupervisor(supervisor, elA2.ChainID())
+			blockA2 := queryBlockFromEL(elA2, eth.Safe)
 			logger.Info("safe head sync status", "supervisor", chainAView.Safe.Number, "verifier CL", syncA2.SafeL2.Number, "verifier EL", blockA2.Number)
 			// verifier reached supervisor safe head
 			check := syncA2.SafeL2.Number == chainAView.Safe.Number
