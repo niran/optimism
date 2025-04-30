@@ -26,8 +26,10 @@ const (
 	IntentTypeStandardOverrides IntentType = "standard-overrides"
 )
 
-var emptyAddress common.Address
-var emptyHash common.Hash
+var (
+	emptyAddress common.Address
+	emptyHash    common.Hash
+)
 
 type SuperchainProofParams struct {
 	WithdrawalDelaySeconds          uint64 `json:"faultGameWithdrawalDelay" toml:"faultGameWithdrawalDelay"`
@@ -41,6 +43,8 @@ type SuperchainProofParams struct {
 type Intent struct {
 	ConfigType            IntentType         `json:"configType" toml:"configType"`
 	L1ChainID             uint64             `json:"l1ChainID" toml:"l1ChainID"`
+	OPCMAddress           *common.Address    `json:"opcmAddress" toml:"opcmAddress"`
+	SuperchainConfigProxy *common.Address    `json:"superchainConfigProxy" toml:"superchainConfigProxy"`
 	SuperchainRoles       *SuperchainRoles   `json:"superchainRoles" toml:"superchainRoles,omitempty"`
 	FundDevAccounts       bool               `json:"fundDevAccounts" toml:"fundDevAccounts"`
 	UseInterop            bool               `json:"useInterop" toml:"useInterop"`
@@ -56,9 +60,11 @@ type SuperchainRoles struct {
 	Guardian              common.Address `json:"guardian" toml:"guardian"`
 }
 
-var ErrSuperchainRoleZeroAddress = errors.New("SuperchainRole is set to zero address")
-var ErrL1ContractsLocatorUndefined = errors.New("L1ContractsLocator undefined")
-var ErrL2ContractsLocatorUndefined = errors.New("L2ContractsLocator undefined")
+var (
+	ErrSuperchainRoleZeroAddress   = errors.New("SuperchainRole is set to zero address")
+	ErrL1ContractsLocatorUndefined = errors.New("L1ContractsLocator undefined")
+	ErrL2ContractsLocatorUndefined = errors.New("L2ContractsLocator undefined")
+)
 
 func (s *SuperchainRoles) CheckNoZeroAddresses() error {
 	val := reflect.ValueOf(*s)
@@ -235,6 +241,14 @@ func (c *Intent) checkL1Prod() error {
 		return fmt.Errorf("tag '%s' not found in standard versions", c.L1ContractsLocator.Tag)
 	}
 
+	opcmAddr, err := standard.ManagerImplementationAddrFor(c.L1ChainID, c.L1ContractsLocator.Tag)
+	if err != nil {
+		return fmt.Errorf("error getting OPCM address: %w", err)
+	}
+	if c.OPCMAddress == nil || *c.OPCMAddress != opcmAddr {
+		return fmt.Errorf("%w: opcmAddress=%s", ErrNonStandardValue, opcmAddr)
+	}
+
 	return nil
 }
 
@@ -304,6 +318,12 @@ func NewIntentStandard(l1ChainId uint64, l2ChainIds []common.Hash) (Intent, erro
 	if err != nil {
 		return Intent{}, fmt.Errorf("error getting L2ProxyAdminOwner: %w", err)
 	}
+
+	opcmAddr, err := standard.ManagerImplementationAddrFor(l1ChainId, intent.L1ContractsLocator.Tag)
+	if err != nil {
+		return Intent{}, fmt.Errorf("error getting OPCM address: %w", err)
+	}
+	intent.OPCMAddress = &opcmAddr
 
 	for _, l2ChainID := range l2ChainIds {
 		intent.Chains = append(intent.Chains, &ChainIntent{
