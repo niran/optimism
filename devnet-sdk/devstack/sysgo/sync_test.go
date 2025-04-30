@@ -342,3 +342,149 @@ func TestUnsafeChainUnknownToL2CL(gt *testing.T) {
 		}, 10*time.Second, waitTime)
 	}
 }
+
+// TestUnsafeChainKnownToL2CL tests the below scenario:
+// supervisor cross-safe ahead of L2CL cross-safe, aka L2CL can "skip" forward to match safety of supervisor.
+// To create this out-of-sync scenario, we follow the steps below:
+// 1. Make sequencer (L2CL), verifier (L2CL), and supervisor sync for a few blocks.
+// - Sequencer and verifier are connected via P2P, which makes their unsafe heads in sync.
+// - Both L2CLs are in managed mode, digesting L1 blocks from the supervisor and reporting unsafe and safe blocks back to the supervisor.
+// - Wait enough for both L2CLs advance safe heads.
+// 2. Disconnect the P2P connection between the sequencer and verifier.
+// - The verifier will not receive unsafe heads via P2P, and can only update unsafe heads matching with safe heads by reading L1 batches.
+// - The verifier safe head will lag behind or match the sequencer and supervisor because all three components share the same L1 view.
+// 3. Stop verifier L2CL
+// - The verifier will not be able to advance unsafe head and safe head.
+// - The sequencer will advance unsafe head and safe head, as well as synced with supervisor.
+// 4. Wait until sequencer and supervisor diverged enough from the verifier.
+// - To make the verifier held unsafe blocks which are already viewed as safe by sequencer and supervisor, we wait.
+// - Wait until supervisor viewed safe head number is large enough than the stopped verifier's safe head view.
+// 5. Restart the verifier.
+// - The verifier will not sync via P2P but only able to advance unsafe and safe heads by reading L1 batches.
+// - The verifier will quickly catch up with the sequencer safe head as well as the supervisor.
+// - The verifier will "skip" processing already known unsafe blocks, and consolidate them into safe blocks.
+func TestUnsafeChainKnownToL2CL(gt *testing.T) {
+	var ids DefaultRedundancyInteropSystemIDs
+	opt := DefaultRedundancyInteropSystem(&ids)
+
+	logger := testlog.Logger(gt, log.LevelInfo)
+
+	p := devtest.NewP(logger, func() {
+		gt.Helper()
+		gt.FailNow()
+	})
+	gt.Cleanup(p.Close)
+
+	orch := NewOrchestrator(p)
+	opt(orch)
+
+	t := devtest.SerialT(gt)
+	system := shim.NewSystem(t)
+	orch.Hydrate(system)
+
+	control := orch.controlPlane
+
+	blockTime := system.L2Network(ids.L2A).RollupConfig().BlockTime
+
+	waitTime := time.Duration(blockTime+1) * time.Second
+	{
+		logger := system.T().Logger()
+
+		elA := system.L2Network(ids.L2A).L2ELNode(ids.L2AEL)
+		elA2 := system.L2Network(ids.L2A).L2ELNode(ids.L2A2EL)
+		clA := system.L2Network(ids.L2A).L2CLNode(ids.L2ACL)
+		clA2 := system.L2Network(ids.L2A).L2CLNode(ids.L2A2CL)
+		supervisor := system.Supervisor(ids.Supervisor)
+
+		queryEL := func(label eth.BlockLabel) (eth.BlockRef, eth.BlockRef) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			blockA, err := elA.EthClient().BlockRefByLabel(ctx, label)
+			require.NoError(t, err)
+			blockA2, err := elA2.EthClient().BlockRefByLabel(ctx, label)
+			require.NoError(t, err)
+			cancel()
+			logger.Info("chain A", "blockNum", blockA.Number, "block", blockA)
+			logger.Info("chain A2", "blockNum", blockA2.Number, "block", blockA2)
+			return blockA, blockA2
+		}
+
+		queryCL := func() (*eth.SyncStatus, *eth.SyncStatus) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			syncA, err := clA.RollupAPI().SyncStatus(ctx)
+			require.NoError(t, err)
+			syncA2, err := clA2.RollupAPI().SyncStatus(ctx)
+			require.NoError(t, err)
+			cancel()
+			logger.Info("chain A", "sync", syncA)
+			logger.Info("chain A2", "sync", syncA2)
+			return syncA, syncA2
+		}
+
+		querySupervisor := func(chainID eth.ChainID) *eth.SupervisorChainSyncStatus {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			viewAll, err := supervisor.QueryAPI().SyncStatus(ctx)
+			require.NoError(t, err)
+			view, ok := viewAll.Chains[chainID]
+			require.True(t, ok)
+			cancel()
+			return view
+		}
+
+		logger.Info("make sure verifier safe head advances")
+		targetBlockNum1 := uint64(5)
+		require.Eventually(t, func() bool {
+			_, syncA2 := queryCL()
+			return syncA2.SafeL2.Number > targetBlockNum1
+		}, 60*time.Second, waitTime)
+
+		_, safeA2 := queryEL(eth.Safe)
+		logger.Info("verifier advanced safe head", "number", safeA2.Number)
+		_, unsafeA2 := queryEL(eth.Unsafe)
+		logger.Info("verifier advanced unsafe head", "number", unsafeA2.Number)
+
+		// For making verifier stop advancing unsafe head via P2P
+		logger.Info("disconnect p2p between L2CLs")
+		DisconnectL2CLP2P(ids.L2ACL, ids.L2A2CL)(orch)
+
+		logger.Info("stop verifier")
+		control.L2CLNodeState(ids.L2A2CL, stack.Stop)
+
+		targetBlockNum2 := safeA2.Number * 2
+		logger.Info("wait until supervisor reaches safe head", "target", targetBlockNum2)
+		var chainAView *eth.SupervisorChainSyncStatus
+		require.Eventually(t, func() bool {
+			chainAView = querySupervisor(clA2.ID().ChainID)
+			logger.Info("supervisor safe head", "number", chainAView.Safe.Number)
+			return chainAView.Safe.Number > targetBlockNum2
+		}, 60*time.Second, waitTime)
+
+		// Restarted verifier will advance its unsafe head by reading L1 but not by P2P
+		logger.Info("restart verifier")
+		control.L2CLNodeState(ids.L2A2CL, stack.Start)
+
+		// Query from EL because initializing CL may return null sync status
+		_, safeA2 = queryEL(eth.Safe)
+		logger.Info("verifier safe head after restart", "number", safeA2.Number)
+		_, unsafeA2 = queryEL(eth.Unsafe)
+		logger.Info("verifier unsafe head after restart", "number", unsafeA2.Number)
+
+		// Make sure there are unsafe blocks to be consolidated:
+		// To check verifier does not have to process blocks since unsafe blocks are already processed
+		require.Greater(t, unsafeA2.Number, safeA2.Number)
+
+		logger.Info("make sure verifier safe head synced with supervisor")
+		var syncA2 *eth.SyncStatus
+		require.Eventually(t, func() bool {
+			_, syncA2 = queryCL()
+			chainAView = querySupervisor(clA2.ID().ChainID)
+			_, blockA2 := queryEL(eth.Safe)
+			logger.Info("safe head sync status", "supervisor", chainAView.Safe.Number, "verifier CL", syncA2.SafeL2.Number, "verifier EL", blockA2.Number)
+			// verifier reached supervisor safe head
+			check := syncA2.SafeL2.Number == chainAView.Safe.Number
+			check = check && syncA2.SafeL2.Hash == chainAView.Safe.Hash
+			// verifier consolidated every previously known unsafe head to safe head
+			check = check && syncA2.SafeL2.Number >= unsafeA2.Number
+			return check
+		}, 60*time.Second, waitTime)
+	}
+}
