@@ -82,7 +82,7 @@ func (c *Cluster) hydrate(system stack.ExtensibleSystem) {
 
 // WithInteropGen is a system option that will create a L1 chain, superchain, cluster and L2 chains.
 func WithInteropGen(l1ID stack.L1NetworkID, superchainID stack.SuperchainID,
-	clusterID stack.ClusterID, l2IDs []stack.L2NetworkID, res ContractPaths) stack.Option {
+	clusterID stack.ClusterID, l2IDs []stack.L2NetworkID, res ContractPaths, interopOffset uint64) stack.Option {
 
 	return func(o stack.Orchestrator) {
 		orch := o.(*Orchestrator)
@@ -99,8 +99,9 @@ func WithInteropGen(l1ID stack.L1NetworkID, superchainID stack.SuperchainID,
 		for _, l2 := range l2IDs {
 			require.True(l2.ChainID().ToBig().IsInt64(), "interop gen uses small chain IDs")
 			recipe.L2s = append(recipe.L2s, interopgen.InteropDevL2Recipe{
-				ChainID:   l2.ChainID().ToBig().Uint64(),
-				BlockTime: 2,
+				ChainID:       l2.ChainID().ToBig().Uint64(),
+				BlockTime:     2,
+				InteropOffset: interopOffset,
 			})
 			ids = append(ids, l2.ChainID())
 		}

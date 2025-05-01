@@ -33,10 +33,10 @@ type SimpleInterop struct {
 	FunderB *dsl.Funder
 }
 
-func NewSimpleInterop(dest *TestSetup[*SimpleInterop]) stack.Option {
+func NewSimpleInterop(dest *TestSetup[*SimpleInterop], opts ...stack.Option) stack.Option {
 	return func(orch stack.Orchestrator) {
 		if _, isSysGo := orch.(*sysgo.Orchestrator); isSysGo {
-			startInProcessSimpleInterop(orch)
+			startInProcessSimpleInterop(orch, opts...)
 		}
 		*dest = func(t devtest.T) *SimpleInterop {
 			return hydrateSimpleInterop(t, orch)
@@ -45,9 +45,10 @@ func NewSimpleInterop(dest *TestSetup[*SimpleInterop]) stack.Option {
 }
 
 // startInProcessSimpleInterop starts a new system that meets the simple interop criteria
-func startInProcessSimpleInterop(orch stack.Orchestrator) {
+func startInProcessSimpleInterop(orch stack.Orchestrator, opts ...stack.Option) {
 	var ids sysgo.DefaultInteropSystemIDs
 	opt := sysgo.DefaultInteropSystem(&ids)
+	opt.Add(opts...)
 	opt(orch)
 }
 
@@ -79,4 +80,23 @@ func hydrateSimpleInterop(t devtest.T, orch stack.Orchestrator) *SimpleInterop {
 	out.FunderA = dsl.NewFunder(out.Wallet, out.FaucetA, out.L2ELA)
 	out.FunderB = dsl.NewFunder(out.Wallet, out.FaucetB, out.L2ELB)
 	return out
+}
+
+func NewInteropGenInterop(dest *TestSetup[*SimpleInterop], interopOffset uint64, opts ...stack.Option) stack.Option {
+	return func(orch stack.Orchestrator) {
+		if _, isSysGo := orch.(*sysgo.Orchestrator); isSysGo {
+			startInProcessInteropGenInterop(orch, interopOffset, opts...)
+		}
+		*dest = func(t devtest.T) *SimpleInterop {
+			return hydrateSimpleInterop(t, orch)
+		}
+	}
+}
+
+// startInProcessInteropGenInterop starts a new system that meets the simple interop criteria
+func startInProcessInteropGenInterop(orch stack.Orchestrator, interopOffset uint64, opts ...stack.Option) {
+	var ids sysgo.DefaultInteropSystemIDs
+	opt := sysgo.InteropGenInteropSystem(&ids, interopOffset)
+	opt.Add(opts...)
+	opt(orch)
 }

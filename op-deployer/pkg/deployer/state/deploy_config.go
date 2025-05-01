@@ -7,8 +7,6 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
 
-	op_service "github.com/ethereum-optimism/optimism/op-service"
-
 	"github.com/ethereum-optimism/optimism/op-service/jsonutil"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -18,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/genesis"
+	op_service "github.com/ethereum-optimism/optimism/op-service"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
@@ -34,6 +33,7 @@ func CombineDeployConfig(intent *Intent, chainIntent *ChainIntent, state *State,
 			return genesis.DeployConfig{}, errors.New("expecting isthmus fork to be enabled for interop deployments")
 		}
 		upgradeSchedule.UseInterop = true
+		upgradeSchedule.L2GenesisInteropTimeOffset = op_service.U64UtilPtr(0)
 	}
 
 	cfg := genesis.DeployConfig{
@@ -115,10 +115,6 @@ func CombineDeployConfig(intent *Intent, chainIntent *ChainIntent, state *State,
 			ProofMaturityDelaySeconds:       604800,
 			DisputeGameFinalityDelaySeconds: 302400,
 		},
-	}
-
-	if intent.UseInterop {
-		cfg.L2InitializationConfig.UpgradeScheduleDeployConfig.L2GenesisInteropTimeOffset = op_service.U64UtilPtr(0)
 	}
 
 	if chainState.StartBlock == nil {

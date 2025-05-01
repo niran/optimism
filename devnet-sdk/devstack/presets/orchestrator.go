@@ -64,7 +64,7 @@ func DoMain(m *testing.M, opts ...stack.Option) {
 		// TODO(#15139): set log-level filter, reduce noise
 		//log.SetDefault(t.Log.New("logger", "global"))
 
-		initOrchestrator(p, opts...)
+		initOrchestratorFromEnv(p, opts...)
 
 		errCode = m.Run()
 		return
@@ -73,7 +73,43 @@ func DoMain(m *testing.M, opts ...stack.Option) {
 	os.Exit(code)
 }
 
-func initOrchestrator(p devtest.P, opts ...stack.Option) {
+// Useful for setting up a one-off sysgo orchestrator for a single test
+func DoTest(gt *testing.T, opts ...stack.Option) {
+	failed := new(atomic.Bool)
+	defer func() {
+		if failed.Load() {
+			gt.Fail()
+		}
+	}()
+	// This may be tuned with env or CLI flags in the future, to customize test output
+	logger := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
+		Level:  log.LevelInfo,
+		Color:  true,
+		Format: oplog.FormatTerminal,
+		Pid:    false,
+	})
+	p := devtest.NewP(logger, func() {
+		debug.PrintStack()
+		failed.Store(true)
+		panic("setup fail")
+	})
+	defer p.Close()
+
+	p.Require().NotEmpty(opts, "Expecting orchestrator options")
+
+	// For the global geth logs,
+	// capture them in the global test logger.
+	// No other tool / test should change the global logger.
+	// TODO(#15139): set log-level filter, reduce noise
+	//log.SetDefault(t.Log.New("logger", "global"))
+
+	orchestrator := sysgo.NewOrchestrator(p)
+	for _, opt := range opts {
+		opt(orchestrator)
+	}
+}
+
+func initOrchestratorFromEnv(p devtest.P, opts ...stack.Option) {
 	lockedOrchestrator.Lock()
 	defer lockedOrchestrator.Unlock()
 	if lockedOrchestrator.Value != nil {
