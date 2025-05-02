@@ -286,7 +286,16 @@ func (e *EngineController) initializeUnknowns(ctx context.Context) error {
 		var err error
 		finalizedRef, err = e.engine.L2BlockRefByLabel(ctx, eth.Finalized)
 		if err != nil {
-			return fmt.Errorf("failed to load finalized head: %w", err)
+			if errors.Is(err, ethereum.NotFound) {
+				genesisRef, err := e.engine.L2BlockRefByHash(ctx, e.rollupCfg.Genesis.L2.Hash)
+				if err != nil {
+					return fmt.Errorf("failed to retrieve genesis block to initialize forkchoice with: %w", err)
+				}
+				e.log.Warn("No finalized block found, falling back to genesis block as finalized", "block", genesisRef)
+				finalizedRef = genesisRef
+			} else {
+				return fmt.Errorf("failed to load finalized head: %w", err)
+			}
 		}
 		e.SetFinalizedHead(finalizedRef)
 		e.log.Info("Loaded initial finalized block ref", "finalized", finalizedRef)
@@ -386,6 +395,9 @@ func (e *EngineController) InsertUnsafePayload(ctx context.Context, envelope *et
 		} else {
 			return derive.NewTemporaryError(fmt.Errorf("failed to fetch finalized head: %w", err))
 		}
+	}
+	if err := e.initializeUnknowns(ctx); err != nil {
+		return derive.NewTemporaryError(fmt.Errorf("cannot process block until engine forkchoice is initialized: %w", err))
 	}
 	// Insert the payload & then call FCU
 	newPayloadStart := time.Now()
