@@ -78,6 +78,12 @@ type Config struct {
 	// RPCEnableProxy is true if the sequencer RPC proxy should be enabled.
 	RPCEnableProxy bool
 
+	// RollupBoostWsURL is the URL of the rollup boost websocket proxy.
+	RollupBoostWsURL string
+
+	// WebsocketProxyURL is the URL of the websocket proxy.
+	WebsocketProxyURL string
+
 	LogConfig     oplog.CLIConfig
 	MetricsConfig opmetrics.CLIConfig
 	PprofConfig   oppprof.CLIConfig
@@ -158,12 +164,14 @@ func NewConfig(ctx *cli.Context, log log.Logger) (*Config, error) {
 			SafeInterval:   ctx.Uint64(flags.HealthCheckSafeInterval.Name),
 			MinPeerCount:   ctx.Uint64(flags.HealthCheckMinPeerCount.Name),
 		},
-		RollupCfg:      *rollupCfg,
-		RPCEnableProxy: ctx.Bool(flags.RPCEnableProxy.Name),
-		LogConfig:      oplog.ReadCLIConfig(ctx),
-		MetricsConfig:  opmetrics.ReadCLIConfig(ctx),
-		PprofConfig:    oppprof.ReadCLIConfig(ctx),
-		RPC:            oprpc.ReadCLIConfig(ctx),
+		RollupCfg:         *rollupCfg,
+		RPCEnableProxy:    ctx.Bool(flags.RPCEnableProxy.Name),
+		RollupBoostWsURL:  ctx.String(flags.RollupBoostWsURL.Name),
+		WebsocketProxyURL: ctx.String(flags.WebsocketProxyURL.Name),
+		LogConfig:         oplog.ReadCLIConfig(ctx),
+		MetricsConfig:     opmetrics.ReadCLIConfig(ctx),
+		PprofConfig:       oppprof.ReadCLIConfig(ctx),
+		RPC:               oprpc.ReadCLIConfig(ctx),
 	}, nil
 }
 

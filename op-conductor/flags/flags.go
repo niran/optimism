@@ -135,6 +135,16 @@ var (
 		EnvVars: opservice.PrefixEnvVar(EnvVarPrefix, "RPC_ENABLE_PROXY"),
 		Value:   true,
 	}
+	RollupBoostWsURL = &cli.StringFlag{
+		Name:    "rollupboost.ws-url",
+		Usage:   "WebSocket URL for the rollup boost to listen for payload streams.",
+		EnvVars: opservice.PrefixEnvVar(EnvVarPrefix, "ROLLUPBOOST_WS_URL"),
+	}
+	WebsocketProxyURL = &cli.StringFlag{
+		Name:    "websocket.proxy-url",
+		Usage:   "WebSocket URL for the conductor to send payloads to.",
+		EnvVars: opservice.PrefixEnvVar(EnvVarPrefix, "WEBSOCKET_PROXY_URL"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -170,7 +180,8 @@ func init() {
 	optionalFlags = append(optionalFlags, opmetrics.CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, oppprof.CLIFlags(EnvVarPrefix)...)
 	optionalFlags = append(optionalFlags, opflags.CLIFlags(EnvVarPrefix, "")...)
-
+	optionalFlags = append(optionalFlags, RollupBoostWsURL)
+	optionalFlags = append(optionalFlags, WebsocketProxyURL)
 	Flags = append(requiredFlags, optionalFlags...)
 }
 

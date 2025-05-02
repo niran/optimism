@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/raft"
 	"github.com/pkg/errors"
@@ -333,6 +334,10 @@ type OpConductor struct {
 	metricsServer *httputil.HTTPServer
 
 	retryBackoff func() time.Duration
+
+	// WebSocket connections for flashblocks handler to listen to rollup boost and send to websocket proxy
+	rollupBoostConn *websocket.Conn
+	proxyConn       *websocket.Conn
 }
 
 type state struct {
@@ -369,6 +374,14 @@ func (oc *OpConductor) Start(ctx context.Context) error {
 	oc.log.Info("starting JSON-RPC server")
 	if err := oc.rpcServer.Start(); err != nil {
 		return errors.Wrap(err, "failed to start JSON-RPC server")
+	}
+
+	// Start the flashblocks handler if configured
+	if oc.cfg.RollupBoostWsURL != "" {
+		oc.log.Info("starting flashblocks handler")
+		if err := oc.StartFlashblocksHandler(ctx); err != nil {
+			return errors.Wrap(err, "failed to start flashblocks handler")
+		}
 	}
 
 	if oc.cfg.MetricsConfig.Enabled {
@@ -411,6 +424,23 @@ func (oc *OpConductor) Stop(ctx context.Context) error {
 	// close control loop
 	oc.shutdownCancel()
 	oc.wg.Wait()
+
+	// Close websocket and rollupboost connections
+	if oc.rollupBoostConn != nil || oc.proxyConn != nil {
+		oc.log.Info("closing websocket and rollupboost connections")
+		if oc.rollupBoostConn != nil {
+			if err := oc.rollupBoostConn.Close(); err != nil {
+				result = multierror.Append(result, errors.Wrap(err, "failed to close rollup boost connection"))
+			}
+			oc.rollupBoostConn = nil
+		}
+		if oc.proxyConn != nil {
+			if err := oc.proxyConn.Close(); err != nil {
+				result = multierror.Append(result, errors.Wrap(err, "failed to close websocket proxy connection"))
+			}
+			oc.proxyConn = nil
+		}
+	}
 
 	if oc.rpcServer != nil {
 		if err := oc.rpcServer.Stop(); err != nil {

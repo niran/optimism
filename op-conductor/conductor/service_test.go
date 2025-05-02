@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -910,4 +914,93 @@ func (s *OpConductorTestSuite) TestSupervisorConnectionDown() {
 	// Verify method calls
 	s.ctrl.AssertNumberOfCalls(s.T(), "StopSequencer", 1)
 	s.cons.AssertNumberOfCalls(s.T(), "TransferLeader", 1)
+}
+
+// TestFlashblocksConnectionsLifecycle tests that rollup boost and websocket proxy connections
+// are correctly established the conductor is started and closed when the conductor is shut down
+func (s *OpConductorTestSuite) TestFlashblocksConnectionsLifecycle() {
+	// Create a test HTTP server for rollup boost WebSocket
+	rollupBoostServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		s.NoError(err)
+		defer conn.Close()
+
+		// Keep the connection alive until the test is done
+		for {
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+		}
+	}))
+	defer rollupBoostServer.Close()
+
+	// Create a test HTTP server for websocket proxy
+	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		s.NoError(err)
+		defer conn.Close()
+
+		// Keep the connection alive until the test is done
+		for {
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+		}
+	}))
+	defer proxyServer.Close()
+
+	// Convert HTTP URLs to WebSocket URLs
+	rollupBoostWsURL := strings.Replace(rollupBoostServer.URL, "http", "ws", 1)
+	proxyWsURL := strings.Replace(proxyServer.URL, "http", "ws", 1)
+
+	// Update the config to include the WebSocket URLs
+	s.cfg.RollupBoostWsURL = rollupBoostWsURL
+	s.cfg.WebsocketProxyURL = proxyWsURL
+
+	// Create a new conductor with the updated config
+	conductor, err := NewOpConductor(s.ctx, &s.cfg, s.log, s.metrics, s.version, s.ctrl, s.cons, s.hmon)
+	s.NoError(err)
+
+	// Start the conductor, which should establish the WebSocket connections
+	s.hmon.EXPECT().Start(mock.Anything).Return(nil)
+	err = conductor.Start(s.ctx)
+	s.NoError(err)
+
+	// Verify that the connections were established
+	s.Eventually(func() bool {
+		return conductor.rollupBoostConn != nil
+	}, 2*time.Second, 100*time.Millisecond, "rollup boost connection was not established")
+
+	// Make the conductor the leader to ensure proxy connection is established
+	conductor.leader.Store(true)
+
+	// Set up mock expectation for Leader() call
+	s.cons.EXPECT().Leader().Return(true).Maybe()
+
+	// Send a message to trigger the proxy connection establishment
+	if conductor.rollupBoostConn != nil {
+		conductor.handleRollupBoostMessage([]byte("test message"))
+	}
+
+	// Verify that the proxy connection was established
+	s.Eventually(func() bool {
+		return conductor.proxyConn != nil
+	}, 2*time.Second, 100*time.Millisecond, "websocket proxy connection was not established")
+
+	// Stop the conductor, which should close the WebSocket connections
+	s.hmon.EXPECT().Stop().Return(nil)
+	s.cons.EXPECT().Shutdown().Return(nil)
+	err = conductor.Stop(s.ctx)
+	s.NoError(err)
+
+	// Verify that the connections were closed
+	s.Nil(conductor.rollupBoostConn, "rollup boost connection was not closed")
+	s.Nil(conductor.proxyConn, "websocket proxy connection was not closed")
+
+	// Verify that the conductor is stopped
+	s.True(conductor.Stopped())
 }
