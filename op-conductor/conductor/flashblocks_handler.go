@@ -105,10 +105,6 @@ func (oc *OpConductor) handleRollupBoostMessage(message []byte) {
 		err := oc.proxyConn.WriteMessage(websocket.TextMessage, message)
 		if err != nil {
 			oc.log.Error("error sending message to websocket proxy", "err", err)
-
-			// Close the connection and set to nil so we'll try to reconnect next time
-			oc.proxyConn.Close()
-			oc.proxyConn = nil
 		}
 	}
 }
