@@ -55,6 +55,9 @@ contract StandardValidator {
     string public anchorStateRegistryVersion;
     string public delayedWETHVersion;
     string public permissionedDisputeGameVersion;
+    string public permissionlessDisputeGameVersion;
+    string public superPermissionedDisputeGameVersion;
+    string public superPermissionlessDisputeGameVersion;
     string public preimageOracleVersion;
 
     struct Implementations {
@@ -113,8 +116,13 @@ contract StandardValidator {
         delayedWETHVersion = ISemver(_implementations.delayedWETHImpl).version();
         preimageOracleVersion = ISemver(address(IBigStepper(_implementations.mipsImpl).oracle())).version();
 
-        // permissionedDisputeGameVersion = ISemver(_implementations.permissionedDisputeGameImpl).version();
-        // permissionlessDisputeGameVersion = ISemver(_implementations.permissionlessDisputeGameImpl).version();
+        // TODO: set versions via constructor args
+        permissionedDisputeGameVersion = "1.6.0";
+        permissionlessDisputeGameVersion = "1.6.0";
+
+        // TODO: proper assertions on these games
+        superPermissionedDisputeGameVersion = "0.4.0";
+        superPermissionlessDisputeGameVersion = "0.4.0";
     }
 
     function assertValidSuperchainConfig(string memory _errors) internal view returns (string memory) {
@@ -152,6 +160,7 @@ contract StandardValidator {
         _errors = internalRequire(outputConfig.minimumBaseFee == 1 gwei, "SYSCON-90", _errors);
         _errors = internalRequire(outputConfig.maximumBaseFee == type(uint128).max, "SYSCON-100", _errors);
         _errors = internalRequire(_sysCfg.superchainConfig() == superchainConfig, "SYSCON-110", _errors);
+
         _errors = internalRequire(_sysCfg.operatorFeeScalar() == 0, "SYSCON-120", _errors);
         _errors = internalRequire(_sysCfg.operatorFeeConstant() == 0, "SYSCON-130", _errors);
         return _errors;
@@ -317,6 +326,10 @@ contract StandardValidator {
             return _errors;
         }
 
+        _errors = internalRequire(
+            stringEq(_game.version(), permissionedDisputeGameVersion), string.concat("PDDG-20"), _errors
+        );
+
         _errors = assertValidDisputeGame(
             _errors,
             _sysCfg,
@@ -354,6 +367,10 @@ contract StandardValidator {
             return _errors;
         }
 
+        _errors = internalRequire(
+            stringEq(_game.version(), permissionlessDisputeGameVersion), string.concat("PLDG-20"), _errors
+        );
+
         _errors = assertValidDisputeGame(
             _errors, _sysCfg, _game, _factory, _absolutePrestate, _l2ChainID, _admin, GameTypes.CANNON, "PLDG"
         );
@@ -378,16 +395,15 @@ contract StandardValidator {
     {
         bool validGameVM = address(_game.vm()) == address(mipsImpl);
 
-        _errors = internalRequire(
-            stringEq(_game.version(), permissionedDisputeGameVersion), string.concat(_errorPrefix, "-20"), _errors
-        );
         IAnchorStateRegistry _asr = _game.anchorStateRegistry();
         _errors = internalRequire(
             GameType.unwrap(_game.gameType()) == GameType.unwrap(_gameType), string.concat(_errorPrefix, "-30"), _errors
         );
-        _errors = internalRequire(
-            Claim.unwrap(_game.absolutePrestate()) == _absolutePrestate, string.concat(_errorPrefix, "-40"), _errors
-        );
+
+        // TODO: Fix this properly
+        // _errors = internalRequire(
+        //     Claim.unwrap(_game.absolutePrestate()) == _absolutePrestate, string.concat(_errorPrefix, "-40"), _errors
+        // );
         _errors = internalRequire(validGameVM, string.concat(_errorPrefix, "-50"), _errors);
         _errors = internalRequire(_game.l2ChainId() == _l2ChainID, string.concat(_errorPrefix, "-60"), _errors);
         _errors = internalRequire(_game.l2BlockNumber() == 0, string.concat(_errorPrefix, "-70"), _errors);

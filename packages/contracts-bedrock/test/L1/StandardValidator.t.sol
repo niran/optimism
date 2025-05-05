@@ -41,24 +41,24 @@ import { OPContractsManager } from "src/L1/OPContractsManager.sol";
 
 contract StandardValidatorTest is CommonTest {
     StandardValidator validator;
-    address l1PAOMultisig;
     address mips;
     address guardian;
     address challenger;
 
     bytes32 absolutePrestate;
     uint256 l2ChainID;
-
+    uint256 withdrawalDelaySeconds;
     address preimageOracle;
 
     function setUp() public virtual override {
         super.setUp();
 
-        // Setup test addresses
-        superchainConfig = ISuperchainConfig(makeAddr("superchainConfig"));
-        l1PAOMultisig = makeAddr("l1PAOMultisig");
-        guardian = makeAddr("guardian");
-        challenger = makeAddr("challenger");
+        // Values from hardhat.json
+        guardian = 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc;
+        challenger = 0x6925B8704Ff96DEe942623d6FB5e946EF5884b63;
+
+        // Value from DeployConfig
+        withdrawalDelaySeconds = 604_800;
 
         // Mock superchainConfig calls needed in setup
         vm.mockCall(address(superchainConfig), abi.encodeCall(ISuperchainConfig.guardian, ()), abi.encode(guardian));
@@ -71,7 +71,9 @@ contract StandardValidatorTest is CommonTest {
         proxyAdmin = IProxyAdmin(IProxy(payable(address(systemConfig))).admin());
 
         absolutePrestate = bytes32(uint256(0xdead));
-        l2ChainID = 10;
+
+        // Matches hardhat.json
+        l2ChainID = 901;
 
         // Setup mock dependency addresses
         permissionedDisputeGame = IPermissionedDisputeGame(
@@ -85,7 +87,7 @@ contract StandardValidatorTest is CommonTest {
         preimageOracle = address(IBigStepper(mips).oracle());
 
         // Mock proxyAdmin owner
-        vm.mockCall(address(proxyAdmin), abi.encodeCall(IProxyAdmin.owner, ()), abi.encode(l1PAOMultisig));
+        vm.mockCall(address(proxyAdmin), abi.encodeCall(IProxyAdmin.owner, ()), abi.encode(proxyAdminOwner));
 
         // Get the OPContractsManager and its implementations struct
         OPContractsManager opcm = OPContractsManager(artifacts.mustGetAddress("OPContractsManager"));
@@ -106,9 +108,9 @@ contract StandardValidatorTest is CommonTest {
                 delayedWETHImpl: impls.delayedWETHImpl
             }),
             superchainConfig,
-            l1PAOMultisig,
+            proxyAdminOwner,
             challenger,
-            302400
+            604_800
         );
     }
 
@@ -715,7 +717,7 @@ contract StandardValidatorTest is CommonTest {
         );
         vm.mockCall(address(disputeGameFactory), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
         vm.mockCall(
-            address(disputeGameFactory), abi.encodeCall(IDisputeGameFactory.owner, ()), abi.encode(l1PAOMultisig)
+            address(disputeGameFactory), abi.encodeCall(IDisputeGameFactory.owner, ()), abi.encode(proxyAdminOwner)
         );
 
         _mockDisputeGame(
@@ -943,7 +945,7 @@ contract StandardValidatorTest is CommonTest {
 
     function _mockDelayedWETH(IDelayedWETH _weth) public {
         vm.mockCall(address(_weth), abi.encodeCall(ISemver.version, ()), abi.encode("1.1.0"));
-        vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.proxyAdminOwner, ()), abi.encode(l1PAOMultisig));
+        vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.proxyAdminOwner, ()), abi.encode(proxyAdminOwner));
         vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.delay, ()), abi.encode(1 weeks / 2));
         vm.mockCall(address(_weth), abi.encodeCall(IDelayedWETH.systemConfig, ()), abi.encode(systemConfig));
     }
