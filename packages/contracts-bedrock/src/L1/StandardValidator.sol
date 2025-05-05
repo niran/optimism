@@ -152,8 +152,8 @@ contract StandardValidator {
         _errors = internalRequire(outputConfig.minimumBaseFee == 1 gwei, "SYSCON-90", _errors);
         _errors = internalRequire(outputConfig.maximumBaseFee == type(uint128).max, "SYSCON-100", _errors);
         _errors = internalRequire(_sysCfg.superchainConfig() == superchainConfig, "SYSCON-110", _errors);
-        _errors = internalRequire(_sysCfg.operatorFeeScalar() == 0, "SYSCON-110", _errors);
-        _errors = internalRequire(_sysCfg.operatorFeeConstant() == 0, "SYSCON-120", _errors);
+        _errors = internalRequire(_sysCfg.operatorFeeScalar() == 0, "SYSCON-120", _errors);
+        _errors = internalRequire(_sysCfg.operatorFeeConstant() == 0, "SYSCON-130", _errors);
         return _errors;
     }
 
