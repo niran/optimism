@@ -1,0 +1,23 @@
+{
+    "usePermissionlessGame": true,
+    "startingAnchorRoot": {
+      "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "l2SequenceNumber": 0
+    },
+    "gameParameters": {
+      "proposer": "0x0000000000000000000000000000000000000000",
+      "challenger": "0x0000000000000000000000000000000000000000",
+      "maxGameDepth": 100,
+      "splitDepth": 100,
+      "initBond": 100,
+      "clockExtension": 100,
+      "maxClockDuration": 100
+    },
+    "opChainConfigs": [
+      {
+        "systemConfigProxy": "0x0000000000000000000000000000000000000000",
+        "proxyAdmin": "0x0000000000000000000000000000000000000000",
+        "absolutePrestate": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  }
