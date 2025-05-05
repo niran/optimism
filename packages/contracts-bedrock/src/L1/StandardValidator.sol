@@ -80,6 +80,9 @@ contract StandardValidator {
         uint256 l2ChainID;
     }
 
+    // TODO: determine which values actually need to be configurable (ie. for sepolia)
+    // or maybe they should just all be hardcoded and sepolia can allow alternatives
+    // or maybe we have a function that allows overriding variables for non-standard configs
     constructor(
         Implementations memory _implementations,
         ISuperchainConfig _superchainConfig,
