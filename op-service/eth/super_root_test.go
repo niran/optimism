@@ -1,6 +1,7 @@
 package eth
 
 import (
+	"bytes"
 	"encoding/binary"
 	"testing"
 
@@ -46,6 +47,13 @@ func TestSuperRootV1Codec(t *testing.T) {
 	t.Run("PartialChainSuperRoot", func(t *testing.T) {
 		input := binary.BigEndian.AppendUint64([]byte{SuperRootVersionV1}, 134058)
 		input = append(input, 0x01, 0x02, 0x03)
+		_, err := UnmarshalSuperRoot(input)
+		require.ErrorIs(t, err, ErrInvalidSuperRoot)
+	})
+
+	t.Run("TruncatedChainOutput", func(t *testing.T) {
+		input := binary.BigEndian.AppendUint64([]byte{SuperRootVersionV1}, 134058)
+		input = append(input, bytes.Repeat([]byte{0x01}, 65)...)
 		_, err := UnmarshalSuperRoot(input)
 		require.ErrorIs(t, err, ErrInvalidSuperRoot)
 	})

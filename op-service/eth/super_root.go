@@ -21,7 +21,7 @@ var (
 const (
 	// SuperRootVersionV1MinLen is the minimum length of a V1 super root prior to hashing
 	// Must contain a 1 byte version, uint64 timestamp and at least one chain's output root hash
-	SuperRootVersionV1MinLen = 1 + 8 + 32
+	SuperRootVersionV1MinLen = 1 + 8 + 64
 )
 
 type Super interface {
@@ -96,7 +96,7 @@ func unmarshalSuperRootV1(data []byte) (*SuperV1, error) {
 		return nil, ErrInvalidSuperRoot
 	}
 	// Must contain complete chain output roots
-	if (len(data)-9)%32 != 0 {
+	if (len(data)-9)%64 != 0 {
 		return nil, ErrInvalidSuperRoot
 	}
 	var output SuperV1
