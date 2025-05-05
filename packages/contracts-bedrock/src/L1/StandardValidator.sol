@@ -386,7 +386,7 @@ contract StandardValidator {
         ISystemConfig _sysCfg,
         IPermissionedDisputeGame _game,
         IDisputeGameFactory _factory,
-        bytes32 _absolutePrestate,
+        bytes32,
         uint256 _l2ChainID,
         IProxyAdmin _admin,
         GameType _gameType,
