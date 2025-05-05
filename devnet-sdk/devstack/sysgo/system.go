@@ -155,3 +155,58 @@ func DefaultRedundancyInteropSystem(dest *DefaultRedundancyInteropSystemIDs) sta
 
 	return opt
 }
+
+type MultiSupervisorInteropSystemIDs struct {
+	DefaultRedundancyInteropSystemIDs
+
+	SupervisorBackup stack.SupervisorID
+
+	L2B2CL stack.L2CLNodeID
+	L2B2EL stack.L2ELNodeID
+}
+
+func MultiSupervisorInteropSystem(dest *MultiSupervisorInteropSystemIDs) stack.Option {
+	l1ID := eth.ChainIDFromUInt64(900)
+	l2AID := eth.ChainIDFromUInt64(901)
+	l2BID := eth.ChainIDFromUInt64(902)
+	ids := MultiSupervisorInteropSystemIDs{
+		DefaultRedundancyInteropSystemIDs: DefaultRedundancyInteropSystemIDs{
+			DefaultInteropSystemIDs: NewDefaultInteropSystemIDs(l1ID, l2AID, l2BID),
+			L2A2CL:                  stack.L2CLNodeID{Key: "verifier", ChainID: l2AID},
+			L2A2EL:                  stack.L2ELNodeID{Key: "verifier", ChainID: l2AID},
+		},
+		SupervisorBackup: "backup",
+		L2B2CL:           stack.L2CLNodeID{Key: "verifier", ChainID: l2BID},
+		L2B2EL:           stack.L2ELNodeID{Key: "verifier", ChainID: l2BID},
+	}
+
+	// start with default interop system
+	var parentIds DefaultInteropSystemIDs
+	opt := DefaultInteropSystem(&parentIds)
+
+	// add backup supervisor
+	opt.Add(WithSupervisor(ids.SupervisorBackup, ids.Cluster, ids.L1EL))
+
+	opt.Add(WithL2ELNode(ids.L2A2EL, &ids.SupervisorBackup))
+	opt.Add(WithL2CLNode(ids.L2A2CL, false, ids.L1CL, ids.L1EL, ids.L2A2EL))
+
+	opt.Add(WithL2ELNode(ids.L2B2EL, &ids.SupervisorBackup))
+	opt.Add(WithL2CLNode(ids.L2B2CL, false, ids.L1CL, ids.L1EL, ids.L2B2EL))
+
+	// verifier must be also managed or it cannot advance
+	// we attach verifer L2CL with backup supervisor
+	opt.Add(WithManagedBySupervisor(ids.L2A2CL, ids.SupervisorBackup))
+	opt.Add(WithManagedBySupervisor(ids.L2B2CL, ids.SupervisorBackup))
+
+	// P2P connect L2CL nodes
+	opt.Add(WithL2CLP2PConnection(ids.L2ACL, ids.L2A2CL))
+	opt.Add(WithL2CLP2PConnection(ids.L2BCL, ids.L2B2CL))
+
+	// Upon evaluation of the option, export the contents we created.
+	// Ids here are static, but other things may be exported too.
+	opt.Add(func(orch stack.Orchestrator) {
+		*dest = ids
+	})
+
+	return opt
+}

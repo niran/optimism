@@ -484,3 +484,128 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 		require.Equal(unsafeA2.Hash, block.Hash)
 	}
 }
+
+func TestSupervisorAheadOfL2CL(gt *testing.T) {
+	var ids MultiSupervisorInteropSystemIDs
+	opt := MultiSupervisorInteropSystem(&ids)
+
+	logger := testlog.Logger(gt, log.LevelInfo)
+
+	p := devtest.NewP(logger, func() {
+		gt.Helper()
+		gt.FailNow()
+	})
+	gt.Cleanup(p.Close)
+
+	orch := NewOrchestrator(p)
+	opt(orch)
+
+	t := devtest.SerialT(gt)
+	system := shim.NewSystem(t)
+	orch.Hydrate(system)
+
+	control := orch.controlPlane
+
+	blockTime := system.L2Network(ids.L2A).RollupConfig().BlockTime
+
+	waitTime := time.Duration(blockTime+1) * time.Second
+	{
+		logger := system.T().Logger()
+		require := system.T().Require()
+
+		logger = logger.With("XXX", "XXX")
+
+		elA := system.L2Network(ids.L2A).L2ELNode(ids.L2A2EL)
+		elA2 := system.L2Network(ids.L2A).L2ELNode(ids.L2A2EL)
+		elB := system.L2Network(ids.L2B).L2ELNode(ids.L2B2EL)
+		elB2 := system.L2Network(ids.L2B).L2ELNode(ids.L2B2EL)
+		clA := system.L2Network(ids.L2A).L2CLNode(ids.L2ACL)
+		clA2 := system.L2Network(ids.L2A).L2CLNode(ids.L2A2CL)
+		clB := system.L2Network(ids.L2B).L2CLNode(ids.L2BCL)
+		clB2 := system.L2Network(ids.L2B).L2CLNode(ids.L2B2CL)
+		supervisorBackup := system.Supervisor(ids.SupervisorBackup)
+		supervisor := system.Supervisor(ids.Supervisor)
+
+		logger.Info("make sure verifier unsafe head advances")
+		targetBlockNum1 := uint64(10)
+		require.Eventually(func() bool {
+			syncA := querySyncStatusFromCL(clA)
+			syncA2 := querySyncStatusFromCL(clA2)
+			syncB := querySyncStatusFromCL(clB)
+			syncB2 := querySyncStatusFromCL(clB2)
+			logger.Info("chain A", "sync", syncA)
+			logger.Info("chain A2", "sync", syncA2)
+			logger.Info("chain B", "sync", syncB)
+			logger.Info("chain B2", "sync", syncB2)
+
+			check := syncA2.UnsafeL2.Number > targetBlockNum1
+			check = check && syncB2.UnsafeL2.Number > targetBlockNum1
+			return check
+		}, 60*time.Second, waitTime)
+
+		targetBlockNum2 := uint64(20)
+		require.Eventually(func() bool {
+			blockA := queryBlockFromEL(elA, eth.Unsafe)
+			blockA2 := queryBlockFromEL(elA2, eth.Unsafe)
+			blockB := queryBlockFromEL(elB, eth.Unsafe)
+			blockB2 := queryBlockFromEL(elB2, eth.Unsafe)
+			logger.Info("chain A", "unsafe", blockA)
+			logger.Info("chain A2", "unsafe", blockA2)
+			logger.Info("chain B", "unsafe", blockB)
+			logger.Info("chain B2", "unsafe", blockB2)
+			check := blockA.Number > targetBlockNum2
+			check = check && blockA2.Number > targetBlockNum2
+			check = check && blockB.Number > targetBlockNum2
+			check = check && blockB2.Number > targetBlockNum2
+			return check
+		}, 60*time.Second, waitTime)
+
+		chainAView := querySyncStatusFromSupervisor(supervisorBackup, elA2.ChainID())
+		chainBView := querySyncStatusFromSupervisor(supervisorBackup, elB2.ChainID())
+		logger.Info("backup supervisor view", "chainA", chainAView, "chainB", chainBView)
+
+		logger.Info("stop backup supervisor")
+		control.SupervisorState(ids.SupervisorBackup, stack.Stop)
+
+		targetBlockNum3 := uint64(30)
+		require.Eventually(func() bool {
+			blockA := queryBlockFromEL(elA, eth.Unsafe)
+			blockA2 := queryBlockFromEL(elA2, eth.Unsafe)
+			blockB := queryBlockFromEL(elB, eth.Unsafe)
+			blockB2 := queryBlockFromEL(elB2, eth.Unsafe)
+			logger.Info("chain A", "unsafe", blockA)
+			logger.Info("chain A2", "unsafe", blockA2)
+			logger.Info("chain B", "unsafe", blockB)
+			logger.Info("chain B2", "unsafe", blockB2)
+			check := blockA.Number > targetBlockNum3
+			check = check && blockB.Number > targetBlockNum3
+			return check
+		}, 60*time.Second, waitTime)
+
+		logger.Info("restart backup supervisor")
+		control.SupervisorState(ids.SupervisorBackup, stack.Start)
+		// make sure supervisor boots
+		time.Sleep(5 * time.Second)
+
+		targetBlockNum4 := uint64(100)
+		require.Eventually(func() bool {
+			blockA := queryBlockFromEL(elA, eth.Unsafe)
+			blockA2 := queryBlockFromEL(elA2, eth.Unsafe)
+			blockB := queryBlockFromEL(elB, eth.Unsafe)
+			blockB2 := queryBlockFromEL(elB2, eth.Unsafe)
+			logger.Info("chain A", "unsafe", blockA)
+			logger.Info("chain A2", "unsafe", blockA2)
+			logger.Info("chain B", "unsafe", blockB)
+			logger.Info("chain B2", "unsafe", blockB2)
+			chainAView := querySyncStatusFromSupervisor(supervisorBackup, elA2.ChainID())
+			chainBView := querySyncStatusFromSupervisor(supervisorBackup, elB2.ChainID())
+			logger.Info("backup supervisor view", "chainA", chainAView, "chainB", chainBView)
+			chainAView2 := querySyncStatusFromSupervisor(supervisor, elA2.ChainID())
+			chainBView2 := querySyncStatusFromSupervisor(supervisor, elB2.ChainID())
+			logger.Info("primary supervisor view", "chainA", chainAView2, "chainB", chainBView2)
+			check := blockA.Number > targetBlockNum4
+			check = check && blockB.Number > targetBlockNum4
+			return check
+		}, 300*time.Second, waitTime)
+	}
+}
