@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -216,33 +215,11 @@ func (su *SupervisorBackend) isEventActive(chainID eth.ChainID, timestamp uint64
 
 // handleActivationForBlock handles interop activation detection for a block
 func (su *SupervisorBackend) handleActivationForBlock(chainID eth.ChainID, block eth.BlockRef) error {
-	// Skip if activation manager is not available
-	if su.activationMgr == nil {
-		return nil
-	}
-
 	if su.chainDBs.IsInitialized(chainID) {
 		return nil
 	}
 
 	su.logger.Debug("Checking interop activation", "chain", chainID, "block", block)
-
-	// In tests, there may not be sync sources available
-	syncSrc, ok := su.syncSources.Get(chainID)
-	if !ok || syncSrc == nil {
-		// In tests we'll just create a mock anchor point
-		if testing.Testing() {
-			mockAnchor := types.DerivedBlockRefPair{
-				Source:  eth.BlockRef{Number: 0, Hash: common.HexToHash("0x123"), Time: 1},
-				Derived: eth.BlockRef{Number: 0, Hash: common.HexToHash("0x456"), Time: 1},
-			}
-			su.chainDBs.InitializeWithAnchor(chainID, mockAnchor)
-			su.logger.Debug("Test environment: Initialized with mock anchor point", "chain", chainID)
-			return nil
-		}
-
-		return fmt.Errorf("no sync source available for chain %s", chainID)
-	}
 
 	// Create a chain-specific anchor provider
 	anchorProvider := &syncNodeAnchorProvider{
