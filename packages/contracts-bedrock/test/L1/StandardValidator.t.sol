@@ -111,14 +111,12 @@ contract StandardValidatorTest is CommonTest {
     /// @notice Tests validation of SuperchainConfig
     function test_validate_superchainConfig_succeeds() public {
         // Test invalid paused
-        _mockValidationCalls();
         vm.mockCall(address(superchainConfig), abi.encodeCall(ISuperchainConfig.paused, (address(0))), abi.encode(true));
         assertEq("SPRCFG-10", validate(true));
     }
 
     /// @notice Tests that validation fails with invalid proxy admin owner
     function test_validate_proxyAdmin_succeeds() public {
-        _mockValidationCalls();
         vm.mockCall(address(proxyAdmin), abi.encodeCall(IProxyAdmin.owner, ()), abi.encode(address(0xbad)));
 
         // Mocking the proxy admin like this will also break ownership checks
@@ -129,7 +127,6 @@ contract StandardValidatorTest is CommonTest {
     /// @notice Tests validation of SystemConfig
     function test_validate_systemConfig_succeeds() public {
         // Test invalid version
-        _mockValidationCalls();
         vm.mockCall(address(systemConfig), abi.encodeCall(ISemver.version, ()), abi.encode("1.0.0"));
         assertEq("SYSCON-10", validate(true));
 
