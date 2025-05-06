@@ -515,9 +515,9 @@ func TestSupervisorAheadOfL2CL(gt *testing.T) {
 
 		logger = logger.With("XXX", "XXX")
 
-		elA := system.L2Network(ids.L2A).L2ELNode(ids.L2A2EL)
+		elA := system.L2Network(ids.L2A).L2ELNode(ids.L2AEL)
 		elA2 := system.L2Network(ids.L2A).L2ELNode(ids.L2A2EL)
-		elB := system.L2Network(ids.L2B).L2ELNode(ids.L2B2EL)
+		elB := system.L2Network(ids.L2B).L2ELNode(ids.L2BEL)
 		elB2 := system.L2Network(ids.L2B).L2ELNode(ids.L2B2EL)
 		clA := system.L2Network(ids.L2A).L2CLNode(ids.L2ACL)
 		clA2 := system.L2Network(ids.L2A).L2CLNode(ids.L2A2CL)
