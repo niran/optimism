@@ -11,13 +11,13 @@ import (
 
 // StartFlashblocksHandler initializes the flashblocks handler and starts the rollup boost listener
 func (oc *OpConductor) StartFlashblocksHandler(ctx context.Context) error {
-	// Start the rollup boost listener
-	if err := oc.startRollupBoostListener(ctx); err != nil {
+	// Start the WebSocket server
+	if err := oc.startWebSocketServer(ctx); err != nil {
 		return err
 	}
 
-	// Start the WebSocket server
-	if err := oc.startWebSocketServer(ctx); err != nil {
+	// Start the rollup boost listener
+	if err := oc.startRollupBoostListener(ctx); err != nil {
 		return err
 	}
 
@@ -72,8 +72,6 @@ func (oc *OpConductor) handleRollupBoostMessage(message []byte) {
 		return
 	}
 
-	oc.log.Info("Forwarding rollup boost message", "message", string(message))
-
 	// Forward the message to connected clients
 	oc.broadcastToClients(message)
 }
@@ -113,41 +111,38 @@ func (oc *OpConductor) startWebSocketServer(ctx context.Context) error {
 
 		oc.log.Info("WebSocket proxy connected", "remote", conn.RemoteAddr())
 
-		// Keep the connection alive until context is done or connection error
+		// Create a channel to detect connection errors
+		errCh := make(chan error, 1)
+
+		// Start a goroutine to read messages (just to detect disconnection)
 		go func() {
-			// Create a channel to detect connection errors
-			errCh := make(chan error, 1)
-
-			// Start a goroutine to read messages (just to detect disconnection)
-			go func() {
-				for {
-					_, _, err := conn.ReadMessage()
-					if err != nil {
-						errCh <- err
-						return
-					}
+			for {
+				_, _, err := conn.ReadMessage()
+				if err != nil {
+					errCh <- err
+					return
 				}
-			}()
-
-			// Wait for either context cancellation or connection error
-			select {
-			case <-ctx.Done():
-				// Context cancelled, conductor is shutting down
-				oc.log.Info("closing WebSocket connection due to shutdown", "remote", conn.RemoteAddr())
-			case err := <-errCh:
-				// Connection error occurred
-				oc.log.Warn("WebSocket connection error", "err", err, "remote", conn.RemoteAddr())
 			}
-
-			// Clean up the connection
-			oc.wsClientMu.Lock()
-			if oc.wsClient == conn {
-				oc.wsClient = nil
-			}
-			oc.wsClientMu.Unlock()
-			conn.Close()
-			oc.log.Info("WebSocket proxy disconnected", "remote", conn.RemoteAddr())
 		}()
+
+		// Wait for either context cancellation or connection error
+		select {
+		case <-ctx.Done():
+			// Context cancelled, conductor is shutting down
+			oc.log.Info("closing WebSocket connection due to shutdown", "remote", conn.RemoteAddr())
+		case err := <-errCh:
+			// Connection error occurred
+			oc.log.Warn("WebSocket connection error", "err", err, "remote", conn.RemoteAddr())
+		}
+
+		// Clean up the connection
+		oc.wsClientMu.Lock()
+		if oc.wsClient == conn {
+			oc.wsClient = nil
+		}
+		oc.wsClientMu.Unlock()
+		conn.Close()
+		oc.log.Info("WebSocket proxy disconnected", "remote", conn.RemoteAddr())
 	})
 
 	// Start HTTP server
