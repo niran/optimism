@@ -485,6 +485,37 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 	}
 }
 
+// TestSupervisorAheadOfL2CL tests the below scenario:
+// L2CL ahead of supervisor, aka supervisor needs to reset the L2CL, to reproduce old data. Currently supervisor has only managed mode implemented, so the supervisor will ask the L2CL to reset back.
+// To create this out-of-sync scenario, we follow the steps below:
+// 0. System setup
+// - Two supervisor initialized, each managing two L2CLs per chains.
+// - Primary supervisor manages sequencer L2CLs for chain A, B.
+// - Backup supervisor manages verifier L2CLs for chain A, B.
+// - Each L2CLs per chain is connected via P2P.
+// 1. Make sequencers (L2CL), verifiers (L2CL), and supervisors sync for a few blocks.
+// - Sequencer and verifier are connected via P2P, which makes their unsafe heads in sync.
+// - Both L2CLs are in managed mode, digesting L1 blocks from the supervisor and reporting unsafe and safe blocks back to the supervisor.
+// - Wait enough for both L2CLs advance unsafe heads.
+// 2. Stop backup supervisor.
+// - Verifiers stops advancing safe heads because there is no supervisor to provide them L1 data.
+// - Verifiers advances unsafe head because they still have P2P connection with each sequencers.
+// - Wait enough to make sequencers and primary supervisor advance safe head enough.
+// 3. Connect verifiers (L2CL) to primary supervisor.
+// - Primary supervisor has safe heads synced with sequencers.
+// - After connection, verifiers will sync with primary supervisor, matching supervisor safe head view.
+// - Stopped backup supervisor and verifiers becomes out-of-sync with safe heads.
+// - Every L2CLs advance safe head.
+// 4. Stop primary supervisor.
+// - Every L2CL safe heads will stop advancing.
+// - For disconnecting every L2CLs from the supervisor.
+// 5. Restart primary supervisor and reconnect sequencers (L2CL) to primary supervisor.
+// - Sequencers will resume advancing safe heads, but not verifiers.
+// 6. Restart backup supervisor and reconnect verifiers (L2CL) to backup supervisor.
+// - Backup supervisor will compare its safe head knowledge with L2CLs, and find out L2CLs are ahead of the backup supervisor.
+// - Backup supervisor asks the verifiers (L2CL) to rewind(reset) back to match backup supervisor safe head view.
+// - After rewinding(reset), verifier will advance safe heads again because backup supervisor gives L1 data to the verifiers.
+// - Wait until verifiers advance safe head enough
 func TestSupervisorAheadOfL2CL(gt *testing.T) {
 	var ids MultiSupervisorInteropSystemIDs
 	opt := MultiSupervisorInteropSystem(&ids)
@@ -512,8 +543,6 @@ func TestSupervisorAheadOfL2CL(gt *testing.T) {
 	{
 		logger := system.T().Logger()
 		require := system.T().Require()
-
-		logger = logger.With("XXX", "XXX")
 
 		clA := system.L2Network(ids.L2A).L2CLNode(ids.L2ACL)
 		clA2 := system.L2Network(ids.L2A).L2CLNode(ids.L2A2CL)
@@ -640,10 +669,10 @@ func TestSupervisorAheadOfL2CL(gt *testing.T) {
 		time.Sleep(waitTime)
 		syncA2Rewinded := querySyncStatusFromCL(clA2)
 		syncB2Rewinded := querySyncStatusFromCL(clB2)
-		// check safe head rewinded
+		// check safe head rewinded(reset)
 		require.Greater(syncA2.SafeL2.Number, syncA2Rewinded.SafeL2.Number)
 		require.Greater(syncB2.SafeL2.Number, syncB2Rewinded.SafeL2.Number)
-		// also check rewinded safe head number is close enough with backup supervisor knowledge before L1 sync
+		// also check rewinded(reset) safe head number is close enough with backup supervisor knowledge before L1 sync
 		tolerance := uint64(3)
 		require.Greater(A2SafeHead.Number+tolerance, syncA2Rewinded.SafeL2.Number)
 		require.Greater(B2SafeHead.Number+tolerance, syncB2Rewinded.SafeL2.Number)
