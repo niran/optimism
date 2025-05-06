@@ -395,27 +395,31 @@ func offsetToUpgradeTime(offset *hexutil.Uint64, genesisTime uint64) *uint64 {
 }
 
 func (d *UpgradeScheduleDeployConfig) ForkTimeOffset(fork rollup.ForkName) *uint64 {
+	return (*uint64)(*d.forkTimeOffsetPtr(fork))
+}
+
+func (d *UpgradeScheduleDeployConfig) forkTimeOffsetPtr(fork rollup.ForkName) **hexutil.Uint64 {
 	switch fork {
 	case rollup.Regolith:
-		return (*uint64)(d.L2GenesisRegolithTimeOffset)
+		return &d.L2GenesisRegolithTimeOffset
 	case rollup.Canyon:
-		return (*uint64)(d.L2GenesisCanyonTimeOffset)
+		return &d.L2GenesisCanyonTimeOffset
 	case rollup.Delta:
-		return (*uint64)(d.L2GenesisDeltaTimeOffset)
+		return &d.L2GenesisDeltaTimeOffset
 	case rollup.Ecotone:
-		return (*uint64)(d.L2GenesisEcotoneTimeOffset)
+		return &d.L2GenesisEcotoneTimeOffset
 	case rollup.Fjord:
-		return (*uint64)(d.L2GenesisFjordTimeOffset)
+		return &d.L2GenesisFjordTimeOffset
 	case rollup.Granite:
-		return (*uint64)(d.L2GenesisGraniteTimeOffset)
+		return &d.L2GenesisGraniteTimeOffset
 	case rollup.Holocene:
-		return (*uint64)(d.L2GenesisHoloceneTimeOffset)
+		return &d.L2GenesisHoloceneTimeOffset
 	case rollup.Isthmus:
-		return (*uint64)(d.L2GenesisIsthmusTimeOffset)
+		return &d.L2GenesisIsthmusTimeOffset
 	case rollup.Jovian:
-		return (*uint64)(d.L2GenesisJovianTimeOffset)
+		return &d.L2GenesisJovianTimeOffset
 	case rollup.Interop:
-		return (*uint64)(d.L2GenesisInteropTimeOffset)
+		return &d.L2GenesisInteropTimeOffset
 	default:
 		panic(fmt.Sprintf("unknown fork: %s", fork))
 	}
