@@ -37,6 +37,7 @@ func DoMain(m *testing.M, opts ...stack.CommonOption) {
 		}()
 		defer func() {
 			if x := recover(); x != nil {
+				debug.PrintStack()
 				_, _ = fmt.Fprintf(os.Stderr, "Panic during test Main: %v\n", x)
 				failed.Store(true)
 			}
