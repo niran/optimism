@@ -13,105 +13,33 @@ import (
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
-// MockDependencySet implements the DependencySet interface for testing
-type mockDependencySet struct {
-	chainConfigs   map[eth.ChainID]*depset.StaticConfigDependency
-	messageExpiry  uint64
-	activationTime uint64
-}
-
-func (m *mockDependencySet) AddChain(chainID eth.ChainID, activationTime uint64) {
-	if m.chainConfigs == nil {
-		m.chainConfigs = make(map[eth.ChainID]*depset.StaticConfigDependency)
-	}
-
-	chainValue, ok := chainID.Uint64()
-	if !ok {
-		panic("chain ID too large")
-	}
-
-	m.chainConfigs[chainID] = &depset.StaticConfigDependency{
-		ChainIndex:     types.ChainIndex(chainValue),
-		ActivationTime: activationTime,
-		HistoryMinTime: activationTime - 1,
-	}
-}
-
-func (m *mockDependencySet) Chains() []eth.ChainID {
-	chains := make([]eth.ChainID, 0, len(m.chainConfigs))
-	for chain := range m.chainConfigs {
-		chains = append(chains, chain)
-	}
-	return chains
-}
-
-func (m *mockDependencySet) CanInitiateAt(chain eth.ChainID, timestamp uint64) (bool, error) {
-	cfg, ok := m.chainConfigs[chain]
-	if !ok {
-		return false, nil
-	}
-	return timestamp > cfg.ActivationTime, nil
-}
-
-func (m *mockDependencySet) CanReceiveAt(chain eth.ChainID, timestamp uint64) (bool, error) {
-	return m.CanInitiateAt(chain, timestamp)
-}
-
-func (m *mockDependencySet) CanExecuteAt(chain eth.ChainID, timestamp uint64) (bool, error) {
-	return m.CanInitiateAt(chain, timestamp)
-}
-
-func (m *mockDependencySet) MessageExpiryWindow() uint64 {
-	return m.messageExpiry
-}
-
-func (m *mockDependencySet) ReverseChainLookup(idx types.ChainIndex) (eth.ChainID, error) {
-	for chain, cfg := range m.chainConfigs {
-		if cfg.ChainIndex == idx {
-			return chain, nil
+func createDepSet(chainConfigs map[eth.ChainID]uint64, messageExpiry uint64) (*depset.StaticConfigDependencySet, error) {
+	deps := make(map[eth.ChainID]*depset.StaticConfigDependency)
+	for chainID, activationTime := range chainConfigs {
+		chainValue, ok := chainID.Uint64()
+		if !ok {
+			panic("chain ID too large")
+		}
+		deps[chainID] = &depset.StaticConfigDependency{
+			ChainIndex:     types.ChainIndex(chainValue),
+			ActivationTime: activationTime,
+			HistoryMinTime: activationTime,
 		}
 	}
-	return eth.ChainID{}, nil
-}
-
-func (m *mockDependencySet) ChainIDFromIndex(idx types.ChainIndex) (eth.ChainID, error) {
-	return m.ReverseChainLookup(idx)
-}
-
-func (m *mockDependencySet) ChainIndexFromID(id eth.ChainID) (types.ChainIndex, error) {
-	cfg, ok := m.chainConfigs[id]
-	if !ok {
-		return 0, nil
-	}
-	return cfg.ChainIndex, nil
-}
-
-func (m *mockDependencySet) HasChain(id eth.ChainID) bool {
-	_, ok := m.chainConfigs[id]
-	return ok
-}
-
-func (m *mockDependencySet) ValidMessageLifespan(timestamp uint64) (bool, error) {
-	now := uint64(time.Now().Unix())
-	if timestamp > now {
-		return false, nil
-	}
-	age := now - timestamp
-	return age <= m.messageExpiry, nil
+	return depset.NewStaticConfigDependencySetWithMessageExpiryOverride(deps, messageExpiry)
 }
 
 func TestActivationTimestampChecks(t *testing.T) {
 	baseTime := uint64(time.Now().Unix() + 60)
-
-	mockDepSet := &mockDependencySet{
-		activationTime: baseTime,
-		messageExpiry:  3600,
-	}
 	chainID := eth.ChainID{1}
-	mockDepSet.AddChain(chainID, baseTime)
+
+	depSet, err := createDepSet(map[eth.ChainID]uint64{
+		chainID: baseTime,
+	}, 3600)
+	require.NoError(t, err)
 
 	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheckFn := NewCheckFn(mockDepSet, logger)
+	activationCheckFn := NewCheckFn(depSet, logger)
 
 	testCases := map[uint64]bool{
 		baseTime - 2: false,
@@ -130,16 +58,15 @@ func TestActivationTimestampChecks(t *testing.T) {
 
 func TestActivationTimestampChecksEdgeCases(t *testing.T) {
 	activationTime := uint64(1000000)
-	mockDepSet := &mockDependencySet{
-		activationTime: activationTime,
-		messageExpiry:  3600,
-	}
-
 	chainID := eth.ChainID{1}
-	mockDepSet.AddChain(chainID, activationTime)
+
+	depSet, err := createDepSet(map[eth.ChainID]uint64{
+		chainID: activationTime,
+	}, 3600)
+	require.NoError(t, err)
 
 	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheckFn := NewCheckFn(mockDepSet, logger)
+	activationCheckFn := NewCheckFn(depSet, logger)
 
 	testCases := []struct {
 		name      string
@@ -169,17 +96,15 @@ func TestActivationTimestampChecksEdgeCases(t *testing.T) {
 
 func TestActivationBlockFiltering(t *testing.T) {
 	activationTime := uint64(time.Now().Unix() + 3600)
-
-	mockDepSet := &mockDependencySet{
-		activationTime: activationTime,
-		messageExpiry:  3600,
-	}
-
 	chainID := eth.ChainID{1}
-	mockDepSet.AddChain(chainID, activationTime)
+
+	depSet, err := createDepSet(map[eth.ChainID]uint64{
+		chainID: activationTime,
+	}, 3600)
+	require.NoError(t, err)
 
 	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheckFn := NewCheckFn(mockDepSet, logger)
+	activationCheckFn := NewCheckFn(depSet, logger)
 
 	preActivationBlock := eth.BlockRef{
 		Time: activationTime - 600,
@@ -198,19 +123,17 @@ func TestActivationBlockFiltering(t *testing.T) {
 
 func TestActivationBoundary(t *testing.T) {
 	activationTime := uint64(time.Now().Unix())
-
-	mockDepSet := &mockDependencySet{
-		activationTime: activationTime,
-		messageExpiry:  3600,
-	}
-
 	chainA := eth.ChainID{1}
 	chainB := eth.ChainID{2}
-	mockDepSet.AddChain(chainA, activationTime)
-	mockDepSet.AddChain(chainB, activationTime)
+
+	depSet, err := createDepSet(map[eth.ChainID]uint64{
+		chainA: activationTime,
+		chainB: activationTime,
+	}, 3600)
+	require.NoError(t, err)
 
 	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheckFn := NewCheckFn(mockDepSet, logger)
+	activationCheckFn := NewCheckFn(depSet, logger)
 
 	blockAtActivationA := eth.BlockRef{
 		Time: activationTime,
@@ -248,21 +171,19 @@ func TestActivationBoundary(t *testing.T) {
 
 func TestActivationBoundaryMultipleChainsSameActivationTime(t *testing.T) {
 	activationTime := uint64(time.Now().Unix() + 10)
-
-	mockDepSet := &mockDependencySet{
-		activationTime: activationTime,
-		messageExpiry:  3600,
-	}
-
 	chainA := eth.ChainID{1}
 	chainB := eth.ChainID{2}
 	chainC := eth.ChainID{3}
-	mockDepSet.AddChain(chainA, activationTime)
-	mockDepSet.AddChain(chainB, activationTime)
-	mockDepSet.AddChain(chainC, activationTime)
+
+	depSet, err := createDepSet(map[eth.ChainID]uint64{
+		chainA: activationTime,
+		chainB: activationTime,
+		chainC: activationTime,
+	}, 3600)
+	require.NoError(t, err)
 
 	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheckFn := NewCheckFn(mockDepSet, logger)
+	activationCheckFn := NewCheckFn(depSet, logger)
 
 	beforeActivation := eth.BlockRef{Time: activationTime - 5}
 	atActivation := eth.BlockRef{Time: activationTime}
@@ -283,22 +204,19 @@ func TestActivationBoundaryMultipleChainsSameActivationTime(t *testing.T) {
 
 func TestActivationBoundaryMultipleChainsDifferentActivationTimes(t *testing.T) {
 	baseTime := uint64(time.Now().Unix())
-
-	mockDepSet := &mockDependencySet{
-		activationTime: baseTime,
-		messageExpiry:  3600,
-	}
-
 	chainA := eth.ChainID{1}
 	chainB := eth.ChainID{2}
 	chainC := eth.ChainID{3}
 
-	mockDepSet.AddChain(chainA, baseTime)
-	mockDepSet.AddChain(chainB, baseTime+10)
-	mockDepSet.AddChain(chainC, baseTime+20)
+	depSet, err := createDepSet(map[eth.ChainID]uint64{
+		chainA: baseTime,
+		chainB: baseTime + 10,
+		chainC: baseTime + 20,
+	}, 3600)
+	require.NoError(t, err)
 
 	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheckFn := NewCheckFn(mockDepSet, logger)
+	activationCheckFn := NewCheckFn(depSet, logger)
 
 	t1 := eth.BlockRef{Time: baseTime + 5}
 	t2 := eth.BlockRef{Time: baseTime + 15}
