@@ -3,6 +3,7 @@ package conductor
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -15,97 +16,183 @@ func (oc *OpConductor) StartFlashblocksHandler(ctx context.Context) error {
 		return err
 	}
 
+	// Start the WebSocket server
+	if err := oc.startWebSocketServer(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// startRollupBoostListener establishes a WebSocket connection to the rollup boost service
-// and listens for messages to forward to the websocket proxy when this node is the leader
-func (oc *OpConductor) startRollupBoostListener(ctx context.Context) error {
+// startRollupBoostListener initializes and starts a WebSocket client to listen for rollup boost messages
+func (oc *OpConductor) startRollupBoostListener(_ context.Context) error {
 	if oc.cfg.RollupBoostWsURL == "" {
-		oc.log.Info("rollup boost listener disabled, no WebSocket URL configured")
+		oc.log.Info("rollup boost WebSocket disabled, no URL configured")
 		return nil
 	}
 
-	// Establish WebSocket connection to rollup boost
-	rollupBoostConn, _, err := websocket.DefaultDialer.Dial(oc.cfg.RollupBoostWsURL, nil)
+	oc.log.Info("connecting to rollup boost WebSocket", "url", oc.cfg.RollupBoostWsURL)
+
+	// Connect to the rollup boost WebSocket
+	conn, _, err := websocket.DefaultDialer.Dial(oc.cfg.RollupBoostWsURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to connect to rollup boost: %w", err)
+		return fmt.Errorf("failed to connect to rollup boost WebSocket: %w", err)
 	}
 
-	// Keep track of the connection for later use
-	oc.rollupBoostConn = rollupBoostConn
+	oc.rollupBoostConn = conn
+	oc.log.Info("connected to rollup boost WebSocket", "url", oc.cfg.RollupBoostWsURL)
 
-	// Also establish connection to websocket proxy if configured
-	if oc.cfg.WebsocketProxyURL != "" {
-		proxyConn, _, err := websocket.DefaultDialer.Dial(oc.cfg.WebsocketProxyURL, nil)
-		if err != nil {
-			oc.log.Warn("failed to connect to websocket proxy, will retry later", "err", err)
-		} else {
-			oc.proxyConn = proxyConn
-			oc.log.Info("established connection to websocket proxy")
-		}
-	}
-
-	// Start a goroutine to listen for messages
+	// Start a goroutine to read messages from the rollup boost WebSocket
 	go func() {
-		defer rollupBoostConn.Close()
+		defer func() {
+			oc.log.Info("closing rollup boost WebSocket connection")
+			conn.Close()
+			oc.rollupBoostConn = nil
+		}()
 
 		for {
-			select {
-			case <-ctx.Done():
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				oc.log.Error("error reading from rollup boost WebSocket", "err", err)
 				return
-			default:
-				// Read message from rollup boost
-				_, message, err := rollupBoostConn.ReadMessage()
-				if err != nil {
-					oc.log.Error("error reading from rollup boost websocket", "err", err)
-
-					// Try to reconnect
-					time.Sleep(5 * time.Second)
-					newConn, _, err := websocket.DefaultDialer.Dial(oc.cfg.RollupBoostWsURL, nil)
-					if err != nil {
-						oc.log.Error("failed to reconnect to rollup boost", "err", err)
-						continue
-					}
-
-					rollupBoostConn = newConn
-					oc.rollupBoostConn = newConn
-					continue
-				}
-
-				// Process the message
-				oc.handleRollupBoostMessage(message)
 			}
+
+			oc.handleRollupBoostMessage(message)
 		}
 	}()
 
 	return nil
 }
 
-// handleRollupBoostMessage processes messages received from rollup boost
-// and forwards them to the websocket proxy if this node is the leader
+// handleRollupBoostMessage processes a message received from rollup boost
 func (oc *OpConductor) handleRollupBoostMessage(message []byte) {
-	ctx := context.Background()
+	// Only forward messages if we're the leader
+	if !oc.leader.Load() {
+		oc.log.Debug("not forwarding rollup boost message, not the leader")
+		return
+	}
 
-	// Only forward messages if this node is the leader
-	if oc.Leader(ctx) && oc.cfg.WebsocketProxyURL != "" {
-		// Ensure we have an active connection to the websocket proxy
-		if oc.proxyConn == nil {
-			// Establish connection to websocket proxy if not already connected
-			conn, _, err := websocket.DefaultDialer.Dial(oc.cfg.WebsocketProxyURL, nil)
-			if err != nil {
-				oc.log.Error("failed to connect to websocket proxy", "err", err)
-				return
-			}
-			oc.proxyConn = conn
-			oc.log.Info("established connection to websocket proxy")
-		}
+	oc.log.Info("Forwarding rollup boost message", "message", string(message))
 
-		// Send the message to the proxy
-		err := oc.proxyConn.WriteMessage(websocket.TextMessage, message)
+	// Forward the message to connected clients
+	oc.broadcastToClients(message)
+}
+
+// startWebSocketServer initializes and starts a WebSocket server
+func (oc *OpConductor) startWebSocketServer(ctx context.Context) error {
+	if oc.cfg.WebsocketServerPort <= 0 {
+		oc.log.Info("WebSocket server disabled, no port configured")
+		return nil
+	}
+
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true // Allow all connections
+		},
+	}
+
+	// Create HTTP server with WebSocket endpoint
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			oc.log.Error("error sending message to websocket proxy", "err", err)
+			oc.log.Error("failed to upgrade connection", "err", err)
+			return
 		}
+
+		// Store the client connection
+		oc.wsClientMu.Lock()
+		// If we already have a connection, reject the new one
+		if oc.wsClient != nil {
+			oc.wsClientMu.Unlock()
+			oc.log.Warn("rejecting new WebSocket connection, already have one", "remote", conn.RemoteAddr())
+			conn.Close()
+			return
+		}
+		oc.wsClient = conn
+		oc.wsClientMu.Unlock()
+
+		oc.log.Info("WebSocket proxy connected", "remote", conn.RemoteAddr())
+
+		// Keep the connection alive until context is done or connection error
+		go func() {
+			// Create a channel to detect connection errors
+			errCh := make(chan error, 1)
+
+			// Start a goroutine to read messages (just to detect disconnection)
+			go func() {
+				for {
+					_, _, err := conn.ReadMessage()
+					if err != nil {
+						errCh <- err
+						return
+					}
+				}
+			}()
+
+			// Wait for either context cancellation or connection error
+			select {
+			case <-ctx.Done():
+				// Context cancelled, conductor is shutting down
+				oc.log.Info("closing WebSocket connection due to shutdown", "remote", conn.RemoteAddr())
+			case err := <-errCh:
+				// Connection error occurred
+				oc.log.Warn("WebSocket connection error", "err", err, "remote", conn.RemoteAddr())
+			}
+
+			// Clean up the connection
+			oc.wsClientMu.Lock()
+			if oc.wsClient == conn {
+				oc.wsClient = nil
+			}
+			oc.wsClientMu.Unlock()
+			conn.Close()
+			oc.log.Info("WebSocket proxy disconnected", "remote", conn.RemoteAddr())
+		}()
+	})
+
+	// Start HTTP server
+	server := &http.Server{
+		Addr: fmt.Sprintf(":%d", oc.cfg.WebsocketServerPort),
+	}
+
+	oc.log.Info("starting WebSocket server", "port", oc.cfg.WebsocketServerPort)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			oc.log.Error("WebSocket server error", "err", err)
+		}
+	}()
+
+	// Handle graceful shutdown
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			oc.log.Error("error shutting down WebSocket server", "err", err)
+		}
+	}()
+
+	return nil
+}
+
+// broadcastToClients sends a message to all connected WebSocket clients
+func (oc *OpConductor) broadcastToClients(message []byte) {
+	oc.wsClientMu.Lock()
+	defer oc.wsClientMu.Unlock()
+
+	if oc.wsClient == nil {
+		oc.log.Debug("no WebSocket clients connected, not broadcasting message")
+		return
+	}
+
+	oc.log.Info("Broadcasting message to WebSocket clients", "message", string(message))
+
+	err := oc.wsClient.WriteMessage(websocket.TextMessage, message)
+	if err != nil {
+		oc.log.Error("error writing to WebSocket client", "err", err)
+		// Close the connection on error
+		oc.wsClient.Close()
+		oc.wsClient = nil
 	}
 }
 
@@ -117,8 +204,11 @@ func (oc *OpConductor) CloseConnections() {
 		oc.rollupBoostConn = nil
 	}
 
-	if oc.proxyConn != nil {
-		oc.proxyConn.Close()
-		oc.proxyConn = nil
+	// Close WebSocket proxy connection
+	oc.wsClientMu.Lock()
+	if oc.wsClient != nil {
+		oc.wsClient.Close()
+		oc.wsClient = nil
 	}
+	oc.wsClientMu.Unlock()
 }

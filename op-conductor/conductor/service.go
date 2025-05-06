@@ -335,9 +335,11 @@ type OpConductor struct {
 
 	retryBackoff func() time.Duration
 
-	// WebSocket connections for flashblocks handler to listen to rollup boost and send to websocket proxy
+	// rollupBoostConn for the flashblock_handler to listen to payloads from rollupboost
+	// wsClient for the flashblock_handler to push payloads to websocket proxy
 	rollupBoostConn *websocket.Conn
-	proxyConn       *websocket.Conn
+	wsClient        *websocket.Conn
+	wsClientMu      sync.Mutex
 }
 
 type state struct {
@@ -426,7 +428,7 @@ func (oc *OpConductor) Stop(ctx context.Context) error {
 	oc.wg.Wait()
 
 	// Close websocket and rollupboost connections
-	if oc.rollupBoostConn != nil || oc.proxyConn != nil {
+	if oc.rollupBoostConn != nil || oc.wsClient != nil {
 		oc.log.Info("closing websocket and rollupboost connections")
 		if oc.rollupBoostConn != nil {
 			if err := oc.rollupBoostConn.Close(); err != nil {
@@ -434,11 +436,11 @@ func (oc *OpConductor) Stop(ctx context.Context) error {
 			}
 			oc.rollupBoostConn = nil
 		}
-		if oc.proxyConn != nil {
-			if err := oc.proxyConn.Close(); err != nil {
+		if oc.wsClient != nil {
+			if err := oc.wsClient.Close(); err != nil {
 				result = multierror.Append(result, errors.Wrap(err, "failed to close websocket proxy connection"))
 			}
-			oc.proxyConn = nil
+			oc.wsClient = nil
 		}
 	}
 

@@ -81,8 +81,8 @@ type Config struct {
 	// RollupBoostWsURL is the URL of the rollup boost websocket proxy.
 	RollupBoostWsURL string
 
-	// WebsocketProxyURL is the URL of the websocket proxy.
-	WebsocketProxyURL string
+	// WebsocketServerPort is the port of the websocket server.
+	WebsocketServerPort int
 
 	LogConfig     oplog.CLIConfig
 	MetricsConfig opmetrics.CLIConfig
@@ -164,14 +164,14 @@ func NewConfig(ctx *cli.Context, log log.Logger) (*Config, error) {
 			SafeInterval:   ctx.Uint64(flags.HealthCheckSafeInterval.Name),
 			MinPeerCount:   ctx.Uint64(flags.HealthCheckMinPeerCount.Name),
 		},
-		RollupCfg:         *rollupCfg,
-		RPCEnableProxy:    ctx.Bool(flags.RPCEnableProxy.Name),
-		RollupBoostWsURL:  ctx.String(flags.RollupBoostWsURL.Name),
-		WebsocketProxyURL: ctx.String(flags.WebsocketProxyURL.Name),
-		LogConfig:         oplog.ReadCLIConfig(ctx),
-		MetricsConfig:     opmetrics.ReadCLIConfig(ctx),
-		PprofConfig:       oppprof.ReadCLIConfig(ctx),
-		RPC:               oprpc.ReadCLIConfig(ctx),
+		RollupCfg:           *rollupCfg,
+		RPCEnableProxy:      ctx.Bool(flags.RPCEnableProxy.Name),
+		RollupBoostWsURL:    ctx.String(flags.RollupBoostWsURL.Name),
+		WebsocketServerPort: ctx.Int(flags.WebsocketServerPort.Name),
+		LogConfig:           oplog.ReadCLIConfig(ctx),
+		MetricsConfig:       opmetrics.ReadCLIConfig(ctx),
+		PprofConfig:         oppprof.ReadCLIConfig(ctx),
+		RPC:                 oprpc.ReadCLIConfig(ctx),
 	}, nil
 }
 
