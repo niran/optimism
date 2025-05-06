@@ -554,8 +554,13 @@ func (d *UpgradeScheduleDeployConfig) forks() []Fork {
 	}
 }
 
+// Check ensures that:
+//  1. parent fork is before or at the same time as child fork
+//  2. forks cannot activate at the same post-Genesis block
 func (d *UpgradeScheduleDeployConfig) Check(log log.Logger) error {
-	// checkFork checks that fork A is before or at the same time as fork B
+	// checkFork checks that:
+	//  1. fork A is before or at the same time as fork B
+	//  2. fork A and B cannot activate at the same post-Genesis block
 	checkFork := func(a, b *hexutil.Uint64, aName, bName string) error {
 		if a == nil && b == nil {
 			return nil
