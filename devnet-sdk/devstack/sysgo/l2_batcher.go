@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/endpoint"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
+	oprpc "github.com/ethereum-optimism/optimism/op-service/rpc"
 )
 
 type L2Batcher struct {
@@ -71,13 +72,13 @@ func WithBatcher(batcherID stack.L2BatcherID, l1ELID stack.L1ELNodeID, l2CLID st
 		batcherSecret, err := orch.keys.Secret(devkeys.BatcherRole.Key(l2ELID.ChainID.ToBig()))
 		require.NoError(err)
 
-		logger := o.P().Logger().New("id", batcherID)
+		logger := o.P().Logger().New("service", "op-batcher", "id", batcherID)
 		logger.Info("Batcher key acquired", "addr", crypto.PubkeyToAddress(batcherSecret.PublicKey))
 
 		batcherCLIConfig := &bss.CLIConfig{
 			L1EthRpc:                 l1EL.userRPC,
-			L2EthRpc:                 l2EL.userRPC,
-			RollupRpc:                l2CL.userRPC,
+			L2EthRpc:                 []string{l2EL.userRPC},
+			RollupRpc:                []string{l2CL.userRPC},
 			MaxPendingTransactions:   1,
 			MaxChannelDuration:       1,
 			MaxL1TxSize:              120_000,
@@ -96,6 +97,9 @@ func WithBatcher(batcherID stack.L2BatcherID, l1ELID stack.L1ELNodeID, l2CLID st
 			MaxBlocksPerSpanBatch: 10,
 			DataAvailabilityType:  batcherFlags.CalldataType,
 			CompressionAlgo:       derive.Brotli,
+			RPC: oprpc.CLIConfig{
+				EnableAdmin: true,
+			},
 		}
 
 		batcher, err := bss.BatcherServiceFromCLIConfig(

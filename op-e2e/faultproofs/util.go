@@ -127,14 +127,17 @@ type vmTestOptions[T any] struct {
 }
 
 func defaultVmTestOptions[T any]() vmTestOptions[T] {
+	allocTypes := []config.AllocType{
+		config.AllocTypeMTCannon,
+	}
+	if config.IsCannonInDevelopment() {
+		allocTypes = append(allocTypes, config.AllocTypeMTCannonNext)
+	}
 	return vmTestOptions[T]{
 		testNameModifier: func(vmName string, testcase T) string {
 			return vmName
 		},
-		allocTypes: []config.AllocType{
-			config.AllocTypeMTCannon,
-			config.AllocTypeMTCannonNext,
-		},
+		allocTypes: allocTypes,
 	}
 }
 
@@ -180,6 +183,8 @@ func RunTestsAcrossVmTypes[T any](t *testing.T, testCases []T, test VMTestCase[T
 
 	for _, testCase := range testCases {
 		for _, allocType := range options.allocTypes {
+			testCase := testCase
+			allocType := allocType
 			testName := options.testNameModifier(string(allocType), testCase)
 			t.Run(testName, func(t *testing.T) {
 				op_e2e.InitParallel(t, op_e2e.UsesCannon)

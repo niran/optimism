@@ -7,27 +7,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/ethereum-optimism/optimism/cannon/mipsevm/versions"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/genesis"
 )
 
 type VMType string
 
 const (
-	VMTypeAlphabet = "ALPHABET"
-	VMTypeCannon1  = "CANNON1" // Legacy: corresponds to 32-bit MIPS VM
-	VMTypeCannon2  = "CANNON2" // Legacy: corresponds to 64-bit MIPS VM StateVersion 6
-	VMTypeCannon6  = "CANNON6" // Corresponds to VM State Version 6: https://github.com/ethereum-optimism/optimism/blob/4c05241bc534ae5837007c32995fc62f3dd059b6/cannon/mipsevm/versions/version.go#L25-L25
-	VMTypeCannon7  = "CANNON7" // Corresponds to VM State Version 7: https://github.com/ethereum-optimism/optimism/blob/4c05241bc534ae5837007c32995fc62f3dd059b6/cannon/mipsevm/versions/version.go#L27-L27
+	VMTypeAlphabet   = "ALPHABET"
+	VMTypeCannon     = "CANNON"      // Corresponds to the currently released Cannon StateVersion. See: https://github.com/ethereum-optimism/optimism/blob/4c05241bc534ae5837007c32995fc62f3dd059b6/cannon/mipsevm/versions/version.go
+	VMTypeCannonNext = "CANNON-NEXT" // Corresponds to the next in-development Cannon StateVersion. See: https://github.com/ethereum-optimism/optimism/blob/4c05241bc534ae5837007c32995fc62f3dd059b6/cannon/mipsevm/versions/version.go
 )
 
 func (v VMType) MipsVersion() uint64 {
 	switch v {
-	case VMTypeCannon1:
-		return 1
-	case VMTypeCannon2, VMTypeCannon6:
-		return 6
-	case VMTypeCannon7:
-		return 7
+	case VMTypeCannon:
+		return uint64(versions.GetCurrentVersion())
+	case VMTypeCannonNext:
+		return uint64(versions.GetExperimentalVersion())
 	default:
 		// Not a mips VM - return empty value
 		return 0
@@ -93,6 +90,7 @@ var ErrChainRoleZeroAddress = fmt.Errorf("ChainRole is set to zero address")
 var ErrFeeVaultZeroAddress = fmt.Errorf("chain has a fee vault set to zero address")
 var ErrNonStandardValue = fmt.Errorf("chain contains non-standard config value")
 var ErrEip1559ZeroValue = fmt.Errorf("eip1559 param is set to zero value")
+var ErrIncompatibleValue = fmt.Errorf("chain contains incompatible config value")
 
 func (c *ChainIntent) Check() error {
 	if c.ID == emptyHash {

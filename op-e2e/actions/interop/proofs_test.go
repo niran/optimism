@@ -86,6 +86,39 @@ func TestInteropFaultProofs_TraceExtensionActivation(gt *testing.T) {
 	runFppAndChallengerTests(gt, system, tests)
 }
 
+func TestInteropFaultProofs_UnsafeProposal(gt *testing.T) {
+	t := helpers.NewDefaultTesting(gt)
+	system := dsl.NewInteropDSL(t)
+
+	system.AddL2Block(system.Actors.ChainA)
+	system.AddL2Block(system.Actors.ChainB)
+
+	proposalTimestamp := system.Actors.ChainA.Sequencer.L2Unsafe().Time
+	agreedTimestamp := proposalTimestamp - 1
+	agreedClaim := system.Outputs.SuperRoot(agreedTimestamp).Marshal()
+	disputedClaim := system.Outputs.TransitionState(agreedTimestamp, 1).Marshal()
+	disputedTraceIndex := int64(0)
+	tests := []*transitionTest{
+		{
+			name:               "ProposedUnsafeBlock-NotValid",
+			agreedClaim:        agreedClaim,
+			disputedClaim:      disputedClaim,
+			disputedTraceIndex: disputedTraceIndex,
+			proposalTimestamp:  proposalTimestamp,
+			expectValid:        false,
+		},
+		{
+			name:               "ProposedUnsafeBlock-ShouldBeInvalid",
+			agreedClaim:        agreedClaim,
+			disputedClaim:      interop.InvalidTransition,
+			disputedTraceIndex: disputedTraceIndex,
+			proposalTimestamp:  proposalTimestamp,
+			expectValid:        true,
+		},
+	}
+	runFppAndChallengerTests(gt, system, tests)
+}
+
 func TestInteropFaultProofs_ConsolidateValidCrossChainMessage(gt *testing.T) {
 	t := helpers.NewDefaultTesting(gt)
 	system := dsl.NewInteropDSL(t)
