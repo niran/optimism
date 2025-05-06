@@ -545,6 +545,10 @@ func TestSupervisorAheadOfL2CL(gt *testing.T) {
 		logger := system.T().Logger()
 		require := system.T().Require()
 
+		elA := system.L2Network(ids.L2A).L2ELNode(ids.L2AEL)
+		elA2 := system.L2Network(ids.L2A).L2ELNode(ids.L2A2EL)
+		elB := system.L2Network(ids.L2B).L2ELNode(ids.L2BEL)
+		elB2 := system.L2Network(ids.L2B).L2ELNode(ids.L2B2EL)
 		clA := system.L2Network(ids.L2A).L2CLNode(ids.L2ACL)
 		clA2 := system.L2Network(ids.L2A).L2CLNode(ids.L2A2CL)
 		clB := system.L2Network(ids.L2B).L2CLNode(ids.L2BCL)
@@ -695,5 +699,9 @@ func TestSupervisorAheadOfL2CL(gt *testing.T) {
 			check = check && syncB2.SafeL2.Number > targetBlockNum5
 			return check
 		}, 60*time.Second, waitTime)
+
+		// Make sure each chain did not diverge
+		require.Equal(queryBlockFromELByNumber(elA, targetBlockNum5).Hash, queryBlockFromELByNumber(elA2, targetBlockNum5).Hash)
+		require.Equal(queryBlockFromELByNumber(elB, targetBlockNum5).Hash, queryBlockFromELByNumber(elB2, targetBlockNum5).Hash)
 	}
 }
