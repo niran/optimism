@@ -43,10 +43,9 @@ func (b *L2Batcher) hydrate(system stack.ExtensibleSystem) {
 	l2Net.(stack.ExtensibleL2Network).AddL2Batcher(bFrontend)
 }
 
-func WithBatcher(batcherID stack.L2BatcherID, l1ELID stack.L1ELNodeID, l2CLID stack.L2CLNodeID, l2ELID stack.L2ELNodeID) stack.Option {
-	return func(o stack.Orchestrator) {
-		orch := o.(*Orchestrator)
-		require := o.P().Require()
+func WithBatcher(batcherID stack.L2BatcherID, l1ELID stack.L1ELNodeID, l2CLID stack.L2CLNodeID, l2ELID stack.L2ELNodeID) stack.Option[*Orchestrator] {
+	return stack.AfterDeploy(func(orch *Orchestrator) {
+		require := orch.P().Require()
 		require.False(orch.batchers.Has(batcherID), "batcher must not already exist")
 
 		l2Net, ok := orch.l2Nets.Get(l2CLID.ChainID)
@@ -71,7 +70,7 @@ func WithBatcher(batcherID stack.L2BatcherID, l1ELID stack.L1ELNodeID, l2CLID st
 		batcherSecret, err := orch.keys.Secret(devkeys.BatcherRole.Key(l2ELID.ChainID.ToBig()))
 		require.NoError(err)
 
-		logger := o.P().Logger().New("id", batcherID)
+		logger := orch.P().Logger().New("id", batcherID)
 		logger.Info("Batcher key acquired", "addr", crypto.PubkeyToAddress(batcherSecret.PublicKey))
 
 		batcherCLIConfig := &bss.CLIConfig{
@@ -99,10 +98,10 @@ func WithBatcher(batcherID stack.L2BatcherID, l1ELID stack.L1ELNodeID, l2CLID st
 		}
 
 		batcher, err := bss.BatcherServiceFromCLIConfig(
-			o.P().Ctx(), "0.0.1", batcherCLIConfig,
+			orch.P().Ctx(), "0.0.1", batcherCLIConfig,
 			logger.New("service", "batcher"))
 		require.NoError(err)
-		require.NoError(batcher.Start(o.P().Ctx()))
+		require.NoError(batcher.Start(orch.P().Ctx()))
 		orch.p.Cleanup(func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel() // force-quit
@@ -120,5 +119,5 @@ func WithBatcher(batcherID stack.L2BatcherID, l1ELID stack.L1ELNodeID, l2CLID st
 			l2ELRPC: l2EL.userRPC,
 		}
 		orch.batchers.Set(batcherID, b)
-	}
+	})
 }

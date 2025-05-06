@@ -54,23 +54,25 @@ func NewDefaultInteropSystemIDs(l1ID, l2AID, l2BID eth.ChainID) DefaultInteropSy
 	return ids
 }
 
-func DefaultInteropSystem(dest *DefaultInteropSystemIDs) stack.Option {
+func DefaultInteropSystem(dest *DefaultInteropSystemIDs) stack.Option[*Orchestrator] {
 	l1ID := eth.ChainIDFromUInt64(900)
 	l2AID := eth.ChainIDFromUInt64(901)
 	l2BID := eth.ChainIDFromUInt64(902)
 	ids := NewDefaultInteropSystemIDs(l1ID, l2AID, l2BID)
 
-	opt := stack.Option(func(o stack.Orchestrator) {
+	opt := stack.Combine[*Orchestrator]()
+	opt.Add(stack.BeforeDeploy(func(o *Orchestrator) {
 		o.P().Logger().Info("Setting up")
-	})
+	}))
 
 	opt.Add(WithMnemonicKeys(devkeys.TestMnemonic))
 
-	opt.Add(WithDeployer(
-		WithLocalContractSources(),
-		WithCommons(ids.L1.ChainID()),
-		WithPrefundedL2(ids.L2A.ChainID()),
-		WithPrefundedL2(ids.L2B.ChainID())))
+	opt.Add(WithDeployer(),
+		WithDeployerOptions(
+			WithLocalContractSources(),
+			WithCommons(ids.L1.ChainID()),
+			WithPrefundedL2(ids.L2A.ChainID()),
+			WithPrefundedL2(ids.L2B.ChainID())))
 
 	//opt.Add(WithInteropGen(ids.L1, ids.Superchain, ids.Cluster,
 	//	[]stack.L2NetworkID{ids.L2A, ids.L2B}, contractPaths))
@@ -100,9 +102,9 @@ func DefaultInteropSystem(dest *DefaultInteropSystemIDs) stack.Option {
 
 	// Upon evaluation of the option, export the contents we created.
 	// Ids here are static, but other things may be exported too.
-	opt.Add(func(orch stack.Orchestrator) {
+	opt.Add(stack.Finally(func(orch *Orchestrator, hook stack.SystemHook) {
 		*dest = ids
-	})
+	}))
 
 	return opt
 }
@@ -114,7 +116,7 @@ type DefaultRedundancyInteropSystemIDs struct {
 	L2A2EL stack.L2ELNodeID
 }
 
-func DefaultRedundancyInteropSystem(dest *DefaultRedundancyInteropSystemIDs) stack.Option {
+func DefaultRedundancyInteropSystem(dest *DefaultRedundancyInteropSystemIDs) stack.Option[*Orchestrator] {
 	l1ID := eth.ChainIDFromUInt64(900)
 	l2AID := eth.ChainIDFromUInt64(901)
 	l2BID := eth.ChainIDFromUInt64(902)
@@ -126,7 +128,8 @@ func DefaultRedundancyInteropSystem(dest *DefaultRedundancyInteropSystemIDs) sta
 
 	// start with default interop system
 	var parentIds DefaultInteropSystemIDs
-	opt := DefaultInteropSystem(&parentIds)
+	opt := stack.Combine[*Orchestrator]()
+	opt.Add(DefaultInteropSystem(&parentIds))
 
 	opt.Add(WithL2ELNode(ids.L2A2EL, &ids.Supervisor))
 	opt.Add(WithL2CLNode(ids.L2A2CL, false, ids.L1CL, ids.L1EL, ids.L2A2EL))
@@ -139,9 +142,9 @@ func DefaultRedundancyInteropSystem(dest *DefaultRedundancyInteropSystemIDs) sta
 
 	// Upon evaluation of the option, export the contents we created.
 	// Ids here are static, but other things may be exported too.
-	opt.Add(func(orch stack.Orchestrator) {
+	opt.Add(stack.Finally(func(orch *Orchestrator, hook stack.SystemHook) {
 		*dest = ids
-	})
+	}))
 
 	return opt
 }
