@@ -122,9 +122,11 @@ contract OptimismPortal2_TestInit is DisputeGameFactory_Init {
     /// @notice Asserts that the reentrant call will revert.
     function callPortalAndExpectRevert() external payable {
         vm.expectRevert(IOptimismPortal.OptimismPortal_NoReentrancy.selector);
+
         // Arguments here don't matter, as the require check is the first thing that happens.
         // We assume that this has already been proven.
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
+
         // Assert that the withdrawal was not finalized.
         assertFalse(optimismPortal2.finalizedWithdrawals(Hashing.hashWithdrawal(_defaultTx)));
     }
@@ -193,6 +195,7 @@ contract OptimismPortal2_Initialize_Test is OptimismPortal2_TestInit {
             "OptimismPortal2_Initialize_Test: Do not check guardian and respectedGameType on forked networks"
         );
         address guardian = superchainConfig.guardian();
+
         // This check is not valid for forked tests, as the guardian is not the same as the one in hardhat.json
         assertEq(guardian, deploy.cfg().superchainConfigGuardian());
 
@@ -412,6 +415,7 @@ contract OptimismPortal2_DonateETH_Test is OptimismPortal2_TestInit {
 
         // not necessary since it's checked below
         assertEq(address(optimismPortal2).balance, preBalance + _amount);
+
         // check that the ETHLockbox balance is unchanged
         assertEq(address(ethLockbox).balance, lockboxBalanceBefore);
 
@@ -424,20 +428,28 @@ contract OptimismPortal2_DonateETH_Test is OptimismPortal2_TestInit {
 
         // to of 1 is the optimism portal proxy
         assertEq(accountAccesses[1].account, address(optimismPortal2));
+
         // accessor is the pranked address
         assertEq(accountAccesses[1].accessor, alice);
+
         // value is the amount of ETH donated
         assertEq(accountAccesses[1].value, _amount);
+
         // old balance is the balance of the optimism portal before the donation
         assertEq(accountAccesses[1].oldBalance, preBalance);
+
         // new balance is the balance of the optimism portal after the donation
         assertEq(accountAccesses[1].newBalance, preBalance + _amount);
+
         // data is the selector of the donateETH function
         assertEq(accountAccesses[1].data, abi.encodePacked(optimismPortal2.donateETH.selector));
+
         // reverted of alice call to proxy is false
         assertEq(accountAccesses[1].reverted, false);
+
         // reverted of delegate call of proxy to impl is false
         assertEq(accountAccesses[2].reverted, false);
+
         // storage accesses of delegate call of proxy to impl is empty (No storage read or write!)
         assertEq(accountAccesses[2].storageAccesses.length, 0);
     }
@@ -1069,6 +1081,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
             gasLimit: 100_000,
             data: hex""
         });
+
         // Get withdrawal proof data we can use for testing.
         (
             bytes32 _stateRoot_noData,
@@ -1077,6 +1090,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
             bytes32 _withdrawalHash_noData,
             bytes[] memory _withdrawalProof_noData
         ) = ffi.getProveWithdrawalTransactionInputs(_defaultTx_noData);
+
         // Setup a dummy output root proof for reuse.
         Types.OutputRootProof memory _outputRootProof_noData = Types.OutputRootProof({
             version: bytes32(uint256(0)),
@@ -1084,6 +1098,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
             messagePasserStorageRoot: _storageRoot_noData,
             latestBlockhash: bytes32(uint256(0))
         });
+
         IFaultDisputeGame game_noData = IFaultDisputeGame(
             payable(
                 address(
@@ -1093,9 +1108,12 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
                 )
             )
         );
+
         uint256 _proposedGameIndex_noData = disputeGameFactory.gameCount() - 1;
+
         // Warp beyond the chess clocks and finalize the game.
         vm.warp(block.timestamp + game_noData.maxClockDuration().raw() + 1 seconds);
+
         // Fund the portal so that we can withdraw ETH.
         vm.store(address(optimismPortal2), bytes32(uint256(61)), bytes32(uint256(0xFFFFFFFF)));
         vm.deal(address(ethLockbox), 0xFFFFFFFF);
@@ -2130,6 +2148,7 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         external
     {
         assumeNotForgeAddress(_7702Target);
+
         // Prevent overflow on an upgrade context
         _mint = bound(_mint, 0, type(uint256).max - address(ethLockbox).balance);
 
@@ -2283,6 +2302,7 @@ contract OptimismPortal2_Params_Test is CommonTest {
         // Here we add a VM assumption to bound the potential increase.
         // Compute the maximum possible increase in base fee.
         uint256 maxPercentIncrease = uint256(_elasticityMultiplier - 1) * 100 / uint256(_baseFeeMaxChangeDenominator);
+
         // Assume that we have enough gas to burn.
         // Compute the maximum amount of gas we'd need to burn.
         // Assume we need 1/5 of our gas to do other stuff.
@@ -2309,6 +2329,7 @@ contract OptimismPortal2_Params_Test is CommonTest {
             bytes32(uint256(1)),
             bytes32((_prevBlockNum << 192) | (uint256(_prevBoughtGas) << 128) | _prevBaseFee)
         );
+
         // Ensure that the storage setting is correct
         (uint128 prevBaseFee, uint64 prevBoughtGas, uint64 prevBlockNum) = optimismPortal2.params();
         assertEq(prevBaseFee, _prevBaseFee);
@@ -2345,6 +2366,7 @@ contract OptimismPortal2_Params_Test is CommonTest {
         NextImpl nextImpl = new NextImpl();
 
         vm.startPrank(EIP1967Helper.getAdmin(address(optimismPortal2)));
+
         // The value passed to the initialize must be larger than the last value
         // that initialize was called with.
         IProxy(payable(address(optimismPortal2))).upgradeToAndCall(
