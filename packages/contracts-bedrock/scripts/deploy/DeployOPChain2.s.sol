@@ -4,11 +4,8 @@ pragma solidity 0.8.15;
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
-import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
-import { BaseDeployIO } from "scripts/deploy/BaseDeployIO.sol";
 import { LibString } from "@solady/utils/LibString.sol";
 
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
