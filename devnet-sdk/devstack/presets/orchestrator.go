@@ -64,7 +64,7 @@ func DoMain(m *testing.M, opts ...stack.Option) {
 		// TODO(#15139): set log-level filter, reduce noise
 		//log.SetDefault(t.Log.New("logger", "global"))
 
-		initOrchestrator(p, opts...)
+		initGlobalOrchestrator(p, opts...)
 
 		errCode = m.Run()
 		return
@@ -73,12 +73,17 @@ func DoMain(m *testing.M, opts ...stack.Option) {
 	os.Exit(code)
 }
 
-func initOrchestrator(p devtest.P, opts ...stack.Option) {
+func initGlobalOrchestrator(p devtest.P, opts ...stack.Option) {
 	lockedOrchestrator.Lock()
 	defer lockedOrchestrator.Unlock()
 	if lockedOrchestrator.Value != nil {
 		return
 	}
+	lockedOrchestrator.Value = InitOrchestrator(p, opts...)
+}
+
+func InitOrchestrator(p devtest.P, opts ...stack.Option) stack.Orchestrator {
+	var orch stack.Orchestrator
 	kind, ok := os.LookupEnv("DEVSTACK_ORCHESTRATOR")
 	if !ok {
 		p.Logger().Warn("Selecting sysgo as default devstack orchestrator")
@@ -86,15 +91,29 @@ func initOrchestrator(p devtest.P, opts ...stack.Option) {
 	}
 	switch kind {
 	case "sysgo":
-		lockedOrchestrator.Value = sysgo.NewOrchestrator(p)
+		orch = sysgo.NewOrchestrator(p)
 	case "syskt":
-		lockedOrchestrator.Value = sysext.NewOrchestrator(p)
+		orch = sysext.NewOrchestrator(p)
 	default:
 		p.Logger().Crit("Unknown devstack backend", "kind", kind)
 	}
 	for _, opt := range opts {
-		opt(lockedOrchestrator.Value)
+		opt(orch)
 	}
+	return orch
+}
+
+func InitDefaultOrchestrator(opts ...stack.Option) stack.Orchestrator {
+	logger := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
+		Level:  log.LevelInfo,
+		Color:  true,
+		Format: oplog.FormatTerminal,
+		Pid:    false,
+	})
+	p := devtest.NewP(logger, func() {
+		debug.PrintStack()
+	})
+	return InitOrchestrator(p, opts...)
 }
 
 // Orchestrator returns the globally configured orchestrator.
@@ -104,11 +123,11 @@ func initOrchestrator(p devtest.P, opts ...stack.Option) {
 //	func TestMain(m *testing.M) {
 //	    presets.DoMain(m)
 //	}
-func Orchestrator() stack.Orchestrator {
+func GlobalOrchestrator() stack.Orchestrator {
 	out := lockedOrchestrator.Get()
 	if out == nil {
 		panic(`
-Add a TestMain to your test package init the orchestrator:
+Add a TestMain to your test package init the global orchestrator:
 
 	func TestMain(m *testing.M) {
 		presets.DoMain(m)

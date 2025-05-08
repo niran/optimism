@@ -24,6 +24,9 @@ type SimpleInterop struct {
 	L2ELA *dsl.L2ELNode
 	L2ELB *dsl.L2ELNode
 
+	L2CLA *dsl.L2CLNode
+	L2CLB *dsl.L2CLNode
+
 	Wallet *dsl.HDWallet
 
 	FaucetA *dsl.Faucet
@@ -72,6 +75,8 @@ func hydrateSimpleInterop(t devtest.T, orch stack.Orchestrator) *SimpleInterop {
 		L2ChainB:     dsl.NewL2Network(l2B),
 		L2ELA:        dsl.NewL2ELNode(l2A.L2ELNode(match.Assume(t, match.FirstL2EL))),
 		L2ELB:        dsl.NewL2ELNode(l2B.L2ELNode(match.Assume(t, match.FirstL2EL))),
+		L2CLA:        dsl.NewL2CLNode(l2A.L2CLNode(match.Assume(t, match.FirstL2CL)), orch.ControlPlane()),
+		L2CLB:        dsl.NewL2CLNode(l2B.L2CLNode(match.Assume(t, match.FirstL2CL)), orch.ControlPlane()),
 		Wallet:       dsl.NewHDWallet(t, devkeys.TestMnemonic, 30),
 		FaucetA:      dsl.NewFaucet(l2A.Faucet(match.Assume(t, match.FirstFaucet))),
 		FaucetB:      dsl.NewFaucet(l2B.Faucet(match.Assume(t, match.FirstFaucet))),
