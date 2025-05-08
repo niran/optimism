@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -917,9 +918,14 @@ func (s *OpConductorTestSuite) TestSupervisorConnectionDown() {
 	s.cons.AssertNumberOfCalls(s.T(), "TransferLeader", 1)
 }
 
-// TestFlashblocksConnectionsLifecycle tests that rollup boost and websocket server
-// are correctly established when the conductor is started and closed when the conductor is shut down
-func (s *OpConductorTestSuite) TestFlashblocksConnectionsLifecycle() {
+// TestFlashblocksHandlerIntegration tests that the flashblocks handler is properly initialized and started
+func (s *OpConductorTestSuite) TestFlashblocksHandlerIntegration() {
+	// Use a random available port to avoid conflicts
+	listener, err := net.Listen("tcp", "localhost:0")
+	s.NoError(err)
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
 	// Create a test HTTP server for rollup boost WebSocket
 	rollupBoostServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
@@ -942,56 +948,44 @@ func (s *OpConductorTestSuite) TestFlashblocksConnectionsLifecycle() {
 
 	// Update the config to include the WebSocket URL and server port
 	s.cfg.RollupBoostWsURL = rollupBoostWsURL
-	s.cfg.WebsocketServerPort = 18546 // Use a test port
+	s.cfg.WebsocketServerPort = port // Use a dynamically assigned port
 
 	// Create a new conductor with the updated config
 	conductor, err := NewOpConductor(s.ctx, &s.cfg, s.log, s.metrics, s.version, s.ctrl, s.cons, s.hmon)
 	s.NoError(err)
 
-	// Start the conductor, which should establish the rollup boost connection and start the WebSocket server
+	// Start the conductor, which should initialize and start the flashblocks handler
 	s.hmon.EXPECT().Start(mock.Anything).Return(nil)
 	err = conductor.Start(s.ctx)
 	s.NoError(err)
 
-	// Verify that the rollup boost connection was established
-	s.Eventually(func() bool {
-		return conductor.rollupBoostConn != nil
-	}, 2*time.Second, 100*time.Millisecond, "rollup boost connection was not established")
+	// Verify that the flashblocks handler was initialized
+	s.NotNil(conductor.flashblocksHandler, "flashblocks handler should be initialized")
 
-	// Connect a test client to the conductor's WebSocket server
+	// Try to connect to the WebSocket server to verify it's running
 	wsURL := fmt.Sprintf("ws://localhost:%d/ws", s.cfg.WebsocketServerPort)
-	proxyClient, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-	s.NoError(err)
-	defer proxyClient.Close()
+	client, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	s.NoError(err, "should be able to connect to the WebSocket server")
+	defer client.Close()
 
-	// Verify that the conductor accepted the client connection
-	s.Eventually(func() bool {
-		conductor.wsClientMu.Lock()
-		defer conductor.wsClientMu.Unlock()
-		return conductor.wsClient != nil
-	}, 2*time.Second, 100*time.Millisecond, "websocket server did not accept client connection")
-
-	// Make the conductor the leader to test message broadcasting
-	conductor.leader.Store(true)
-
-	// Set up mock expectation for Leader() call
-	s.cons.EXPECT().Leader().Return(true).Times(1)
-
-	// Send a message to trigger the broadcasting mechanism
-	if conductor.rollupBoostConn != nil {
-		conductor.handleRollupBoostMessage([]byte("test message"))
-	}
-
-	// Stop the conductor, which should close the WebSocket connections
+	// Stop the conductor, which should also stop the flashblocks handler
 	s.hmon.EXPECT().Stop().Return(nil)
 	s.cons.EXPECT().Shutdown().Return(nil)
 	err = conductor.Stop(s.ctx)
 	s.NoError(err)
 
-	// Verify that the connections were closed
-	s.Nil(conductor.rollupBoostConn, "rollup boost connection was not closed")
-	s.Nil(conductor.wsClient, "websocket client connection was not closed")
-
 	// Verify that the conductor is stopped
 	s.True(conductor.Stopped())
+
+	// Give the OS a moment to release the port
+	time.Sleep(100 * time.Millisecond)
+
+	// Instead of trying to connect, check if we can bind to the port
+	// If we can bind to it, it means the server is no longer using it
+	testListener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		s.Fail("Port is still in use after stopping the server: %v", err)
+	} else {
+		testListener.Close() // Successfully bound to the port, close it
+	}
 }

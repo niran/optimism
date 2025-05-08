@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-conductor/health"
 	"github.com/ethereum-optimism/optimism/op-conductor/metrics"
 	conductorrpc "github.com/ethereum-optimism/optimism/op-conductor/rpc"
+	"github.com/ethereum-optimism/optimism/op-conductor/rpc/ws"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
 	"github.com/ethereum-optimism/optimism/op-service/cliapp"
 	opclient "github.com/ethereum-optimism/optimism/op-service/client"
@@ -115,6 +116,9 @@ func (c *OpConductor) init(ctx context.Context) error {
 	}
 	if err := c.initRPCServer(ctx); err != nil {
 		return errors.Wrap(err, "failed to initialize rpc server")
+	}
+	if err := c.initFlashblocksHandler(ctx); err != nil {
+		return errors.Wrap(err, "failed to initialize flashblocks handler")
 	}
 	return nil
 }
@@ -289,6 +293,24 @@ func (oc *OpConductor) initRPCServer(ctx context.Context) error {
 	return nil
 }
 
+// init flashblocks handler
+func (c *OpConductor) initFlashblocksHandler(ctx context.Context) error {
+	if c.cfg.RollupBoostWsURL == "" && c.cfg.WebsocketServerPort <= 0 {
+		c.log.Info("flashblocks handler disabled, no rollup boost URL or websocket server port configured")
+		return nil
+	}
+
+	// Initialize the flashblocks handler
+	c.flashblocksHandler = ws.NewHandler(ws.Config{
+		RollupBoostWsURL:    c.cfg.RollupBoostWsURL,
+		WebsocketServerPort: c.cfg.WebsocketServerPort,
+	}, c.log, func(ctx context.Context) bool {
+		return c.Leader(ctx)
+	})
+
+	return nil
+}
+
 // OpConductor represents a full conductor instance and its resources, it does:
 //  1. performs health checks on sequencer
 //  2. participate in consensus protocol for leader election
@@ -336,10 +358,12 @@ type OpConductor struct {
 	retryBackoff func() time.Duration
 
 	// rollupBoostConn for the flashblock_handler to listen to payloads from rollupboost
-	// wsClient for the flashblock_handler to push payloads to websocket proxy
+	// wsClients for the flashblock_handler to push payloads to multiple websocket proxies
 	rollupBoostConn *websocket.Conn
-	wsClient        *websocket.Conn
-	wsClientMu      sync.Mutex
+	wsClients       []*websocket.Conn
+	wsClientsMu     sync.Mutex
+
+	flashblocksHandler ws.FlashblockHandler
 }
 
 type state struct {
@@ -378,10 +402,10 @@ func (oc *OpConductor) Start(ctx context.Context) error {
 		return errors.Wrap(err, "failed to start JSON-RPC server")
 	}
 
-	// Start the flashblocks handler if configured
-	if oc.cfg.RollupBoostWsURL != "" {
+	// Start the flashblocks handler if it was initialized
+	if oc.flashblocksHandler != nil {
 		oc.log.Info("starting flashblocks handler")
-		if err := oc.StartFlashblocksHandler(ctx); err != nil {
+		if err := oc.flashblocksHandler.Start(ctx); err != nil {
 			return errors.Wrap(err, "failed to start flashblocks handler")
 		}
 	}
@@ -428,20 +452,9 @@ func (oc *OpConductor) Stop(ctx context.Context) error {
 	oc.wg.Wait()
 
 	// Close websocket and rollupboost connections
-	if oc.rollupBoostConn != nil || oc.wsClient != nil {
-		oc.log.Info("closing websocket and rollupboost connections")
-		if oc.rollupBoostConn != nil {
-			if err := oc.rollupBoostConn.Close(); err != nil {
-				result = multierror.Append(result, errors.Wrap(err, "failed to close rollup boost connection"))
-			}
-			oc.rollupBoostConn = nil
-		}
-		if oc.wsClient != nil {
-			if err := oc.wsClient.Close(); err != nil {
-				result = multierror.Append(result, errors.Wrap(err, "failed to close websocket proxy connection"))
-			}
-			oc.wsClient = nil
-		}
+	if oc.flashblocksHandler != nil {
+		oc.log.Info("stopping flashblocks handler")
+		oc.flashblocksHandler.Stop()
 	}
 
 	if oc.rpcServer != nil {
