@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/raft"
 	"github.com/pkg/errors"
@@ -357,12 +356,6 @@ type OpConductor struct {
 
 	retryBackoff func() time.Duration
 
-	// rollupBoostConn for the flashblock_handler to listen to payloads from rollupboost
-	// wsClients for the flashblock_handler to push payloads to multiple websocket proxies
-	rollupBoostConn *websocket.Conn
-	wsClients       []*websocket.Conn
-	wsClientsMu     sync.Mutex
-
 	flashblocksHandler ws.FlashblockHandler
 }
 
@@ -451,7 +444,7 @@ func (oc *OpConductor) Stop(ctx context.Context) error {
 	oc.shutdownCancel()
 	oc.wg.Wait()
 
-	// Close websocket and rollupboost connections
+	// Close flashblocks handler
 	if oc.flashblocksHandler != nil {
 		oc.log.Info("stopping flashblocks handler")
 		oc.flashblocksHandler.Stop()
