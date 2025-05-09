@@ -50,7 +50,7 @@ contract L1CrossDomainMessenger_TestInit is CommonTest {
     /// @dev Encoding library harness.
     Encoding_Harness encoding;
 
-    function setUp() public override virtual {
+    function setUp() public virtual override {
         super.setUp();
         senderSlotIndex = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot;
         encoding = new Encoding_Harness();
@@ -300,10 +300,11 @@ contract L1CrossDomainMessenger_SendMessage_Test is L1CrossDomainMessenger_TestI
     }
 }
 
-/// @title L1CrossDomainMessenger_Test
-/// @notice General tests for L1CrossDomainMessenger functionality, including inherited
-///         CrossDomainMessenger behavior.
-contract L1CrossDomainMessenger_Test is L1CrossDomainMessenger_TestInit {
+/// @title L1CrossDomainMessenger_Unclassified_Test
+/// @notice General tests that are not testing any function directly of the L1CrossDomainMessenger
+///         but are testing functionality of the CrossDomainMessenger contract that is inherited
+///         from.
+contract L1CrossDomainMessenger_Unclassified_Test is L1CrossDomainMessenger_TestInit {
     /// @notice Tests that the version can be decoded from the message nonce.
     function test_messageVersion_succeeds() external view {
         (, uint16 version) = Encoding.decodeVersionedNonce(l1CrossDomainMessenger.messageNonce());
