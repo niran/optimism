@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -142,6 +143,14 @@ type ChainsDB struct {
 	emitter event.Emitter
 
 	m Metrics
+
+	// Pre-activation tracking fields
+
+	// preActivationMode tracks if we're in pre-activation mode for each chain
+	preActivationMode locks.RWMap[eth.ChainID, bool]
+
+	// preActivationHeads tracks the current head of each chain before activation
+	preActivationHeads locks.RWMap[eth.ChainID, eth.BlockRef]
 }
 
 var _ event.AttachEmitter = (*ChainsDB)(nil)
@@ -157,6 +166,23 @@ func NewChainsDB(l log.Logger, depSet depset.DependencySet, m Metrics) *ChainsDB
 		m:               m,
 		activationCheck: activation.NewCheck(depSet, l),
 	}
+
+	// Pre-initialize chains in pre-activation mode if appropriate
+	for _, chainID := range depSet.Chains() {
+		canActivate, err := depSet.CanInitiateAt(chainID, uint64(time.Now().Unix()))
+		if err != nil {
+			l.Warn("Failed to check activation status for chain", "chain", chainID, "err", err)
+			continue
+		}
+
+		if !canActivate {
+			// Chain is in pre-activation mode
+			l.Info("Setting chain to pre-activation mode", "chain", chainID)
+			db.preActivationMode.Set(chainID, true)
+		}
+	}
+
+	return db
 }
 
 func (db *ChainsDB) AttachEmitter(em event.Emitter) {

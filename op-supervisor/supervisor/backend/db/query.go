@@ -10,6 +10,30 @@ import (
 )
 
 func (db *ChainsDB) FindSealedBlock(chain eth.ChainID, number uint64) (seal types.BlockSeal, err error) {
+	// Check if in pre-activation mode
+	if db.IsInPreActivationMode(chain) {
+		head, ok := db.GetPreActivationHead(chain)
+		if !ok {
+			return types.BlockSeal{}, types.ErrFuture
+		}
+
+		// Only return the head block in pre-activation mode
+		if number != head.Number {
+			if number > head.Number {
+				return types.BlockSeal{}, types.ErrFuture
+			}
+			return types.BlockSeal{}, types.ErrConflict
+		}
+
+		// Return the head as a block seal
+		return types.BlockSeal{
+			Hash:      head.Hash,
+			Number:    head.Number,
+			Timestamp: head.Time,
+		}, nil
+	}
+
+	// Normal mode operation
 	logDB, ok := db.logDBs.Get(chain)
 	if !ok {
 		return types.BlockSeal{}, fmt.Errorf("%w: %v", types.ErrUnknownChain, chain)
@@ -68,6 +92,31 @@ func (db *ChainsDB) IsCrossUnsafe(chainID eth.ChainID, block eth.BlockID) error 
 }
 
 func (db *ChainsDB) IsLocalUnsafe(chainID eth.ChainID, block eth.BlockID) error {
+	// Check if in pre-activation mode
+	if db.IsInPreActivationMode(chainID) {
+		head, ok := db.GetPreActivationHead(chainID)
+		if !ok {
+			return types.ErrFuture
+		}
+
+		// Only the tracked head block is considered "unsafe"
+		if block.Number > head.Number {
+			return types.ErrFuture
+		} else if block.Number < head.Number {
+			// This is not a "future" block, but it's not one we track in pre-activation mode
+			return types.ErrConflict
+		}
+
+		// Check that the hash matches our tracked head
+		if block.Hash != head.Hash {
+			db.logger.Debug("Pre-activation head hash mismatch", "expected", block.Hash, "got", head.Hash)
+			return types.ErrConflict
+		}
+
+		return nil
+	}
+
+	// Normal operation
 	logDB, ok := db.logDBs.Get(chainID)
 	if !ok {
 		return types.ErrUnknownChain
@@ -83,6 +132,31 @@ func (db *ChainsDB) IsLocalUnsafe(chainID eth.ChainID, block eth.BlockID) error 
 }
 
 func (db *ChainsDB) IsCrossSafe(chainID eth.ChainID, block eth.BlockID) error {
+	// Check if in pre-activation mode
+	if db.IsInPreActivationMode(chainID) {
+		head, ok := db.GetPreActivationHead(chainID)
+		if !ok {
+			return types.ErrFuture
+		}
+
+		// Only the tracked head block is considered "safe"
+		if block.Number > head.Number {
+			return types.ErrFuture
+		} else if block.Number < head.Number {
+			// This is not a "future" block, but it's not one we track in pre-activation mode
+			return types.ErrConflict
+		}
+
+		// Check that the hash matches our tracked head
+		if block.Hash != head.Hash {
+			db.logger.Debug("Pre-activation head hash mismatch", "expected", block.Hash, "got", head.Hash)
+			return types.ErrConflict
+		}
+
+		return nil
+	}
+
+	// Normal operation
 	xdb, ok := db.crossDBs.Get(chainID)
 	if !ok {
 		return types.ErrUnknownChain
@@ -111,6 +185,31 @@ func (db *ChainsDB) findRevision(chainID eth.ChainID, block eth.BlockID) (types.
 }
 
 func (db *ChainsDB) IsLocalSafe(chainID eth.ChainID, block eth.BlockID) error {
+	// Check if in pre-activation mode
+	if db.IsInPreActivationMode(chainID) {
+		head, ok := db.GetPreActivationHead(chainID)
+		if !ok {
+			return types.ErrFuture
+		}
+
+		// Only the tracked head block is considered "safe"
+		if block.Number > head.Number {
+			return types.ErrFuture
+		} else if block.Number < head.Number {
+			// This is not a "future" block, but it's not one we track in pre-activation mode
+			return types.ErrConflict
+		}
+
+		// Check that the hash matches our tracked head
+		if block.Hash != head.Hash {
+			db.logger.Debug("Pre-activation head hash mismatch", "expected", block.Hash, "got", head.Hash)
+			return types.ErrConflict
+		}
+
+		return nil
+	}
+
+	// Normal operation
 	ldb, ok := db.localDBs.Get(chainID)
 	if !ok {
 		return types.ErrUnknownChain
@@ -150,6 +249,22 @@ func (db *ChainsDB) LocalSafeDerivedAt(chainID eth.ChainID, source eth.BlockID) 
 }
 
 func (db *ChainsDB) LocalUnsafe(chainID eth.ChainID) (types.BlockSeal, error) {
+	// Check if in pre-activation mode
+	if db.IsInPreActivationMode(chainID) {
+		head, ok := db.GetPreActivationHead(chainID)
+		if !ok {
+			return types.BlockSeal{}, types.ErrFuture
+		}
+
+		// Return the head as a block seal
+		return types.BlockSeal{
+			Hash:      head.Hash,
+			Number:    head.Number,
+			Timestamp: head.Time,
+		}, nil
+	}
+
+	// Normal operation
 	eventsDB, ok := db.logDBs.Get(chainID)
 	if !ok {
 		return types.BlockSeal{}, types.ErrUnknownChain
@@ -162,6 +277,22 @@ func (db *ChainsDB) LocalUnsafe(chainID eth.ChainID) (types.BlockSeal, error) {
 }
 
 func (db *ChainsDB) CrossUnsafe(chainID eth.ChainID) (types.BlockSeal, error) {
+	// Check if in pre-activation mode
+	if db.IsInPreActivationMode(chainID) {
+		head, ok := db.GetPreActivationHead(chainID)
+		if !ok {
+			return types.BlockSeal{}, types.ErrFuture
+		}
+
+		// Return the head as a block seal
+		return types.BlockSeal{
+			Hash:      head.Hash,
+			Number:    head.Number,
+			Timestamp: head.Time,
+		}, nil
+	}
+
+	// Normal operation
 	result, ok := db.crossUnsafe.Get(chainID)
 	if !ok {
 		return types.BlockSeal{}, types.ErrUnknownChain
@@ -202,6 +333,29 @@ func (db *ChainsDB) AcceptedBlock(chainID eth.ChainID, id eth.BlockID) error {
 }
 
 func (db *ChainsDB) LocalSafe(chainID eth.ChainID) (pair types.DerivedBlockSealPair, err error) {
+	// Check if in pre-activation mode
+	if db.IsInPreActivationMode(chainID) {
+		head, ok := db.GetPreActivationHead(chainID)
+		if !ok {
+			return types.DerivedBlockSealPair{}, types.ErrFuture
+		}
+
+		// Create a self-derived pair for the head block
+		return types.DerivedBlockSealPair{
+			Derived: types.BlockSeal{
+				Hash:      head.Hash,
+				Number:    head.Number,
+				Timestamp: head.Time,
+			},
+			Source: types.BlockSeal{
+				Hash:      head.Hash,
+				Number:    head.Number,
+				Timestamp: head.Time,
+			},
+		}, nil
+	}
+
+	// Normal operation
 	localDB, ok := db.localDBs.Get(chainID)
 	if !ok {
 		return types.DerivedBlockSealPair{}, types.ErrUnknownChain
@@ -210,6 +364,29 @@ func (db *ChainsDB) LocalSafe(chainID eth.ChainID) (pair types.DerivedBlockSealP
 }
 
 func (db *ChainsDB) CrossSafe(chainID eth.ChainID) (pair types.DerivedBlockSealPair, err error) {
+	// Check if in pre-activation mode
+	if db.IsInPreActivationMode(chainID) {
+		head, ok := db.GetPreActivationHead(chainID)
+		if !ok {
+			return types.DerivedBlockSealPair{}, types.ErrFuture
+		}
+
+		// Create a self-derived pair for the head block
+		return types.DerivedBlockSealPair{
+			Derived: types.BlockSeal{
+				Hash:      head.Hash,
+				Number:    head.Number,
+				Timestamp: head.Time,
+			},
+			Source: types.BlockSeal{
+				Hash:      head.Hash,
+				Number:    head.Number,
+				Timestamp: head.Time,
+			},
+		}, nil
+	}
+
+	// Normal operation
 	crossDB, ok := db.crossDBs.Get(chainID)
 	if !ok {
 		return types.DerivedBlockSealPair{}, types.ErrUnknownChain

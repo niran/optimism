@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/db/logs"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -786,7 +787,24 @@ func TestReadHandleCrossChainConsistency(t *testing.T) {
 
 func setupTestDB(t *testing.T) *ChainsDB {
 	logger := testlog.Logger(t, log.LvlTrace)
-	db := NewChainsDB(logger, nil, nil)
+
+	// Create a static dependency set with two chains
+	depSet, err := depset.NewStaticConfigDependencySet(
+		map[eth.ChainID]*depset.StaticConfigDependency{
+			eth.ChainID{1}: {
+				ChainIndex:     0,
+				ActivationTime: 0,
+				HistoryMinTime: 0,
+			},
+			eth.ChainID{2}: {
+				ChainIndex:     1,
+				ActivationTime: 0,
+				HistoryMinTime: 0,
+			},
+		},
+	)
+	require.NoError(t, err)
+	db := NewChainsDB(logger, depSet, nil)
 
 	// Add mock LogDBs for testing
 	chain1 := eth.ChainID{1}
