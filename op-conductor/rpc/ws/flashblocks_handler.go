@@ -77,7 +77,7 @@ func newHub() *Hub {
 	return &Hub{
 		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		unregister: make(chan *Client, 64), // Add buffer to handle multiple unregister events
 		clients:    make(map[*Client]bool),
 		done:       make(chan struct{}),
 	}
@@ -118,13 +118,10 @@ func (h *Hub) run() {
 					// Client send buffer is full, increment failure count
 					client.failureCount++
 					if client.failureCount >= client.maxFailures {
-						// Drop client after reaching max failures
-						h.clientsMu.RUnlock()
-						h.clientsMu.Lock()
-						client.Close()
-						delete(h.clients, client)
-						h.clientsMu.Unlock()
-						h.clientsMu.RLock()
+						// Send to unregister channel instead of directly manipulating the clients map
+						go func(c *Client) {
+							h.unregister <- c
+						}(client)
 					}
 				}
 			}
