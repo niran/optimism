@@ -165,7 +165,7 @@ type MultiSupervisorInteropSystemIDs struct {
 	L2B2EL stack.L2ELNodeID
 }
 
-func MultiSupervisorInteropSystem(dest *MultiSupervisorInteropSystemIDs) stack.Option {
+func MultiSupervisorInteropSystem(dest *MultiSupervisorInteropSystemIDs) stack.Option[*Orchestrator] {
 	l1ID := eth.ChainIDFromUInt64(900)
 	l2AID := eth.ChainIDFromUInt64(901)
 	l2BID := eth.ChainIDFromUInt64(902)
@@ -182,7 +182,8 @@ func MultiSupervisorInteropSystem(dest *MultiSupervisorInteropSystemIDs) stack.O
 
 	// start with default interop system
 	var parentIds DefaultInteropSystemIDs
-	opt := DefaultInteropSystem(&parentIds)
+	opt := stack.Combine[*Orchestrator]()
+	opt.Add(DefaultInteropSystem(&parentIds))
 
 	// add backup supervisor
 	opt.Add(WithSupervisor(ids.SupervisorBackup, ids.Cluster, ids.L1EL))
@@ -204,9 +205,9 @@ func MultiSupervisorInteropSystem(dest *MultiSupervisorInteropSystemIDs) stack.O
 
 	// Upon evaluation of the option, export the contents we created.
 	// Ids here are static, but other things may be exported too.
-	opt.Add(func(orch stack.Orchestrator) {
+	opt.Add(stack.Finally(func(orch *Orchestrator, hook stack.SystemHook) {
 		*dest = ids
-	})
+	}))
 
 	return opt
 }

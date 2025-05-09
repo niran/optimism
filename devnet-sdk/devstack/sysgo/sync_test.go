@@ -403,6 +403,7 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 		logger := system.T().Logger()
 		require := system.T().Require()
 
+		elA := system.L2Network(ids.L2A).L2ELNode(ids.L2AEL)
 		elA2 := system.L2Network(ids.L2A).L2ELNode(ids.L2A2EL)
 		clA := system.L2Network(ids.L2A).L2CLNode(ids.L2ACL)
 		clA2 := system.L2Network(ids.L2A).L2CLNode(ids.L2A2CL)
@@ -522,14 +523,14 @@ func TestL2CLAheadOfSupervisor(gt *testing.T) {
 
 	logger := testlog.Logger(gt, log.LevelInfo)
 
-	p := devtest.NewP(logger, func() {
+	p := devtest.NewP(context.Background(), logger, func() {
 		gt.Helper()
 		gt.FailNow()
 	})
 	gt.Cleanup(p.Close)
 
 	orch := NewOrchestrator(p)
-	opt(orch)
+	stack.ApplyOptionLifecycle(opt, orch)
 
 	t := devtest.SerialT(gt)
 	system := shim.NewSystem(t)
@@ -602,8 +603,8 @@ func TestL2CLAheadOfSupervisor(gt *testing.T) {
 		}, 60*time.Second, waitTime)
 
 		logger.Info("connect verifier CLs to primary supervisor to advance verifier safe heads")
-		WithManagedBySupervisor(ids.L2A2CL, ids.Supervisor)(orch)
-		WithManagedBySupervisor(ids.L2B2CL, ids.Supervisor)(orch)
+		WithManagedBySupervisor(ids.L2A2CL, ids.Supervisor).AfterDeploy(orch)
+		WithManagedBySupervisor(ids.L2B2CL, ids.Supervisor).AfterDeploy(orch)
 
 		targetBlockNum3 := max(querySyncStatusFromCL(clA).SafeL2.Number, querySyncStatusFromCL(clB).SafeL2.Number) + 10
 		logger.Info("every CLs advance safe heads", "target", targetBlockNum3)
@@ -656,8 +657,8 @@ func TestL2CLAheadOfSupervisor(gt *testing.T) {
 		syncB2 := querySyncStatusFromCL(clB2)
 
 		logger.Info("reconnect sequencer CLs to primary supervisor")
-		WithManagedBySupervisor(ids.L2ACL, ids.Supervisor)(orch)
-		WithManagedBySupervisor(ids.L2BCL, ids.Supervisor)(orch)
+		WithManagedBySupervisor(ids.L2ACL, ids.Supervisor).AfterDeploy(orch)
+		WithManagedBySupervisor(ids.L2BCL, ids.Supervisor).AfterDeploy(orch)
 
 		logger.Info("restart backup supervisor")
 		control.SupervisorState(ids.SupervisorBackup, stack.Start)
@@ -665,8 +666,8 @@ func TestL2CLAheadOfSupervisor(gt *testing.T) {
 		time.Sleep(waitTime)
 
 		logger.Info("reconnect verifier CLs to backup supervisor")
-		WithManagedBySupervisor(ids.L2A2CL, ids.SupervisorBackup)(orch)
-		WithManagedBySupervisor(ids.L2B2CL, ids.SupervisorBackup)(orch)
+		WithManagedBySupervisor(ids.L2A2CL, ids.SupervisorBackup).AfterDeploy(orch)
+		WithManagedBySupervisor(ids.L2B2CL, ids.SupervisorBackup).AfterDeploy(orch)
 
 		logger.Info("check verifier CLs safe head rewinded")
 		// wait for backup supervisor manage verifier CLs
