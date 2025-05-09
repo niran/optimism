@@ -20,8 +20,11 @@ func DeploySuperchain(env *Env, intent *state.Intent, st *state.State) error {
 
 	lgr.Info("deploying superchain")
 
-	dso, err := opcm.DeploySuperchain(
-		env.L1ScriptHost,
+	deploySuperchainScript, err := opcm.NewDeploySuperchainScript(env.L1ScriptHost)
+	if err != nil {
+		return fmt.Errorf("failed to load DeploySuperchain script: %w", err)
+	}
+	dso, err := deploySuperchainScript.Run(
 		opcm.DeploySuperchainInput{
 			SuperchainProxyAdminOwner:  intent.SuperchainRoles.SuperchainProxyAdminOwner,
 			ProtocolVersionsOwner:      intent.SuperchainRoles.ProtocolVersionsOwner,
