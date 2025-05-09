@@ -300,12 +300,18 @@ func (c *OpConductor) initFlashblocksHandler(ctx context.Context) error {
 	}
 
 	// Initialize the flashblocks handler
-	c.flashblocksHandler = ws.NewHandler(ws.Config{
+	handler, err := ws.NewHandler(ws.Config{
 		RollupBoostWsURL:    c.cfg.RollupBoostWsURL,
 		WebsocketServerPort: c.cfg.WebsocketServerPort,
 	}, c.log, func(ctx context.Context) bool {
 		return c.Leader(ctx)
 	})
+
+	if err != nil {
+		return errors.Wrap(err, "failed to create flashblocks handler")
+	}
+
+	c.flashblocksHandler = handler
 
 	return nil
 }
