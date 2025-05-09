@@ -54,14 +54,14 @@ func TestFindRPCEndpoints(t *testing.T) {
 	tests := []struct {
 		name         string
 		services     inspect.ServiceMap
-		findFn       func(*ServiceFinder) ([]descriptors.Node, descriptors.ServiceMap)
+		findFn       func(*ServiceFinder) ([]descriptors.Node, descriptors.RedundantServiceMap)
 		wantNodes    []descriptors.Node
-		wantServices descriptors.ServiceMap
+		wantServices descriptors.RedundantServiceMap
 	}{
 		{
 			name:     "find L1 endpoints",
 			services: testServices,
-			findFn: func(f *ServiceFinder) ([]descriptors.Node, descriptors.ServiceMap) {
+			findFn: func(f *ServiceFinder) ([]descriptors.Node, descriptors.RedundantServiceMap) {
 				return f.FindL1Services()
 			},
 			wantNodes: []descriptors.Node{
@@ -90,12 +90,12 @@ func TestFindRPCEndpoints(t *testing.T) {
 					},
 				},
 			},
-			wantServices: descriptors.ServiceMap{},
+			wantServices: descriptors.RedundantServiceMap{},
 		},
 		{
 			name:     "find op-kurtosis L2 endpoints",
 			services: testServices,
-			findFn: func(f *ServiceFinder) ([]descriptors.Node, descriptors.ServiceMap) {
+			findFn: func(f *ServiceFinder) ([]descriptors.Node, descriptors.RedundantServiceMap) {
 				return f.FindL2Services(ChainSpec{
 					ChainSpec: spec.ChainSpec{
 						Name:      "op-kurtosis",
@@ -129,11 +129,13 @@ func TestFindRPCEndpoints(t *testing.T) {
 					},
 				},
 			},
-			wantServices: descriptors.ServiceMap{
-				"batcher": &descriptors.Service{
-					Name: "op-batcher-op-kurtosis",
-					Endpoints: descriptors.EndpointMap{
-						"http": {Port: 53572},
+			wantServices: descriptors.RedundantServiceMap{
+				"batcher": []*descriptors.Service{
+					&descriptors.Service{
+						Name: "op-batcher-op-kurtosis",
+						Endpoints: descriptors.EndpointMap{
+							"http": {Port: 53572},
+						},
 					},
 				},
 			},
@@ -145,7 +147,7 @@ func TestFindRPCEndpoints(t *testing.T) {
 					"http": {Host: "custom.host", Port: 8080},
 				},
 			},
-			findFn: func(f *ServiceFinder) ([]descriptors.Node, descriptors.ServiceMap) {
+			findFn: func(f *ServiceFinder) ([]descriptors.Node, descriptors.RedundantServiceMap) {
 				return f.FindL2Services(ChainSpec{
 					ChainSpec: spec.ChainSpec{
 						Name:      "custom-host",
@@ -155,11 +157,13 @@ func TestFindRPCEndpoints(t *testing.T) {
 				})
 			},
 			wantNodes: nil,
-			wantServices: descriptors.ServiceMap{
-				"batcher": &descriptors.Service{
-					Name: "op-batcher-custom-host",
-					Endpoints: descriptors.EndpointMap{
-						"http": {Host: "custom.host", Port: 8080},
+			wantServices: descriptors.RedundantServiceMap{
+				"batcher": []*descriptors.Service{
+					&descriptors.Service{
+						Name: "op-batcher-custom-host",
+						Endpoints: descriptors.EndpointMap{
+							"http": {Host: "custom.host", Port: 8080},
+						},
 					},
 				},
 			},
@@ -266,14 +270,14 @@ func TestFindL2ServicesSkipsOtherNetworks(t *testing.T) {
 		assert.Contains(t, serviceMap, "batcher")
 		assert.Contains(t, serviceMap, "proposer")
 		assert.Contains(t, serviceMap, "common-service")
-		assert.Equal(t, "op-batcher-network2", serviceMap["batcher"].Name)
-		assert.Equal(t, "op-proposer-2222", serviceMap["proposer"].Name)
-		assert.Equal(t, "op-common-service", serviceMap["common-service"].Name)
+		assert.Equal(t, "op-batcher-network2", serviceMap["batcher"][0].Name)
+		assert.Equal(t, "op-proposer-2222", serviceMap["proposer"][0].Name)
+		assert.Equal(t, "op-common-service", serviceMap["common-service"][0].Name)
 
 		// Verify network1 and network3 services are not included
 		for _, service := range serviceMap {
-			assert.NotContains(t, service.Name, "network1")
-			assert.NotContains(t, service.Name, "network3")
+			assert.NotContains(t, service[0].Name, "network1")
+			assert.NotContains(t, service[0].Name, "network3")
 		}
 	})
 
@@ -291,7 +295,7 @@ func TestFindL2ServicesSkipsOtherNetworks(t *testing.T) {
 		assert.Len(t, nodes, 0)
 		assert.Len(t, serviceMap, 1)
 		assert.Contains(t, serviceMap, "common-service")
-		assert.Equal(t, "op-common-service", serviceMap["common-service"].Name)
+		assert.Equal(t, "op-common-service", serviceMap["common-service"][0].Name)
 	})
 }
 
@@ -436,8 +440,8 @@ func TestFindL2ServicesWithSupervisors(t *testing.T) {
 			// Verify supervisor services
 			assert.Len(t, serviceMap, 1) // just the supervisor service
 			assert.Contains(t, serviceMap, "supervisor")
-			assert.Equal(t, tt.wantName, serviceMap["supervisor"].Name)
-			assert.Equal(t, tt.wantPort, serviceMap["supervisor"].Endpoints["rpc"].Port)
+			assert.Equal(t, tt.wantName, serviceMap["supervisor"][0].Name)
+			assert.Equal(t, tt.wantPort, serviceMap["supervisor"][0].Endpoints["rpc"].Port)
 		})
 	}
 }

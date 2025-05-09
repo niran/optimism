@@ -341,7 +341,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 					L1: &descriptors.Chain{
 						ID:       "1234",
 						Name:     "Ethereum",
-						Services: make(descriptors.ServiceMap),
+						Services: make(descriptors.RedundantServiceMap),
 						Nodes: []descriptors.Node{
 							{
 								Services: l1Services,
@@ -363,7 +363,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 							Chain: &descriptors.Chain{
 								Name:     "op-kurtosis",
 								ID:       "1234",
-								Services: make(descriptors.ServiceMap),
+								Services: make(descriptors.RedundantServiceMap),
 								JWT:      testJWTs.L2JWT,
 							},
 						},
@@ -422,7 +422,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 					L1: &descriptors.Chain{
 						ID:       "1234",
 						Name:     "Ethereum",
-						Services: make(descriptors.ServiceMap),
+						Services: make(descriptors.RedundantServiceMap),
 						Nodes: []descriptors.Node{
 							{
 								Services: l1Services,
@@ -444,7 +444,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 							Chain: &descriptors.Chain{
 								Name:     "op-kurtosis",
 								ID:       "1234",
-								Services: make(descriptors.ServiceMap),
+								Services: make(descriptors.RedundantServiceMap),
 								JWT:      testJWTs.L2JWT,
 							},
 						},
@@ -483,7 +483,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 					L1: &descriptors.Chain{
 						ID:       "1234",
 						Name:     "Ethereum",
-						Services: make(descriptors.ServiceMap),
+						Services: make(descriptors.RedundantServiceMap),
 						Nodes: []descriptors.Node{
 							{
 								Services: l1Services,
@@ -505,7 +505,7 @@ func TestGetEnvironmentInfo(t *testing.T) {
 							Chain: &descriptors.Chain{
 								Name:     "op-kurtosis",
 								ID:       "1234",
-								Services: make(descriptors.ServiceMap),
+								Services: make(descriptors.RedundantServiceMap),
 								JWT:      testJWTs.L2JWT,
 							},
 						},

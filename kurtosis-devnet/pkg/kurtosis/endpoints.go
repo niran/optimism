@@ -72,7 +72,7 @@ func NewServiceFinder(services inspect.ServiceMap, opts ...ServiceFinderOption) 
 }
 
 // FindL1Services finds L1 nodes.
-func (f *ServiceFinder) FindL1Services() ([]descriptors.Node, descriptors.ServiceMap) {
+func (f *ServiceFinder) FindL1Services() ([]descriptors.Node, descriptors.RedundantServiceMap) {
 	return f.findRPCEndpoints(func(serviceName string) (string, int, bool) {
 		// Find node services and global services
 		allServices := append(f.nodeServices, f.globalServices...)
@@ -89,7 +89,7 @@ func (f *ServiceFinder) FindL1Services() ([]descriptors.Node, descriptors.Servic
 }
 
 // FindL2Services finds L2 nodes and services for a specific network
-func (f *ServiceFinder) FindL2Services(s ChainSpec) ([]descriptors.Node, descriptors.ServiceMap) {
+func (f *ServiceFinder) FindL2Services(s ChainSpec) ([]descriptors.Node, descriptors.RedundantServiceMap) {
 	network := s.Name
 	networkID := s.NetworkID
 	return f.findRPCEndpoints(func(serviceName string) (string, int, bool) {
@@ -157,8 +157,8 @@ func (f *ServiceFinder) FindL2Services(s ChainSpec) ([]descriptors.Node, descrip
 }
 
 // findRPCEndpoints looks for services matching the given predicate that have an RPC port
-func (f *ServiceFinder) findRPCEndpoints(matchService func(string) (string, int, bool)) ([]descriptors.Node, descriptors.ServiceMap) {
-	serviceMap := make(descriptors.ServiceMap)
+func (f *ServiceFinder) findRPCEndpoints(matchService func(string) (string, int, bool)) ([]descriptors.Node, descriptors.RedundantServiceMap) {
+	serviceMap := make(descriptors.RedundantServiceMap)
 	var nodes []descriptors.Node
 
 	for serviceName, ports := range f.services {
@@ -190,9 +190,11 @@ func (f *ServiceFinder) findRPCEndpoints(matchService func(string) (string, int,
 				for portName, portInfo := range ports {
 					endpoints[portName] = portInfo
 				}
-				serviceMap[serviceIdentifier] = &descriptors.Service{
-					Name:      serviceName,
-					Endpoints: endpoints,
+				serviceMap[serviceIdentifier] = []*descriptors.Service{
+					&descriptors.Service{
+						Name:      serviceName,
+						Endpoints: endpoints,
+					},
 				}
 			}
 		}
