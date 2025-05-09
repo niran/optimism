@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -30,14 +31,33 @@ type Config struct {
 
 // Client represents a connected WebSocket client
 type Client struct {
-	conn *websocket.Conn
-	send chan []byte
+	conn         *websocket.Conn
+	send         chan []byte
+	failureCount int
+	maxFailures  int
+}
+
+// Close closes the client's WebSocket connection and send channel
+func (c *Client) Close() {
+	close(c.send)
+	c.conn.Close()
+}
+
+// newClient creates a new client with default settings
+func newClient(conn *websocket.Conn) *Client {
+	return &Client{
+		conn:        conn,
+		send:        make(chan []byte, 1), // Buffer size of 1
+		maxFailures: 5,                    // Drop client after 5 consecutive failures
+	}
 }
 
 // Hub maintains the set of active clients and broadcasts messages to them
 type Hub struct {
 	// Registered clients
 	clients map[*Client]bool
+	// Mutex to protect access to clients map
+	clientsMu sync.RWMutex
 
 	// Register requests from the clients
 	register chan *Client
@@ -69,29 +89,46 @@ func (h *Hub) run() {
 		select {
 		case <-h.done:
 			// Close all client connections
+			h.clientsMu.Lock()
 			for client := range h.clients {
-				close(client.send)
+				client.Close()
 				delete(h.clients, client)
 			}
+			h.clientsMu.Unlock()
 			return
 		case client := <-h.register:
+			h.clientsMu.Lock()
 			h.clients[client] = true
+			h.clientsMu.Unlock()
 		case client := <-h.unregister:
+			h.clientsMu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.send)
+				client.Close()
 			}
+			h.clientsMu.Unlock()
 		case message := <-h.broadcast:
+			h.clientsMu.RLock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
 					// Message sent successfully
+					client.failureCount = 0 // Reset failure count on success
 				default:
-					// Client send buffer is full, drop the client
-					close(client.send)
-					delete(h.clients, client)
+					// Client send buffer is full, increment failure count
+					client.failureCount++
+					if client.failureCount >= client.maxFailures {
+						// Drop client after reaching max failures
+						h.clientsMu.RUnlock()
+						h.clientsMu.Lock()
+						client.Close()
+						delete(h.clients, client)
+						h.clientsMu.Unlock()
+						h.clientsMu.RLock()
+					}
 				}
 			}
+			h.clientsMu.RUnlock()
 		}
 	}
 }
@@ -107,13 +144,32 @@ type Handler struct {
 }
 
 // NewHandler creates a new flashblocks handler
-func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) bool) FlashblockHandler {
-	return &Handler{
+func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) bool) (FlashblockHandler, error) {
+	// Create the hub
+	hub := newHub()
+
+	// Initialize the handler
+	handler := &Handler{
 		cfg:        cfg,
 		log:        log,
 		isLeaderFn: isLeaderFn,
-		hub:        newHub(),
+		hub:        hub,
 	}
+
+	// Establish connection to rollup boost if URL is configured
+	if cfg.RollupBoostWsURL != "" {
+		log.Info("connecting to rollup boost WebSocket", "url", cfg.RollupBoostWsURL)
+		conn, _, err := websocket.DefaultDialer.Dial(cfg.RollupBoostWsURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to rollup boost WebSocket: %w", err)
+		}
+		handler.rollupBoostConn = conn
+		log.Info("connected to rollup boost WebSocket", "url", cfg.RollupBoostWsURL)
+	} else {
+		log.Info("rollup boost WebSocket disabled, no URL configured")
+	}
+
+	return handler, nil
 }
 
 // Start initializes the flashblocks handler and starts the WebSocket server and rollup boost listener
@@ -125,9 +181,9 @@ func (h *Handler) Start(ctx context.Context) error {
 		return err
 	}
 
-	// Start the rollup boost listener
-	if err := h.startRollupBoostListener(ctx); err != nil {
-		return err
+	// Start the rollup boost listener if connection exists
+	if h.rollupBoostConn != nil {
+		go h.listenToRollupBoost(ctx)
 	}
 
 	return nil
@@ -140,6 +196,7 @@ func (h *Handler) Stop() {
 
 	// Close the rollup boost connection if it exists
 	if h.rollupBoostConn != nil {
+		h.log.Info("closing rollup boost WebSocket connection due to context cancellation")
 		h.rollupBoostConn.Close()
 		h.rollupBoostConn = nil
 	}
@@ -157,7 +214,10 @@ func (h *Handler) Stop() {
 
 // BroadcastMessage sends a message to all connected WebSocket clients
 func (h *Handler) BroadcastMessage(message []byte) {
+	h.hub.clientsMu.RLock()
 	clientCount := len(h.hub.clients)
+	h.hub.clientsMu.RUnlock()
+
 	if clientCount == 0 {
 		h.log.Debug("no WebSocket clients connected, not broadcasting message")
 		return
@@ -167,53 +227,34 @@ func (h *Handler) BroadcastMessage(message []byte) {
 	h.hub.broadcast <- message
 }
 
-// startRollupBoostListener initializes and starts a WebSocket client to listen for rollup boost messages
-func (h *Handler) startRollupBoostListener(ctx context.Context) error {
-	if h.cfg.RollupBoostWsURL == "" {
-		h.log.Info("rollup boost WebSocket disabled, no URL configured")
-		return nil
-	}
-
-	// Start a goroutine to maintain the rollup boost WebSocket connection
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				if h.rollupBoostConn != nil {
-					h.log.Info("closing rollup boost WebSocket connection due to context cancellation")
-					h.rollupBoostConn.Close()
-					h.rollupBoostConn = nil
-				}
-				return
-			case <-h.hub.done:
-				return
-			default:
-				// Try to connect if not connected
-				if h.rollupBoostConn == nil {
-					conn, _, err := websocket.DefaultDialer.Dial(h.cfg.RollupBoostWsURL, nil)
-					if err != nil {
-						h.log.Error("failed to connect to rollup boost WebSocket", "err", err)
-						time.Sleep(time.Second) // delay before retry
-						continue
-					}
-					h.rollupBoostConn = conn
-					h.log.Info("connected to rollup boost WebSocket", "url", h.cfg.RollupBoostWsURL)
-				}
-
-				// Read messages from the connection
-				_, message, err := h.rollupBoostConn.ReadMessage()
-				if err != nil {
-					h.log.Warn("error reading from rollup boost WebSocket", "err", err)
-					// Don't close the connection on read errors, just try reading again
-					continue
-				}
-
-				h.handleRollupBoostMessage(ctx, message)
-			}
+// listenToRollupBoost listens for messages from the rollup boost WebSocket
+func (h *Handler) listenToRollupBoost(ctx context.Context) {
+	defer func() {
+		if h.rollupBoostConn != nil {
+			h.log.Info("closing rollup boost WebSocket connection")
+			h.rollupBoostConn.Close()
+			h.rollupBoostConn = nil
 		}
 	}()
 
-	return nil
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-h.hub.done:
+			return
+		default:
+			// Read messages from the connection
+			_, message, err := h.rollupBoostConn.ReadMessage()
+			if err != nil {
+				h.log.Warn("error reading from rollup boost WebSocket", "err", err)
+				// Connection error, exit the loop
+				return
+			}
+
+			h.handleRollupBoostMessage(ctx, message)
+		}
+	}
 }
 
 // handleRollupBoostMessage processes a message received from rollup boost
@@ -271,10 +312,7 @@ func (h *Handler) serveWs(w http.ResponseWriter, r *http.Request, upgrader webso
 		return
 	}
 
-	client := &Client{
-		conn: conn,
-		send: make(chan []byte, 256),
-	}
+	client := newClient(conn)
 
 	// Register the client with the hub
 	h.hub.register <- client
@@ -290,7 +328,7 @@ func (h *Handler) serveWs(w http.ResponseWriter, r *http.Request, upgrader webso
 // writePump pumps messages from the hub to the WebSocket connection
 func (h *Handler) writePump(client *Client) {
 	defer func() {
-		client.conn.Close()
+		client.Close()
 	}()
 
 	for message := range client.send {
@@ -307,7 +345,7 @@ func (h *Handler) readPump(client *Client) {
 	defer func() {
 		// Unregister the client when the read pump exits
 		h.hub.unregister <- client
-		client.conn.Close()
+		client.Close()
 		h.log.Info("WebSocket proxy disconnected", "remote", client.conn.RemoteAddr())
 	}()
 
