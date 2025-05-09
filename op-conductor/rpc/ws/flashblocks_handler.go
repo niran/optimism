@@ -118,10 +118,8 @@ func (h *Hub) run() {
 					// Client send buffer is full, increment failure count
 					client.failureCount++
 					if client.failureCount >= client.maxFailures {
-						// Send to unregister channel instead of directly manipulating the clients map
-						go func(c *Client) {
-							h.unregister <- c
-						}(client)
+						// Send to unregister channel - now non-blocking with buffered channel
+						h.unregister <- client
 					}
 				}
 			}
