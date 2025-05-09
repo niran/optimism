@@ -87,7 +87,7 @@ func (s *Supervisor) fetchSyncStatus() eth.SupervisorSyncStatus {
 }
 
 func (s *Supervisor) SafeBlockID(chainID eth.ChainID) eth.BlockID {
-	ctx, cancel := context.WithTimeout(s.ctx, defaultTimeout)
+	ctx, cancel := context.WithTimeout(s.ctx, DefaultTimeout)
 	defer cancel()
 	syncStatus, err := retry.Do[eth.SupervisorSyncStatus](ctx, 2, retry.Fixed(500*time.Millisecond), func() (eth.SupervisorSyncStatus, error) {
 		syncStatus, err := s.inner.QueryAPI().SyncStatus(s.ctx)
