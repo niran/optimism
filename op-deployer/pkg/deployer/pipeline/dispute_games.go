@@ -104,19 +104,24 @@ func deployDisputeGame(
 	lgr.Info("vm deployed", "vmAddr", vmAddr)
 
 	lgr.Info("deploying dispute game")
-	out, err := opcm.DeployDisputeGame(env.L1ScriptHost, opcm.DeployDisputeGameInput{
+	deployDisputeGameScript, err := opcm.NewDeployDisputeGameScript(env.L1ScriptHost)
+	if err != nil {
+		return fmt.Errorf("failed to load DeployDisputeGame script: %w", err)
+	}
+	out, err := deployDisputeGameScript.Run(opcm.DeployDisputeGameInput{
 		Release:                  "dev",
+		StandardVersionsToml:     "dev.toml",
 		VmAddress:                vmAddr,
 		GameKind:                 "FaultDisputeGame",
-		GameType:                 game.DisputeGameType,
+		GameType:                 new(big.Int).SetUint64(uint64(game.DisputeGameType)),
 		AbsolutePrestate:         game.DisputeAbsolutePrestate,
-		MaxGameDepth:             game.DisputeMaxGameDepth,
-		SplitDepth:               game.DisputeSplitDepth,
-		ClockExtension:           game.DisputeClockExtension,
-		MaxClockDuration:         game.DisputeMaxClockDuration,
+		MaxGameDepth:             new(big.Int).SetUint64(game.DisputeMaxGameDepth),
+		SplitDepth:               new(big.Int).SetUint64(game.DisputeSplitDepth),
+		ClockExtension:           new(big.Int).SetUint64(game.DisputeClockExtension),
+		MaxClockDuration:         new(big.Int).SetUint64(game.DisputeMaxClockDuration),
 		DelayedWethProxy:         thisState.OpChainContracts.DelayedWethPermissionedGameProxy,
 		AnchorStateRegistryProxy: thisState.OpChainContracts.AnchorStateRegistryProxy,
-		L2ChainId:                thisIntent.ID,
+		L2ChainId:                new(big.Int).SetBytes(thisIntent.ID.Bytes()),
 		Proposer:                 thisIntent.Roles.Proposer,
 		Challenger:               thisIntent.Roles.Challenger,
 	})
