@@ -1,6 +1,7 @@
 package opcm
 
 import (
+	"encoding/json"
 	"math/big"
 	"testing"
 
@@ -132,21 +133,11 @@ func TestNewDeployOPChainScript(t *testing.T) {
 		require.NotNil(t, deprecatedOutput)
 
 		// Now make sure the addresses are the same
-		require.Equal(t, deprecatedOutput.OpChainProxyAdmin, output.OpChainProxyAdmin)
-		require.Equal(t, deprecatedOutput.AddressManager, output.AddressManager)
-		require.Equal(t, deprecatedOutput.L1ERC721BridgeProxy, output.L1ERC721BridgeProxy)
-		require.Equal(t, deprecatedOutput.SystemConfigProxy, output.SystemConfigProxy)
-		require.Equal(t, deprecatedOutput.OptimismMintableERC20FactoryProxy, output.OptimismMintableERC20FactoryProxy)
-		require.Equal(t, deprecatedOutput.L1StandardBridgeProxy, output.L1StandardBridgeProxy)
-		require.Equal(t, deprecatedOutput.L1CrossDomainMessengerProxy, output.L1CrossDomainMessengerProxy)
-		require.Equal(t, deprecatedOutput.OptimismPortalProxy, output.OptimismPortalProxy)
-		require.Equal(t, deprecatedOutput.ETHLockboxProxy, output.EthLockboxProxy)
-		require.Equal(t, deprecatedOutput.DisputeGameFactoryProxy, output.DisputeGameFactoryProxy)
-		require.Equal(t, deprecatedOutput.AnchorStateRegistryProxy, output.AnchorStateRegistryProxy)
-		require.Equal(t, deprecatedOutput.FaultDisputeGame, output.FaultDisputeGame)
-		require.Equal(t, deprecatedOutput.PermissionedDisputeGame, output.PermissionedDisputeGame)
-		require.Equal(t, deprecatedOutput.DelayedWETHPermissionedGameProxy, output.DelayedWETHPermissionedGameProxy)
-		require.Equal(t, deprecatedOutput.DelayedWETHPermissionlessGameProxy, output.DelayedWETHPermissionlessGameProxy)
+		deprecatedJSON, err := json.Marshal(deprecatedOutput)
+		require.NoError(t, err)
+		outputJSON, err := json.Marshal(output)
+		require.NoError(t, err)
+		require.JSONEq(t, string(deprecatedJSON), string(outputJSON))
 
 		// And just to be super sure we also compare the code deployed to the addresses
 		require.Equal(t, host2.GetCode(deprecatedOutput.OpChainProxyAdmin), host1.GetCode(output.OpChainProxyAdmin))
@@ -157,7 +148,7 @@ func TestNewDeployOPChainScript(t *testing.T) {
 		require.Equal(t, host2.GetCode(deprecatedOutput.L1StandardBridgeProxy), host1.GetCode(output.L1StandardBridgeProxy))
 		require.Equal(t, host2.GetCode(deprecatedOutput.L1CrossDomainMessengerProxy), host1.GetCode(output.L1CrossDomainMessengerProxy))
 		require.Equal(t, host2.GetCode(deprecatedOutput.OptimismPortalProxy), host1.GetCode(output.OptimismPortalProxy))
-		require.Equal(t, host2.GetCode(deprecatedOutput.ETHLockboxProxy), host1.GetCode(output.EthLockboxProxy))
+		require.Equal(t, host2.GetCode(deprecatedOutput.ETHLockboxProxy), host1.GetCode(output.ETHLockboxProxy))
 		require.Equal(t, host2.GetCode(deprecatedOutput.DisputeGameFactoryProxy), host1.GetCode(output.DisputeGameFactoryProxy))
 		require.Equal(t, host2.GetCode(deprecatedOutput.AnchorStateRegistryProxy), host1.GetCode(output.AnchorStateRegistryProxy))
 		require.Equal(t, host2.GetCode(deprecatedOutput.FaultDisputeGame), host1.GetCode(output.FaultDisputeGame))

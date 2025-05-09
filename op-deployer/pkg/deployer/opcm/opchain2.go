@@ -49,7 +49,7 @@ type DeployOPChainOutput2 struct {
 	L1CrossDomainMessengerProxy       common.Address
 	// Fault proof contracts below.
 	OptimismPortalProxy                common.Address
-	EthLockboxProxy                    common.Address
+	ETHLockboxProxy                    common.Address `abi:"ethLockboxProxy"`
 	DisputeGameFactoryProxy            common.Address
 	AnchorStateRegistryProxy           common.Address
 	FaultDisputeGame                   common.Address
