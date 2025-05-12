@@ -55,17 +55,12 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
     bytes32 internal constant CROSS_DOMAIN_MESSAGE_SOURCE_SLOT =
         0x711dfa3259c842fffc17d6e1f1e0fc5927756133a2345ca56b4cb8178589fee7;
 
-    /// @notice Event selector for the SentMessage event. Will be removed in favor of reading
-    //          the `selector` property directly once crytic/slithe/#2566 is fixed.
-    bytes32 internal constant SENT_MESSAGE_EVENT_SELECTOR =
-        0x382409ac69001e11931a28435afef442cbfd20d9891907e8fa373ba7d351f320;
-
     /// @notice Current message version identifier.
     uint16 public constant messageVersion = uint16(0);
 
     /// @notice Semantic version.
-    /// @custom:semver 1.2.0
-    string public constant version = "1.2.0";
+    /// @custom:semver 1.3.0
+    string public constant version = "1.3.0";
 
     /// @notice Mapping of message hashes to boolean receipt values. Note that a message will only be present in this
     ///         mapping if it has successfully been relayed on this chain, and can therefore not be relayed again.
@@ -86,8 +81,14 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
     /// @param messageNonce Nonce associated with the message sent
     /// @param sender       Address initiating this message call
     /// @param message      Message payload to call target with.
+    /// @param context      Context of the message.
     event SentMessage(
-        uint256 indexed destination, address indexed target, uint256 indexed messageNonce, address sender, bytes message
+        uint256 indexed destination,
+        address indexed target,
+        uint256 indexed messageNonce,
+        address sender,
+        bytes message,
+        bytes context
     );
 
     /// @notice Emitted whenever a message is successfully relayed on this chain.
@@ -145,19 +146,22 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
         if (_target == Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER) revert MessageTargetL2ToL2CrossDomainMessenger();
 
         uint256 nonce = messageNonce();
+        bytes memory context = "";
+
         messageHash_ = Hashing.hashL2toL2CrossDomainMessage({
             _destination: _destination,
             _source: block.chainid,
             _nonce: nonce,
             _sender: msg.sender,
             _target: _target,
-            _message: _message
+            _message: _message,
+            _context: context
         });
 
         sentMessages[messageHash_] = true;
         msgNonce++;
 
-        emit SentMessage(_destination, _target, nonce, msg.sender, _message);
+        emit SentMessage(_destination, _target, nonce, msg.sender, _message, context);
     }
 
     /// @notice Re-emits a previously sent message event for old messages that haven't been
@@ -169,13 +173,15 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
     /// @param _sender Address that sent the message
     /// @param _target Target contract or wallet address.
     /// @param _message Message payload to call target with.
+    /// @param _context The context of the message.
     /// @return messageHash_ The hash of the message being re-sent.
     function resendMessage(
         uint256 _destination,
         uint256 _nonce,
         address _sender,
         address _target,
-        bytes calldata _message
+        bytes calldata _message,
+        bytes calldata _context
     )
         external
         returns (bytes32 messageHash_)
@@ -186,12 +192,13 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
             _nonce: _nonce,
             _sender: _sender,
             _target: _target,
-            _message: _message
+            _message: _message,
+            _context: _context
         });
 
         if (!sentMessages[messageHash_]) revert InvalidMessage();
 
-        emit SentMessage(_destination, _target, _nonce, _sender, _message);
+        emit SentMessage(_destination, _target, _nonce, _sender, _message, _context);
     }
 
     /// @notice Relays a message that was sent by the other L2ToL2CrossDomainMessenger contract. Can only be executed
@@ -218,8 +225,8 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
         ICrossL2Inbox(Predeploys.CROSS_L2_INBOX).validateMessage(_id, keccak256(_sentMessage));
 
         // Decode the payload
-        (uint256 destination, address target, uint256 nonce, address sender, bytes memory message) =
-            _decodeSentMessagePayload(_sentMessage);
+        (uint256 destination, address target, uint256 nonce, address sender, bytes memory message, bytes memory context)
+        = _decodeSentMessagePayload(_sentMessage);
 
         // Assert invariants on the message
         if (destination != block.chainid) revert MessageDestinationNotRelayChain();
@@ -231,7 +238,8 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
             _nonce: nonce,
             _sender: sender,
             _target: target,
-            _message: message
+            _message: message,
+            _context: context
         });
 
         if (successfulMessages[messageHash]) {
@@ -287,16 +295,23 @@ contract L2ToL2CrossDomainMessenger is ISemver, TransientReentrancyAware {
     function _decodeSentMessagePayload(bytes calldata _payload)
         internal
         pure
-        returns (uint256 destination_, address target_, uint256 nonce_, address sender_, bytes memory message_)
+        returns (
+            uint256 destination_,
+            address target_,
+            uint256 nonce_,
+            address sender_,
+            bytes memory message_,
+            bytes memory context_
+        )
     {
         // Validate Selector (also reverts if LOG0 with no topics)
         bytes32 selector = abi.decode(_payload[:32], (bytes32));
-        if (selector != SENT_MESSAGE_EVENT_SELECTOR) revert EventPayloadNotSentMessage();
+        if (selector != SentMessage.selector) revert EventPayloadNotSentMessage();
 
         // Topics
         (destination_, target_, nonce_) = abi.decode(_payload[32:128], (uint256, address, uint256));
 
         // Data
-        (sender_, message_) = abi.decode(_payload[128:], (address, bytes));
+        (sender_, message_, context_) = abi.decode(_payload[128:], (address, bytes, bytes));
     }
 }
