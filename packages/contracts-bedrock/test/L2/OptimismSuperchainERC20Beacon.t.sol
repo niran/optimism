@@ -22,7 +22,8 @@ contract OptimismSuperchainERC20Beacon_TestInit is CommonTest {
 }
 
 /// @title OptimismSuperchainERC20Beacon_Implementation_Test
-/// @notice Contract for testing the `implementation` function of the `OptimismSuperchainERC20Beacon` contract.
+/// @notice Contract for testing the `implementation` function of the
+///         `OptimismSuperchainERC20Beacon` contract.
 contract OptimismSuperchainERC20Beacon_Implementation_Test is OptimismSuperchainERC20Beacon_TestInit {
     /// @notice Test that calling the implementation function returns the correct implementation address.
     function test_implementation_isCorrect_works() public view {

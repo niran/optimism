@@ -17,7 +17,7 @@ contract WETH_Name_Test is CommonTest {
         assertEq(string.concat("Wrapped ", _gasPayingTokenName), weth.name());
     }
 
-    /// @notice Tests that the `name` function returns the correct value.
+    /// @notice Tests that the `name` function returns 'Wrapped Ether' by default.
     function test_name_ether_succeeds() external view {
         assertEq("Wrapped Ether", weth.name());
     }
@@ -35,7 +35,7 @@ contract WETH_Symbol_Test is CommonTest {
         assertEq(string.concat("W", _gasPayingTokenSymbol), weth.symbol());
     }
 
-    /// @notice Tests that the `symbol` function returns the correct value.
+    /// @notice Tests that the `symbol` function returns 'WETH' by default.
     function test_symbol_ether_succeeds() external view {
         assertEq("WETH", weth.symbol());
     }
