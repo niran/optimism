@@ -2,7 +2,7 @@ package oraclebenchmark
 
 import (
 	"fmt"
-	"math/rand/v2"
+	mathrand "math/rand"
 
 	"github.com/ethereum-optimism/optimism/op-program/client/boot"
 	"github.com/ethereum-optimism/optimism/op-program/client/l2"
@@ -47,6 +47,8 @@ func RunOracleBenchmark(
 		return ForwardsQueryPattern(logger, canonOracle, head, bootInfo.QueryNumber, bootInfo.QueryHash)
 	case boot.CanonOracleQueryPatternBackward:
 		return BackwardsQueryPattern(logger, canonOracle, head, bootInfo.QueryNumber, bootInfo.QueryHash)
+	case boot.CanonOracleQueryPatternRandom:
+		return RandomQueryPattern(logger, canonOracle, head, bootInfo.QueryNumber, bootInfo.QueryHash)
 	default:
 		panic(fmt.Sprintf("invalid query pattern: %v", bootInfo.QueryPattern))
 	}
@@ -60,9 +62,17 @@ func SingleQuery(log log.Logger, oracle *l2.FastCanonicalBlockHeaderOracle, quer
 	return nil
 }
 
+// relates to the maximum number of executing messages in a single block
+const maxQueries = 2000
+
 func ForwardsQueryPattern(log log.Logger, oracle *l2.FastCanonicalBlockHeaderOracle, head *ethtypes.Block, queryNumber uint64, queryHash common.Hash) error {
-	start := head.Number().Uint64()
-	for i := queryNumber; i <= start; i++ {
+	start := queryNumber
+	end := head.Number().Uint64()
+	if end-start > maxQueries {
+		end = start + maxQueries
+		log.Info("Forwards query pattern minimized", "start", start, "end", end)
+	}
+	for i := start; i <= end; i++ {
 		log.Info("Query fetching head", "number", i)
 		fetchedHead := oracle.GetHeaderByNumber(i)
 		if queryNumber == i {
@@ -76,7 +86,12 @@ func ForwardsQueryPattern(log log.Logger, oracle *l2.FastCanonicalBlockHeaderOra
 
 func BackwardsQueryPattern(log log.Logger, oracle *l2.FastCanonicalBlockHeaderOracle, head *ethtypes.Block, queryNumber uint64, queryHash common.Hash) error {
 	start := head.Number().Uint64()
-	for i := start; i >= queryNumber; i-- {
+	end := queryNumber
+	if end-start > maxQueries {
+		end = start - maxQueries
+		log.Info("Backwards query pattern minimized", "start", start, "end", end)
+	}
+	for i := start; i >= end; i-- {
 		log.Info("Query fetching head", "number", i)
 		fetchedHead := oracle.GetHeaderByNumber(i)
 		if queryNumber == i {
@@ -90,22 +105,26 @@ func BackwardsQueryPattern(log log.Logger, oracle *l2.FastCanonicalBlockHeaderOr
 
 func RandomQueryPattern(log log.Logger, oracle *l2.FastCanonicalBlockHeaderOracle, head *ethtypes.Block, queryNumber uint64, queryHash common.Hash) error {
 	var accesses []uint64
-	for i := uint64(0); i < queryNumber; i++ {
+	start := queryNumber
+	end := head.Number().Uint64()
+	for i := start; i < end; i++ {
 		accesses = append(accesses, i)
 	}
 
-	var seed [32]byte
-	copy(seed[:], head.Hash().Bytes()[:32])
-	randSource := rand.NewChaCha8(seed)
-	r := rand.New(randSource)
+	src := mathrand.NewSource(int64(queryNumber))
+	r := mathrand.New(src)
 	r.Shuffle(len(accesses), func(i, j int) {
 		accesses[i], accesses[j] = accesses[j], accesses[i]
 	})
 
-	for _, access := range accesses {
+	for i, access := range accesses {
 		log.Info("Query fetching head", "number", access)
 		fetchedHead := oracle.GetHeaderByNumber(access)
 		_ = fetchedHead
+		if i >= maxQueries {
+			log.Info("Random query pattern minimized", "num_accesses", len(accesses))
+			break
+		}
 	}
 	return nil
 }
