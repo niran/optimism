@@ -1,6 +1,8 @@
 package ws
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -67,29 +69,20 @@ func (h *Hub) run() {
 			}
 			h.clientsMu.Unlock()
 		case message := <-h.broadcast:
-			h.clientsMu.RLock()
+			h.clientsMu.Lock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
-					// Message sent successfully
-					client.failureCount = 0 // Reset failure count on success
+					client.failureCount = 0
 				default:
-					// Client send buffer is full, increment failure count
 					client.failureCount++
 					if client.failureCount >= maxClientFailures {
-						// Try to unregister, but don't block if channel is full
-						select {
-						case h.unregister <- client:
-							// Successfully queued for unregistration
-						default:
-							// Unregister channel is full, we'll try again next loop
-							log.Warn("Unregister channel full, client will be retried next loop",
-								"remote", client.conn.RemoteAddr())
-						}
+						delete(h.clients, client)
+						client.Close()
 					}
 				}
 			}
-			h.clientsMu.RUnlock()
+			h.clientsMu.Unlock()
 		}
 	}
 }
@@ -136,44 +129,152 @@ func (h *Handler) serveWs(w http.ResponseWriter, r *http.Request, upgrader webso
 	h.readPump(client)
 }
 
-// writePump pumps messages from the hub to the WebSocket connection
-func (h *Handler) writePump(client *Client) {
-	defer func() {
-		// The client.Close() will be called here
-		// The readPump will handle unregistering the client
-	}()
-
-	for message := range client.send {
-		// Set a short write deadline to prevent slow clients from blocking
-		client.conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
-
-		err := client.conn.WriteMessage(websocket.TextMessage, message)
-		if err != nil {
-			h.log.Error("error writing to WebSocket client", "err", err, "remote", client.conn.RemoteAddr())
-			// Break the loop, which will trigger the defer and close the client
-			break
-		}
-	}
-}
-
 // readPump pumps messages from the WebSocket connection to the hub
 func (h *Handler) readPump(client *Client) {
 	defer func() {
 		// Unregister the client when the read pump exits
 		h.hub.unregister <- client
 		client.Close()
-		h.log.Info("WebSocket proxy disconnected", "remote", client.conn.RemoteAddr())
+		h.log.Info("WebSocket read pump exited, client unregistered", "remote", client.conn.RemoteAddr())
 	}()
 
-	// Set read deadline to detect closed connections
+	// Set up pong handler to respond to pings
+	client.conn.SetPongHandler(func(string) error {
+		// Reset read deadline when we get a pong
+		client.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+
 	for {
-		client.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		// Check if we're the leader
+		ctx := context.Background()
+		isLeader := h.isLeaderFn(ctx)
+
+		if isLeader {
+			// As leader, we expect to be sending blocks regularly
+			// Set a timeout to detect if something is wrong
+			client.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		} else {
+			// As non-leader, we don't expect to send anything
+			// Set a longer timeout to allow for ping/pong
+			client.conn.SetReadDeadline(time.Now().Add(120 * time.Second))
+		}
+
+		// Read from the connection
 		_, _, err := client.conn.ReadMessage()
+
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err) || !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				h.log.Warn("WebSocket connection closed by client", "err", err, "remote", client.conn.RemoteAddr())
+			if isLeader {
+				// If we're the leader and there's an error, log and break
+				h.log.Warn("Error reading from WebSocket client as leader", "err", err, "remote", client.conn.RemoteAddr())
+				break
+			} else if websocket.IsUnexpectedCloseError(err) {
+				// If it's an unexpected close, log and break
+				h.log.Warn("WebSocket connection closed unexpectedly", "err", err, "remote", client.conn.RemoteAddr())
+				break
+			} else if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				// If it's a timeout and we're not the leader, just log and continue
+				h.log.Debug("Read timeout as non-leader, continuing", "remote", client.conn.RemoteAddr())
+				continue
+			} else {
+				// For other errors, log and break
+				h.log.Warn("Error reading from WebSocket client", "err", err, "remote", client.conn.RemoteAddr())
+				break
 			}
-			break
+		}
+	}
+}
+
+// writePump pumps messages from the hub to the WebSocket connection
+func (h *Handler) writePump(client *Client) {
+	defer func() {
+		// Unregister client if not already done by readPump
+		select {
+		case h.hub.unregister <- client:
+			h.log.Debug("Unregistered client from writePump", "remote", client.conn.RemoteAddr())
+		default:
+			// If channel is full or client already unregistered, just log
+			h.log.Debug("Client may already be unregistered", "remote", client.conn.RemoteAddr())
+		}
+
+		// Close the client connection
+		client.Close()
+	}()
+
+	// Configure ping for connection keepalive
+	pingPeriod := 30 * time.Second
+	pingTicker := time.NewTicker(pingPeriod)
+	defer pingTicker.Stop()
+
+	// Track consecutive failures
+	consecutiveFailures := 0
+	maxConsecutiveFailures := 5 // Allow up to 5 consecutive failures before disconnecting
+
+	for {
+		select {
+		case message, ok := <-client.send:
+			if !ok {
+				// The hub closed the channel, exit the write pump
+				h.log.Debug("Client send channel closed", "remote", client.conn.RemoteAddr())
+				return
+			}
+
+			// Set a short write deadline to prevent slow clients from blocking
+			client.conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
+			err := client.conn.WriteMessage(websocket.TextMessage, message)
+
+			if err != nil {
+				consecutiveFailures++
+				h.log.Warn("error writing to WebSocket client",
+					"err", err,
+					"remote", client.conn.RemoteAddr(),
+					"consecutiveFailures", consecutiveFailures,
+					"maxAllowed", maxConsecutiveFailures)
+
+				// Only break the loop if we've had too many consecutive failures
+				if consecutiveFailures >= maxConsecutiveFailures {
+					h.log.Error("too many consecutive write failures, disconnecting client",
+						"remote", client.conn.RemoteAddr(),
+						"failures", consecutiveFailures)
+					return
+				}
+
+				// Continue processing other messages
+				continue
+			}
+
+			// Reset failure counter on successful write
+			if consecutiveFailures > 0 {
+				h.log.Debug("successful write after previous failures",
+					"remote", client.conn.RemoteAddr(),
+					"resetFailureCount", consecutiveFailures)
+				consecutiveFailures = 0
+			}
+
+		case <-pingTicker.C:
+			// Only send ping if we're not the leader
+			ctx := context.Background()
+			if !h.isLeaderFn(ctx) {
+				// Send a ping to keep the connection alive
+				client.conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
+				if err := client.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					h.log.Warn("error sending ping to client", "err", err, "remote", client.conn.RemoteAddr())
+					consecutiveFailures++
+
+					// Only break the loop if we've had too many consecutive failures
+					if consecutiveFailures >= maxConsecutiveFailures {
+						h.log.Error("too many consecutive ping failures, disconnecting client",
+							"remote", client.conn.RemoteAddr(),
+							"failures", consecutiveFailures)
+						return
+					}
+				} else {
+					// Reset failure counter on successful ping
+					if consecutiveFailures > 0 {
+						consecutiveFailures = 0
+					}
+				}
+			}
 		}
 	}
 }

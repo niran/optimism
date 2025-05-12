@@ -66,21 +66,51 @@ func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) boo
 		hub:        hub,
 	}
 
-	// Establish connection to rollup boost if URL is configured
+	// If rollup boost URL is not configured, return early
 	if cfg.RollupBoostWsURL == "" {
 		log.Info("rollup boost WebSocket disabled, no URL configured")
 		return handler, nil
 	}
 
-	log.Info("connecting to rollup boost WebSocket", "url", cfg.RollupBoostWsURL)
-	conn, _, err := websocket.DefaultDialer.Dial(cfg.RollupBoostWsURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to rollup boost WebSocket: %w", err)
-	}
-	handler.rollupBoostConn = conn
-	log.Info("connected to rollup boost WebSocket", "url", cfg.RollupBoostWsURL)
+	// retry logic for initial connection
+	var conn *websocket.Conn
+	var lastErr error
 
-	return handler, nil
+	// Create a context with timeout for the initial connection attempts
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Try to connect with retries
+	for retryCount := range maxReconnectAttempts {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timeout connecting to rollup boost WebSocket: %w", ctx.Err())
+		default:
+			conn, _, lastErr = websocket.DefaultDialer.Dial(cfg.RollupBoostWsURL, nil)
+			if lastErr == nil {
+				// Successfully connected
+				handler.rollupBoostConn = conn
+				log.Info("connected to rollup boost WebSocket", "url", cfg.RollupBoostWsURL)
+				return handler, nil
+			}
+
+			// Log the error and retry after delay
+			log.Warn("failed to connect to rollup boost WebSocket, will retry",
+				"err", lastErr,
+				"attempt", retryCount+1,
+				"maxAttempts", maxReconnectAttempts,
+				"retryIn", reconnectDelay)
+
+			// Don't sleep on the last attempt
+			if retryCount < maxReconnectAttempts-1 {
+				time.Sleep(reconnectDelay)
+			}
+		}
+	}
+
+	// If we've exhausted all retry attempts without success, return the error
+	return nil, fmt.Errorf("failed to connect to rollup boost WebSocket after %d attempts: %w",
+		maxReconnectAttempts, lastErr)
 }
 
 // BroadcastMessage sends a message to all connected WebSocket clients

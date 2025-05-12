@@ -91,16 +91,6 @@ func (h *Handler) startWebSocketServer(_ context.Context) error {
 
 // listenToRollupBoost listens for messages from the rollup boost WebSocket
 func (h *Handler) listenToRollupBoost(ctx context.Context) {
-	defer func() {
-		if h.rollupBoostConn != nil {
-			h.log.Info("closing rollup boost WebSocket connection")
-			h.rollupBoostConn.Close()
-			h.rollupBoostConn = nil
-		}
-	}()
-
-	retryCount := 0
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -108,25 +98,22 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 		case <-h.hub.done:
 			return
 		default:
-			// Check if connection is nil and try to reconnect
+			// Check if connection is nil and try to connect/reconnect
 			if h.rollupBoostConn == nil {
-				if retryCount >= maxReconnectAttempts {
-					h.log.Error("exceeded maximum reconnection attempts to rollup boost WebSocket", "maxRetries", maxReconnectAttempts)
-					return
-				}
+				h.log.Info("attempting to connect to rollup boost WebSocket", "url", h.cfg.RollupBoostWsURL)
 
-				h.log.Info("attempting to connect to rollup boost WebSocket", "url", h.cfg.RollupBoostWsURL, "attempt", retryCount+1)
+				// Try indefinitely to connect to rollup boost
 				conn, _, err := websocket.DefaultDialer.Dial(h.cfg.RollupBoostWsURL, nil)
 				if err != nil {
-					retryCount++
-					h.log.Warn("failed to connect to rollup boost WebSocket, will retry", "err", err, "retryIn", reconnectDelay)
+					h.log.Warn("failed to connect to rollup boost WebSocket, will retry",
+						"err", err,
+						"retryIn", reconnectDelay)
 					time.Sleep(reconnectDelay)
 					continue
 				}
 
 				h.rollupBoostConn = conn
-				h.log.Info("successfully reconnected to rollup boost WebSocket")
-				retryCount = 0 // Reset retry counter on successful connection
+				h.log.Info("successfully connected to rollup boost WebSocket")
 			}
 
 			// Read messages from the connection
