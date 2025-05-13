@@ -29,6 +29,10 @@ type Service struct {
 // ServiceMap is a map of service names to services.
 type ServiceMap map[string]*Service
 
+// RedundantServiceMap is a map of service names to services.
+// It is used to represent services that are redundant, i.e. they can have multiple instances.
+type RedundantServiceMap map[string][]*Service
+
 // Node represents a node for a chain
 type Node struct {
 	Name     string     `json:"name"`
@@ -41,7 +45,7 @@ type AddressMap map[string]types.Address
 type Chain struct {
 	Name      string              `json:"name"`
 	ID        string              `json:"id,omitempty"`
-	Services  ServiceMap          `json:"services,omitempty"`
+	Services  RedundantServiceMap `json:"services,omitempty"`
 	Nodes     []Node              `json:"nodes"`
 	Wallets   WalletMap           `json:"wallets,omitempty"`
 	JWT       string              `json:"jwt,omitempty"`

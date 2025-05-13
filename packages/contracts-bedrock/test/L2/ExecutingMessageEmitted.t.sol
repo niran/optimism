@@ -13,8 +13,9 @@ import { IL2ToL2CrossDomainMessenger, Identifier } from "interfaces/L2/IL2ToL2Cr
 import { Identifier as CrossL2InboxIdentifier } from "interfaces/L2/ICrossL2Inbox.sol";
 import { ISuperchainTokenBridge } from "interfaces/L2/ISuperchainTokenBridge.sol";
 
-/// @notice Integration test that checks that the `ExecutingMessage` event is emitted on crosschain mints.
-contract ExecutingMessageEmittedTest is CommonTest {
+/// @title ExecutingMessageEmitted_TestInit
+/// @notice Reusable test initialization for ExecutingMessageEmitted tests.
+contract ExecutingMessageEmitted_TestInit is CommonTest {
     bytes32 internal constant SENT_MESSAGE_EVENT_SELECTOR =
         0x382409ac69001e11931a28435afef442cbfd20d9891907e8fa373ba7d351f320;
 
@@ -42,8 +43,14 @@ contract ExecutingMessageEmittedTest is CommonTest {
 
         vm.etch(superchainERC20, vm.getDeployedCode("OptimismSuperchainERC20.sol:OptimismSuperchainERC20"));
     }
+}
 
-    /// @notice Tests that when `SuperchainERC20#crosschainMint` is called, the `ExecutingMessage` event is emitted.
+/// @title ExecutingMessageEmittedTest
+/// @notice Integration test that checks that the `ExecutingMessage` event is emitted on crosschain
+///         mints.
+contract ExecutingMessageEmitted_Test is ExecutingMessageEmitted_TestInit {
+    /// @notice Tests that when `SuperchainERC20#crosschainMint` is called, the `ExecutingMessage`
+    ///         event is emitted.
     /// forge-config: default.isolate = true
     function test_superchainERC20CrosschainMint_emitsExecutingMessage_succeeds(
         Identifier memory _id,
@@ -57,9 +64,10 @@ contract ExecutingMessageEmittedTest is CommonTest {
         _crosschainMint_emitsExecutingMessage_succeeds(superchainERC20, _id, _nonce, _sender, _to, _amount);
     }
 
-    /// @notice Tests that when a super token mint is relayed, the `ExecutingMessage` event is emitted.
-    /// @dev Using 2 different `Identifier` and `CrossL2InboxIdentifier` structs type, when it's the same type to avoid
-    ///      a compiler error due to a type mismatch.
+    /// @notice Tests that when a super token mint is relayed, the `ExecutingMessage` event is
+    ///         emitted.
+    /// @dev Using 2 different `Identifier` and `CrossL2InboxIdentifier` structs type, when it's
+    ///      the same type to avoid a compiler error due to a type mismatch.
     function _crosschainMint_emitsExecutingMessage_succeeds(
         address _token,
         Identifier memory _id,
@@ -70,7 +78,8 @@ contract ExecutingMessageEmittedTest is CommonTest {
     )
         internal
     {
-        // Ensure that the target contract is not CrossL2Inbox or L2ToL2CrossDomain- or the foundry VM
+        // Ensure that the target contract is not CrossL2Inbox or L2ToL2CrossDomain- or the foundry
+        // VM.
         vm.assume(_to != address(crossL2Inbox) && _to != address(MESSENGER) && _to != FOUNDRY_VM_ADDRESS);
 
         // Ensure that the target is not a forge address.
