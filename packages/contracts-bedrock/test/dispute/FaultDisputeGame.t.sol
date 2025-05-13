@@ -36,10 +36,19 @@ contract FaultDisputeGame_Init is DisputeGameFactory_Init {
     /// @dev The initial bond for the game.
     uint256 internal initBond;
 
+    /// @dev The preimage of the absolute prestate claim
+    bytes internal absolutePrestateData;
+    /// @dev The absolute prestate of the trace.
+    Claim internal absolutePrestate;
+
     /// @dev The implementation of the game.
     IFaultDisputeGame internal gameImpl;
     /// @dev The `Clone` proxy of the game.
     IFaultDisputeGame internal gameProxy;
+
+    IFaultDisputeGame.GameConstructorParams internal fdgConstructorParams;
+    IPreimageOracle internal oracle;
+    AlphabetVM internal alphabetVM;
 
     /// @dev The extra data passed to the game for initialization.
     bytes internal extraData;
@@ -54,6 +63,31 @@ contract FaultDisputeGame_Init is DisputeGameFactory_Init {
         if (!isForkTest()) {
             vm.warp(1690906994);
         }
+
+        oracle = IPreimageOracle(
+            DeployUtils.create1({
+                _name: "PreimageOracle",
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 0)))
+            })
+        );
+        alphabetVM = new AlphabetVM(absolutePrestate, oracle);
+
+        absolutePrestateData = abi.encode(0);
+
+        absolutePrestate = _changeClaimStatus(Claim.wrap(keccak256(absolutePrestateData)), VMStatuses.UNFINISHED);
+
+        fdgConstructorParams = IFaultDisputeGame.GameConstructorParams({
+            gameType: GAME_TYPE,
+            absolutePrestate: absolutePrestate,
+            maxGameDepth: 16,
+            splitDepth: 8,
+            clockExtension: Duration.wrap(3 hours),
+            maxClockDuration: Duration.wrap(3.5 days),
+            vm: alphabetVM,
+            weth: IDelayedWETH(payable(address(0))),
+            anchorStateRegistry: IAnchorStateRegistry(address(0)),
+            l2ChainId: 10
+        });
 
         // Set the extra data for the game creation
         extraData = abi.encode(l2BlockNumber);
@@ -100,10 +134,6 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
     /// @dev An arbitrary root claim for testing.
     Claim internal arbitaryRootClaim = Claim.wrap(bytes32(uint256(123)));
 
-    /// @dev The preimage of the absolute prestate claim
-    bytes internal absolutePrestateData;
-    /// @dev The absolute prestate of the trace.
-    Claim internal absolutePrestate;
     /// @dev A valid l2BlockNumber that comes after the current anchor root block.
     uint256 internal validL2BlockNumber;
 
@@ -129,37 +159,12 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
     /// @dev Tests that the constructor of the `FaultDisputeGame` reverts when the `MAX_GAME_DEPTH` parameter is
     ///      greater  than `LibPosition.MAX_POSITION_BITLEN - 1`.
     function testFuzz_constructor_maxDepthTooLarge_reverts(uint256 _maxGameDepth) public {
-        IPreimageOracle oracle = IPreimageOracle(
-            DeployUtils.create1({
-                _name: "PreimageOracle",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 0)))
-            })
-        );
-        AlphabetVM alphabetVM = new AlphabetVM(absolutePrestate, oracle);
+        fdgConstructorParams.maxGameDepth = bound(_maxGameDepth, LibPosition.MAX_POSITION_BITLEN, type(uint256).max - 1);
 
-        _maxGameDepth = bound(_maxGameDepth, LibPosition.MAX_POSITION_BITLEN, type(uint256).max - 1);
         vm.expectRevert(MaxDepthTooLarge.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: _maxGameDepth,
-                            splitDepth: _maxGameDepth + 1,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, (fdgConstructorParams)))
         });
     }
 
@@ -169,14 +174,6 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
     function testFuzz_constructor_oracleChallengePeriodTooLarge_reverts(uint256 _challengePeriod) public {
         _challengePeriod = bound(_challengePeriod, uint256(type(uint64).max) + 1, type(uint256).max);
 
-        IPreimageOracle oracle = IPreimageOracle(
-            DeployUtils.create1({
-                _name: "PreimageOracle",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 0)))
-            })
-        );
-        AlphabetVM alphabetVM = new AlphabetVM(absolutePrestate, IPreimageOracle(address(oracle)));
-
         // PreimageOracle constructor will revert if the challenge period is too large, so we need
         // to mock the call to pretend this is a bugged implementation where the challenge period
         // is allowed to be too large.
@@ -185,105 +182,32 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
         vm.expectRevert(InvalidChallengePeriod.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: 2 ** 3,
-                            splitDepth: 2 ** 2,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, (fdgConstructorParams)))
         });
     }
 
     /// @dev Tests that the constructor of the `FaultDisputeGame` reverts when the `_splitDepth`
     ///      parameter is greater than or equal to the `MAX_GAME_DEPTH`
     function testFuzz_constructor_invalidSplitDepth_reverts(uint256 _splitDepth) public {
-        AlphabetVM alphabetVM = new AlphabetVM(
-            absolutePrestate,
-            IPreimageOracle(
-                DeployUtils.create1({
-                    _name: "PreimageOracle",
-                    _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 0)))
-                })
-            )
-        );
-
         uint256 maxGameDepth = 2 ** 3;
-        _splitDepth = bound(_splitDepth, maxGameDepth - 1, type(uint256).max);
+        fdgConstructorParams.maxGameDepth = maxGameDepth;
+        fdgConstructorParams.splitDepth = bound(_splitDepth, maxGameDepth - 1, type(uint256).max);
         vm.expectRevert(InvalidSplitDepth.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: maxGameDepth,
-                            splitDepth: _splitDepth,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, (fdgConstructorParams)))
         });
     }
 
     /// @dev Tests that the constructor of the `FaultDisputeGame` reverts when the `_splitDepth`
     ///      parameter is less than the minimum split depth (currently 2).
     function testFuzz_constructor_lowSplitDepth_reverts(uint256 _splitDepth) public {
-        AlphabetVM alphabetVM = new AlphabetVM(
-            absolutePrestate,
-            IPreimageOracle(
-                DeployUtils.create1({
-                    _name: "PreimageOracle",
-                    _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 0)))
-                })
-            )
-        );
-
         uint256 minSplitDepth = 2;
-        _splitDepth = bound(_splitDepth, 0, minSplitDepth - 1);
+        fdgConstructorParams.splitDepth = bound(_splitDepth, 0, minSplitDepth - 1);
         vm.expectRevert(InvalidSplitDepth.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: 2 ** 3,
-                            splitDepth: _splitDepth,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, (fdgConstructorParams)))
         });
     }
 
@@ -295,81 +219,30 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
     )
         public
     {
-        AlphabetVM alphabetVM = new AlphabetVM(
-            absolutePrestate,
-            IPreimageOracle(
-                DeployUtils.create1({
-                    _name: "PreimageOracle",
-                    _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 0)))
-                })
-            )
-        );
-
         // Force the clock extension * 2 to be greater than the max clock duration, but keep things within
         // bounds of the uint64 type.
         _maxClockDuration = uint64(bound(_maxClockDuration, 0, type(uint64).max / 2 - 1));
         _clockExtension = uint64(bound(_clockExtension, _maxClockDuration / 2 + 1, type(uint64).max / 2));
 
+        fdgConstructorParams.clockExtension = Duration.wrap(_clockExtension);
+        fdgConstructorParams.maxClockDuration = Duration.wrap(_maxClockDuration);
+
         vm.expectRevert(InvalidClockExtension.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GAME_TYPE,
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: 16,
-                            splitDepth: 8,
-                            clockExtension: Duration.wrap(_clockExtension),
-                            maxClockDuration: Duration.wrap(_maxClockDuration),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, (fdgConstructorParams)))
         });
     }
 
     /// @dev Tests that the constructor of the `FaultDisputeGame` reverts when the `_gameType`
     ///      parameter is set to the reserved `type(uint32).max` game type.
     function test_constructor_reservedGameType_reverts() public {
-        AlphabetVM alphabetVM = new AlphabetVM(
-            absolutePrestate,
-            IPreimageOracle(
-                DeployUtils.create1({
-                    _name: "PreimageOracle",
-                    _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 0)))
-                })
-            )
-        );
+        fdgConstructorParams.gameType = GameType.wrap(type(uint32).max);
 
         vm.expectRevert(ReservedGameType.selector);
         DeployUtils.create1({
             _name: "FaultDisputeGame",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(
-                    IFaultDisputeGame.__constructor__,
-                    (
-                        IFaultDisputeGame.GameConstructorParams({
-                            gameType: GameType.wrap(type(uint32).max),
-                            absolutePrestate: absolutePrestate,
-                            maxGameDepth: 16,
-                            splitDepth: 8,
-                            clockExtension: Duration.wrap(3 hours),
-                            maxClockDuration: Duration.wrap(3.5 days),
-                            vm: alphabetVM,
-                            weth: IDelayedWETH(payable(address(0))),
-                            anchorStateRegistry: IAnchorStateRegistry(address(0)),
-                            l2ChainId: 10
-                        })
-                    )
-                )
-            )
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGame.__constructor__, (fdgConstructorParams)))
         });
     }
 
