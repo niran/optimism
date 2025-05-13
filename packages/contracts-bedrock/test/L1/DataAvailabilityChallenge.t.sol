@@ -66,7 +66,8 @@ contract DataAvailabilityChallenge_SetResolverRefundPercentage_Test is DataAvail
         assertEq(dataAvailabilityChallenge.resolverRefundPercentage(), resolverRefundPercentage);
     }
 
-    /// @notice Test that the `setResolverRefundPercentage` function reverts if the resolver refund percentage is invalid.
+    /// @notice Test that the `setResolverRefundPercentage` function reverts if the resolver refund
+    ///         percentage is invalid.
     function test_setResolverRefundPercentage_invalidResolverRefundPercentage_reverts() public {
         address owner = dataAvailabilityChallenge.owner();
         vm.expectRevert(
@@ -128,7 +129,8 @@ contract DataAvailabilityChallenge_Withdraw_Test is DataAvailabilityChallenge_Te
         assertEq(sender.balance, amount);
     }
 
-    /// @notice Test that the `withdraw` function reverts if the withdrawal fails (e.g., sender is a contract).
+    /// @notice Test that the `withdraw` function reverts if the withdrawal fails (e.g., sender is
+    ///         a contract).
     function test_withdraw_fails_reverts(address sender, uint256 amount) public {
         assumePayable(sender);
         assumeNotPrecompile(sender);
@@ -231,7 +233,8 @@ contract DataAvailabilityChallenge_Challenge_Test is DataAvailabilityChallenge_T
         assertEq(dataAvailabilityChallenge.balances(challenger), 0);
     }
 
-    /// @notice Test that the `challenge` function succeeds when depositing bond in the same transaction.
+    /// @notice Test that the `challenge` function succeeds when depositing bond in the same
+    ///         transaction.
     function test_challenge_deposit_succeeds(
         address challenger,
         uint256 challengedBlockNumber,
@@ -318,7 +321,8 @@ contract DataAvailabilityChallenge_Challenge_Test is DataAvailabilityChallenge_T
         dataAvailabilityChallenge.challenge(0, computeCommitmentKeccak256("some other hash"));
     }
 
-    /// @notice Test that the `challenge` function reverts if the current block number is before the challenged block.
+    /// @notice Test that the `challenge` function reverts if the current block number is before
+    ///         the challenged block.
     function test_challenge_beforeChallengeWindow_reverts() public {
         uint256 challengedBlockNumber = 1;
         bytes memory challengedCommitment = computeCommitmentKeccak256("some hash");
@@ -332,7 +336,8 @@ contract DataAvailabilityChallenge_Challenge_Test is DataAvailabilityChallenge_T
         dataAvailabilityChallenge.challenge(challengedBlockNumber, challengedCommitment);
     }
 
-    /// @notice Test that the `challenge` function reverts if the current block number is after the challenge window.
+    /// @notice Test that the `challenge` function reverts if the current block number is after
+    ///         the challenge window.
     function test_challenge_afterChallengeWindow_reverts() public {
         uint256 challengedBlockNumber = 1;
         bytes memory challengedCommitment = computeCommitmentKeccak256("some hash");
@@ -560,7 +565,8 @@ contract DataAvailabilityChallenge_Resolve_Test is DataAvailabilityChallenge_Tes
         dataAvailabilityChallenge.resolve(challengedBlockNumber, challengedCommitment, preImage);
     }
 
-    /// @notice Test that the `resolve` function reverts if the challenge is after the resolve window.
+    /// @notice Test that the `resolve` function reverts if the challenge is after the resolve
+    ///         window.
     function test_resolve_afterResolveWindow_reverts() public {
         bytes memory preImage = "some preimage";
         bytes memory challengedCommitment = computeCommitmentKeccak256(preImage);
@@ -667,7 +673,8 @@ contract DataAvailabilityChallenge_UnlockBond_Test is DataAvailabilityChallenge_
         dataAvailabilityChallenge.unlockBond(challengedBlockNumber, challengedCommitment);
     }
 
-    /// @notice Test that the `unlockBond` function handles double-unlocking of expired challenges correctly.
+    /// @notice Test that the `unlockBond` function handles double-unlocking of expired challenges
+    ///         correctly.
     function test_unlockBond_expiredChallengeTwice_fails() public {
         bytes memory preImage = "some preimage";
         bytes memory challengedCommitment = computeCommitmentKeccak256(preImage);
