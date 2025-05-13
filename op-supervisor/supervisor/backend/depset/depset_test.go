@@ -97,8 +97,8 @@ func testDependencySetSerialization(
 
 			var newDepSet StaticConfigDependencySet
 			err = unmarshal(fileData, &newDepSet)
-			require.NoError(t, err)
 			result = &newDepSet
+			require.NoError(t, err)
 		}
 
 		chainIDs := result.Chains()
@@ -123,6 +123,7 @@ func testDependencySetSerialization(
 			loader := &JsonDependencySetLoader{Path: d}
 			result, err = loader.LoadDependencySet(context.Background())
 			require.NoError(t, err)
+			require.Equal(t, uint64(15), result.MessageExpiryWindow())
 		} else {
 			fileData, err := os.ReadFile(d)
 			require.NoError(t, err)
@@ -131,9 +132,9 @@ func testDependencySetSerialization(
 			err = unmarshal(fileData, &newDepSet)
 			require.NoError(t, err)
 			result = &newDepSet
+			require.Equal(t, uint64(params.MessageExpiryTimeSecondsInterop), result.MessageExpiryWindow())
 		}
 
-		require.Equal(t, uint64(15), result.MessageExpiryWindow())
 		testChainCapabilities(t, result)
 	})
 

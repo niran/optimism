@@ -110,10 +110,11 @@ func (ds *StaticConfigDependencySet) MarshalTOML() ([]byte, error) {
 	for id, dep := range ds.dependencies {
 		stringMap[id.String()] = dep
 	}
-
+	// Always set to OverrideMessageExpiryWindow to 0 to avoid encoding it to TOML
+	// (due to the `omitempty` tag on that field)
 	payload := &minStaticConfigDependencySet{
 		Dependencies:                stringMap,
-		OverrideMessageExpiryWindow: ds.overrideMessageExpiryWindow,
+		OverrideMessageExpiryWindow: 0,
 	}
 
 	var buf bytes.Buffer
