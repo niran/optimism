@@ -196,6 +196,16 @@ func (db *ChainsDB) OnEvent(ev event.Event) bool {
 		if !db.activationCheck.Check(x.ChainID, x.Anchor.Derived.Time) {
 			return true
 		}
+
+		// If we're in pre-activation mode, exit it and initialize with the anchor
+		if db.IsInPreActivationMode(x.ChainID) {
+			if err := db.ExitPreActivationMode(x.ChainID, x.Anchor); err != nil {
+				db.logger.Error("Failed to exit pre-activation mode", "chain", x.ChainID, "err", err)
+			}
+			return true
+		}
+
+		// Normal initialization
 		db.initFromAnchor(x.ChainID, x.Anchor)
 	case superevents.LocalDerivedEvent:
 		if !db.activationCheck.Check(x.ChainID, x.Derived.Source.Time) {
