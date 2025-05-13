@@ -92,7 +92,7 @@ func (db *ChainsDB) Rewind(chain eth.ChainID, headBlock eth.BlockID) error {
 // This is used when interop activation occurs and we need to start fresh.
 func (db *ChainsDB) RewindToEmpty(chain eth.ChainID) error {
 	db.logger.Info("Rewinding all databases to empty state for interop activation", "chain", chain)
-	
+
 	// Rewind each database to empty state
 	logDB, ok := db.logDBs.Get(chain)
 	if !ok {
@@ -109,7 +109,7 @@ func (db *ChainsDB) RewindToEmpty(chain eth.ChainID) error {
 	if err := localDB.RewindToEmpty(); err != nil {
 		return fmt.Errorf("failed to rewind local derivation database to empty state for chain %s: %w", chain, err)
 	}
-	
+
 	crossDB, ok := db.crossDBs.Get(chain)
 	if !ok {
 		return fmt.Errorf("cannot RewindToEmpty (crossDB not found): %w: %s", types.ErrUnknownChain, chain)
@@ -122,12 +122,15 @@ func (db *ChainsDB) RewindToEmpty(chain eth.ChainID) error {
 	if tracker, ok := db.crossUnsafe.Get(chain); ok {
 		tracker.Set(types.BlockSeal{})
 	}
-	
+
 	// Invalidate read handles
 	if registry, ok := db.readRegistries.Get(chain); ok {
 		registry.InvalidateHandlesAfter(0)
 	}
-	
+
+	// Mark the chain as uninitialized
+	db.initialized.Delete(chain)
+
 	db.logger.Info("Successfully rewound all databases to empty state for interop activation", "chain", chain)
 	return nil
 }
@@ -139,7 +142,7 @@ func (db *ChainsDB) handleInteropActivation(chainID eth.ChainID, activationBlock
 
 	// First rewind all databases to empty state
 	if err := db.RewindToEmpty(chainID); err != nil {
-		db.logger.Error("Failed to rewind databases to empty state for interop activation", 
+		db.logger.Error("Failed to rewind databases to empty state for interop activation",
 			"chain", chainID, "err", err)
 		return
 	}
@@ -147,28 +150,28 @@ func (db *ChainsDB) handleInteropActivation(chainID eth.ChainID, activationBlock
 	// Create a source block reference (L1 reference)
 	// The source is the same as the activation block for the anchor point
 	sourceBlock := activationBlock
-	
+
 	// Create an anchor point with the activation block
 	anchor := types.DerivedBlockRefPair{
 		Source:  sourceBlock,
 		Derived: activationBlock,
 	}
-	
+
 	// Initialize the database with the anchor point
 	// We're recycling the initFromAnchor functionality which handles setting up empty DBs
 	// But we need to reset the initialization tracking to force it to execute
 	db.initialized.Delete(chainID)
 	db.initFromAnchor(chainID, anchor)
-	
+
 	// Emit event for the activation
 	db.emitter.Emit(superevents.LocalUnsafeUpdateEvent{
 		ChainID:        chainID,
 		NewLocalUnsafe: activationBlock,
 	})
-	
+
 	// Notify nodes to reset
 	db.emitter.Emit(superevents.ChainRewoundEvent{ChainID: chainID})
-	
+
 	db.logger.Info("Successfully handled interop activation",
 		"chain", chainID, "activationBlock", activationBlock)
 }
