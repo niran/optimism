@@ -13,25 +13,179 @@ import (
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
-func createDepSet(chainConfigs map[eth.ChainID]uint64, messageExpiry uint64) (*depset.StaticConfigDependencySet, error) {
+func testDependencySet(chains []uint64, activationTimes map[uint64]uint64) depset.DependencySet {
 	deps := make(map[eth.ChainID]*depset.StaticConfigDependency)
-	for chainID, activationTime := range chainConfigs {
-		chainValue, ok := chainID.Uint64()
-		if !ok {
-			panic("chain ID too large")
+	for _, chainIDUint := range chains {
+		chainID := eth.ChainIDFromUInt64(chainIDUint)
+		activationTime := uint64(0)
+		if activationTimes != nil {
+			if time, ok := activationTimes[chainIDUint]; ok {
+				activationTime = time
+			}
 		}
 		deps[chainID] = &depset.StaticConfigDependency{
-			ChainIndex:     types.ChainIndex(chainValue),
+			ChainIndex:     0, // Not important for this test
 			ActivationTime: activationTime,
-			HistoryMinTime: activationTime,
+			HistoryMinTime: 0,
 		}
 	}
-	return depset.NewStaticConfigDependencySetWithMessageExpiryOverride(deps, messageExpiry)
+	depSet, _ := depset.NewStaticConfigDependencySet(deps)
+	return depSet
 }
 
-func TestActivationTimestampChecks(t *testing.T) {
+func TestIsActivationBlockCases(t *testing.T) {
+	logger := testlog.Logger(t, log.LvlInfo)
+
+	// Create a mock activation check with activation time of 1000
+	ds := testDependencySet([]uint64{1}, map[uint64]uint64{1: 1000})
+	check := NewCheck(ds, logger)
+
+	// Test cases
+	testCases := []struct {
+		name         string
+		block        eth.BlockRef
+		prevBlock    eth.BlockRef
+		chainID      eth.ChainID
+		isActivation bool
+	}{
+		{
+			name: "Not active block",
+			block: eth.BlockRef{
+				Number: 100,
+				Time:   900, // Before activation
+			},
+			prevBlock: eth.BlockRef{
+				Number: 99,
+				Time:   890, // Before activation
+			},
+			chainID:      eth.ChainIDFromUInt64(1),
+			isActivation: false,
+		},
+		{
+			name: "Activation block",
+			block: eth.BlockRef{
+				Number: 100,
+				Time:   1001, // After activation
+			},
+			prevBlock: eth.BlockRef{
+				Number: 99,
+				Time:   999, // Before activation
+			},
+			chainID:      eth.ChainIDFromUInt64(1),
+			isActivation: true,
+		},
+		{
+			name: "Already active block",
+			block: eth.BlockRef{
+				Number: 101,
+				Time:   1100, // After activation
+			},
+			prevBlock: eth.BlockRef{
+				Number: 100,
+				Time:   1050, // After activation
+			},
+			chainID:      eth.ChainIDFromUInt64(1),
+			isActivation: false,
+		},
+		{
+			name: "First block after startup, active",
+			block: eth.BlockRef{
+				Number: 100,
+				Time:   1100, // After activation
+			},
+			prevBlock:    eth.BlockRef{}, // Empty struct, first block
+			chainID:      eth.ChainIDFromUInt64(1),
+			isActivation: true,
+		},
+		{
+			name: "First block after startup, not active",
+			block: eth.BlockRef{
+				Number: 100,
+				Time:   900, // Before activation
+			},
+			prevBlock:    eth.BlockRef{}, // Empty struct, first block
+			chainID:      eth.ChainIDFromUInt64(1),
+			isActivation: false,
+		},
+		{
+			name: "Unknown chain",
+			block: eth.BlockRef{
+				Number: 100,
+				Time:   1001,
+			},
+			prevBlock: eth.BlockRef{
+				Number: 99,
+				Time:   999,
+			},
+			chainID:      eth.ChainIDFromUInt64(2), // Not in the dep set
+			isActivation: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := check.IsActivationBlock(tc.block, tc.prevBlock, tc.chainID)
+			require.Equal(t, tc.isActivation, result, "IsActivationBlock should return expected result")
+		})
+	}
+}
+
+func TestNilCheck(t *testing.T) {
+	// Test with nil checker
+	var check *Check
+
+	block := eth.BlockRef{
+		Number: 100,
+		Time:   1001,
+	}
+	prevBlock := eth.BlockRef{
+		Number: 99,
+		Time:   999,
+	}
+	chainID := eth.ChainIDFromUInt64(1)
+
+	result := check.IsActivationBlock(block, prevBlock, chainID)
+	require.False(t, result, "Nil checker should return false")
+}
+
+func TestCheckWithNilDependencySet(t *testing.T) {
+	logger := testlog.Logger(t, log.LvlInfo)
+
+	// Create a check with nil dependency set
+	check := &Check{
+		depSet: nil,
+		logger: logger,
+	}
+
+	block := eth.BlockRef{
+		Number: 100,
+		Time:   1001,
+	}
+	prevBlock := eth.BlockRef{
+		Number: 99,
+		Time:   999,
+	}
+	chainID := eth.ChainIDFromUInt64(1)
+
+	result := check.IsActivationBlock(block, prevBlock, chainID)
+	require.False(t, result, "Check with nil dependency set should return false")
+}
+
+func TestIsActivationBlock(t *testing.T) {
 	baseTime := uint64(time.Now().Unix() + 60)
-	chainID := eth.ChainID{1}
+	chainID := eth.ChainIDFromUInt64(1)
+
+	createDepSet := func(activationTimes map[eth.ChainID]uint64, messageExpiryWindow uint64) (depset.DependencySet, error) {
+		deps := make(map[eth.ChainID]*depset.StaticConfigDependency)
+		for chainID, activationTime := range activationTimes {
+			deps[chainID] = &depset.StaticConfigDependency{
+				ChainIndex:     types.ChainIndex(int(chainID[0])),
+				ActivationTime: activationTime,
+				HistoryMinTime: 0,
+			}
+		}
+		return depset.NewStaticConfigDependencySetWithMessageExpiryOverride(deps, messageExpiryWindow)
+	}
 
 	depSet, err := createDepSet(map[eth.ChainID]uint64{
 		chainID: baseTime,
@@ -41,196 +195,74 @@ func TestActivationTimestampChecks(t *testing.T) {
 	logger := testlog.Logger(t, log.LvlInfo)
 	activationCheck := NewCheck(depSet, logger)
 
-	testCases := map[uint64]bool{
-		baseTime - 2: false,
-		baseTime - 1: false,
-		baseTime:     false,
-		baseTime + 1: true,
-		baseTime + 2: true,
+	// Create test blocks
+	preActivationBlock := eth.BlockRef{
+		Number: 100,
+		Time:   baseTime - 1,
+		Hash:   [32]byte{0x1},
+	}
+	activationBlock := eth.BlockRef{
+		Number:     101,
+		Time:       baseTime + 1,
+		Hash:       [32]byte{0x2},
+		ParentHash: preActivationBlock.Hash,
+	}
+	postActivationBlock := eth.BlockRef{
+		Number:     102,
+		Time:       baseTime + 10,
+		Hash:       [32]byte{0x3},
+		ParentHash: activationBlock.Hash,
 	}
 
-	for ts, expectedVal := range testCases {
-		active := activationCheck.Check(chainID, ts)
-		require.Equal(t, expectedVal, active,
-			"IsActiveForChain at timestamp %d (activation+%d)", ts, int(ts)-int(baseTime))
-	}
-}
-
-func TestActivationTimestampChecksEdgeCases(t *testing.T) {
-	activationTime := uint64(1000000)
-	chainID := eth.ChainID{1}
-
-	depSet, err := createDepSet(map[eth.ChainID]uint64{
-		chainID: activationTime,
-	}, 3600)
-	require.NoError(t, err)
-
-	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheck := NewCheck(depSet, logger)
-
+	// Test cases
 	testCases := []struct {
-		name      string
-		timestamp uint64
-		expected  bool
+		name        string
+		block       eth.BlockRef
+		prevBlock   eth.BlockRef
+		expectation bool
 	}{
-		{"Zero timestamp", 0, false},
-		{"One before activation", activationTime - 1, false},
-		{"At activation", activationTime, false},
-		{"One after activation", activationTime + 1, true},
-		{"Far future", activationTime + 1000000, true},
+		{
+			"Pre-activation block is not activation",
+			preActivationBlock,
+			eth.BlockRef{},
+			false,
+		},
+		{
+			"Activation block with no previous block is considered activation",
+			activationBlock,
+			eth.BlockRef{},
+			true,
+		},
+		{
+			"Activation block with previous block is detected as activation",
+			activationBlock,
+			preActivationBlock,
+			true,
+		},
+		{
+			"Post-activation block with activation block as parent is not activation",
+			postActivationBlock,
+			activationBlock,
+			false,
+		},
+		{
+			"Post-activation block with no previous block reference is considered activation",
+			postActivationBlock,
+			eth.BlockRef{},
+			true,
+		},
+		{
+			"Post-activation block with pre-activation block is considered activation",
+			postActivationBlock,
+			preActivationBlock,
+			true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			active := activationCheck.Check(chainID, tc.timestamp)
-
-			require.Equal(t, tc.expected, active,
-				"IsActiveForChain at timestamp %d", tc.timestamp)
+			isActivation := activationCheck.IsActivationBlock(tc.block, tc.prevBlock, chainID)
+			require.Equal(t, tc.expectation, isActivation)
 		})
 	}
-
-	unknownChain := eth.ChainID{99}
-	active := activationCheck.Check(unknownChain, activationTime+1)
-	require.False(t, active, "Unknown chain should not be active")
-}
-
-func TestActivationBlockFiltering(t *testing.T) {
-	activationTime := uint64(time.Now().Unix() + 3600)
-	chainID := eth.ChainID{1}
-
-	depSet, err := createDepSet(map[eth.ChainID]uint64{
-		chainID: activationTime,
-	}, 3600)
-	require.NoError(t, err)
-
-	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheck := NewCheck(depSet, logger)
-
-	preActivationBlock := eth.BlockRef{
-		Time: activationTime - 600,
-	}
-
-	postActivationBlock := eth.BlockRef{
-		Time: activationTime + 600,
-	}
-
-	isActiveForPreActivation := activationCheck.Check(chainID, preActivationBlock.Time)
-	require.False(t, isActiveForPreActivation, "Chain should not be active at pre-activation time")
-
-	isActiveForPostActivation := activationCheck.Check(chainID, postActivationBlock.Time)
-	require.True(t, isActiveForPostActivation, "Chain should be active at post-activation time")
-}
-
-func TestActivationBoundary(t *testing.T) {
-	activationTime := uint64(time.Now().Unix())
-	chainA := eth.ChainID{1}
-	chainB := eth.ChainID{2}
-
-	depSet, err := createDepSet(map[eth.ChainID]uint64{
-		chainA: activationTime,
-		chainB: activationTime,
-	}, 3600)
-	require.NoError(t, err)
-
-	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheck := NewCheck(depSet, logger)
-
-	blockAtActivationA := eth.BlockRef{
-		Time: activationTime,
-	}
-
-	blockAtActivationB := eth.BlockRef{
-		Time: activationTime,
-	}
-
-	isActiveA := activationCheck.Check(chainA, blockAtActivationA.Time)
-	isActiveB := activationCheck.Check(chainB, blockAtActivationB.Time)
-
-	require.False(t, isActiveA, "Chain A should not be active at exactly the activation time")
-	require.False(t, isActiveB, "Chain B should not be active at exactly the activation time")
-
-	blockJustAfterA := eth.BlockRef{
-		Time: activationTime + 1,
-	}
-
-	blockJustAfterB := eth.BlockRef{
-		Time: activationTime + 1,
-	}
-
-	isActiveJustAfterA := activationCheck.Check(chainA, blockJustAfterA.Time)
-	isActiveJustAfterB := activationCheck.Check(chainB, blockJustAfterB.Time)
-
-	require.True(t, isActiveJustAfterA, "Chain A should be active just after the activation time")
-	require.True(t, isActiveJustAfterB, "Chain B should be active just after the activation time")
-
-	require.False(t, activationCheck.Check(chainA, blockAtActivationA.Time))
-	require.False(t, activationCheck.Check(chainB, blockAtActivationB.Time))
-	require.True(t, activationCheck.Check(chainA, blockJustAfterA.Time))
-	require.True(t, activationCheck.Check(chainB, blockJustAfterB.Time))
-}
-
-func TestActivationBoundaryMultipleChainsSameActivationTime(t *testing.T) {
-	activationTime := uint64(time.Now().Unix() + 10)
-	chainA := eth.ChainID{1}
-	chainB := eth.ChainID{2}
-	chainC := eth.ChainID{3}
-
-	depSet, err := createDepSet(map[eth.ChainID]uint64{
-		chainA: activationTime,
-		chainB: activationTime,
-		chainC: activationTime,
-	}, 3600)
-	require.NoError(t, err)
-
-	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheck := NewCheck(depSet, logger)
-
-	beforeActivation := eth.BlockRef{Time: activationTime - 5}
-	atActivation := eth.BlockRef{Time: activationTime}
-	afterActivation := eth.BlockRef{Time: activationTime + 5}
-
-	require.False(t, activationCheck.Check(chainA, beforeActivation.Time))
-	require.False(t, activationCheck.Check(chainB, beforeActivation.Time))
-	require.False(t, activationCheck.Check(chainC, beforeActivation.Time))
-
-	require.False(t, activationCheck.Check(chainA, atActivation.Time))
-	require.False(t, activationCheck.Check(chainB, atActivation.Time))
-	require.False(t, activationCheck.Check(chainC, atActivation.Time))
-
-	require.True(t, activationCheck.Check(chainA, afterActivation.Time))
-	require.True(t, activationCheck.Check(chainB, afterActivation.Time))
-	require.True(t, activationCheck.Check(chainC, afterActivation.Time))
-}
-
-func TestActivationBoundaryMultipleChainsDifferentActivationTimes(t *testing.T) {
-	baseTime := uint64(time.Now().Unix())
-	chainA := eth.ChainID{1}
-	chainB := eth.ChainID{2}
-	chainC := eth.ChainID{3}
-
-	depSet, err := createDepSet(map[eth.ChainID]uint64{
-		chainA: baseTime,
-		chainB: baseTime + 10,
-		chainC: baseTime + 20,
-	}, 3600)
-	require.NoError(t, err)
-
-	logger := testlog.Logger(t, log.LvlInfo)
-	activationCheck := NewCheck(depSet, logger)
-
-	t1 := eth.BlockRef{Time: baseTime + 5}
-	t2 := eth.BlockRef{Time: baseTime + 15}
-	t3 := eth.BlockRef{Time: baseTime + 25}
-
-	require.True(t, activationCheck.Check(chainA, t1.Time))
-	require.False(t, activationCheck.Check(chainB, t1.Time))
-	require.False(t, activationCheck.Check(chainC, t1.Time))
-
-	require.True(t, activationCheck.Check(chainA, t2.Time))
-	require.True(t, activationCheck.Check(chainB, t2.Time))
-	require.False(t, activationCheck.Check(chainC, t2.Time))
-
-	require.True(t, activationCheck.Check(chainA, t3.Time))
-	require.True(t, activationCheck.Check(chainB, t3.Time))
-	require.True(t, activationCheck.Check(chainC, t3.Time))
 }

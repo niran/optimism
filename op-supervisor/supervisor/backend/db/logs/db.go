@@ -605,6 +605,37 @@ func (db *DB) Rewind(newHead eth.BlockID) error {
 	return nil
 }
 
+// RewindToEmpty completely resets the database to an empty state.
+// This is different from Rewind in that it doesn't keep any entries.
+// This is used when the interop activation occurs and we need to start fresh.
+func (db *DB) RewindToEmpty() error {
+	db.rwLock.Lock()
+	defer db.rwLock.Unlock()
+
+	db.log.Info("Rewinding database to empty state for interop activation")
+
+	// Truncate the store to -1 entries, effectively clearing it
+	if err := db.store.Truncate(-1); err != nil {
+		return fmt.Errorf("failed to truncate database to empty state: %w", err)
+	}
+
+	// Reset lastEntryContext to initial empty state
+	db.lastEntryContext = logContext{
+		nextEntryIndex: 0,
+		blockHash:      common.Hash{},
+		blockNum:       0,
+		timestamp:      0,
+		logsSince:      0,
+		logHash:        common.Hash{},
+		execMsg:        nil,
+		out:            nil,
+	}
+
+	db.updateEntryCountMetric()
+	db.log.Info("Database successfully rewound to empty state")
+	return nil
+}
+
 func (db *DB) readSearchCheckpoint(entryIdx entrydb.EntryIdx) (searchCheckpoint, error) {
 	data, err := db.store.Read(entryIdx)
 	if err != nil {

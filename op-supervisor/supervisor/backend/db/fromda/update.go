@@ -166,6 +166,25 @@ func (db *DB) RewindToFirstDerived(v eth.BlockID, revision types.Revision) error
 	}, false)
 }
 
+// RewindToEmpty completely resets the database to an empty state.
+// This is different from other rewind methods in that it doesn't keep any entries.
+// This is used when interop activation occurs and we need to start fresh.
+func (db *DB) RewindToEmpty() error {
+	db.rwLock.Lock()
+	defer db.rwLock.Unlock()
+
+	db.log.Info("Rewinding derivation database to empty state for interop activation")
+
+	// Truncate all entries
+	if err := db.store.Truncate(-1); err != nil {
+		return fmt.Errorf("failed to truncate database to empty state: %w", err)
+	}
+
+	db.m.RecordDBDerivedEntryCount(0)
+	db.log.Info("Derivation database successfully rewound to empty state")
+	return nil
+}
+
 // rewindLocked performs the truncate operation to a specified block seal pair.
 // data beyond the specified block seal pair is truncated from the database.
 // If including is true, the block seal pair itself is removed as well.

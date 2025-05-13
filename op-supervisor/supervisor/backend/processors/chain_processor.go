@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/activation"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/superevents"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
@@ -61,6 +62,12 @@ type ChainProcessor struct {
 	emitter event.Emitter
 
 	maxFetcherThreads int
+
+	// Activation check for interop
+	activationCheck *activation.Check
+
+	// Previous block for checking activation transitions
+	previousBlock eth.BlockRef
 }
 
 var _ event.AttachEmitter = (*ChainProcessor)(nil)
@@ -76,6 +83,11 @@ func NewChainProcessor(systemContext context.Context, log log.Logger, chain eth.
 		maxFetcherThreads: 10,
 	}
 	return out
+}
+
+// SetActivationCheck sets the activation checker for interop
+func (s *ChainProcessor) SetActivationCheck(check *activation.Check) {
+	s.activationCheck = check
 }
 
 func (s *ChainProcessor) AttachEmitter(em event.Emitter) {
@@ -274,6 +286,19 @@ func (s *ChainProcessor) rangeUpdate(target uint64) (int, error) {
 }
 
 func (s *ChainProcessor) process(ctx context.Context, next eth.BlockRef, receipts gethtypes.Receipts) error {
+	// Check if this block activates interop
+	if s.activationCheck.IsActivationBlock(next, s.previousBlock, s.chain) {
+		s.log.Info("Detected interop activation block", "chain", s.chain, "block", next, "timestamp", next.Time)
+		s.emitter.Emit(superevents.InteropActivationEvent{
+			ChainID:         s.chain,
+			ActivationBlock: next,
+			PreviousBlock:   s.previousBlock,
+		})
+	}
+
+	// Store this block as the previous block for next time
+	s.previousBlock = next
+
 	if err := s.processor.ProcessLogs(ctx, next, receipts); err != nil {
 		s.log.Error("Failed to process block", "block", next, "err", err)
 

@@ -171,3 +171,14 @@ type UpdateLocalSafeFailedEvent struct {
 func (ev UpdateLocalSafeFailedEvent) String() string {
 	return "update-local-safe-failed"
 }
+
+// InteropActivationEvent is emitted when a chain crosses the interop activation threshold
+type InteropActivationEvent struct {
+	ChainID         eth.ChainID
+	ActivationBlock eth.BlockRef
+	PreviousBlock   eth.BlockRef
+}
+
+func (ev InteropActivationEvent) String() string {
+	return "interop-activation"
+}

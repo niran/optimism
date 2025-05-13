@@ -31,6 +31,10 @@ type LogStorage interface {
 
 	Rewind(newHead eth.BlockID) error
 
+	// RewindToEmpty completely resets the database to an empty state.
+	// This is different from Rewind in that it doesn't keep any entries.
+	RewindToEmpty() error
+
 	LatestSealedBlock() (id eth.BlockID, ok bool)
 
 	// FindSealedBlock finds the requested block by number, to check if it exists,
@@ -90,6 +94,10 @@ type DerivationStorage interface {
 	RewindAndInvalidate(invalidated types.DerivedBlockRefPair) error
 	RewindToScope(scope eth.BlockID) error
 	RewindToFirstDerived(v eth.BlockID, revision types.Revision) error
+
+	// RewindToEmpty completely resets the database to an empty state.
+	// This is different from other rewind methods in that it doesn't keep any entries.
+	RewindToEmpty() error
 }
 
 var _ DerivationStorage = (*fromda.DB)(nil)
@@ -170,6 +178,8 @@ func (db *ChainsDB) OnEvent(ev event.Event) bool {
 		db.onFinalizedL1(x.FinalizedL1)
 	case superevents.ReplaceBlockEvent:
 		db.onReplaceBlock(x.ChainID, x.Replacement.Replacement, x.Replacement.Invalidated)
+	case superevents.InteropActivationEvent:
+		db.handleInteropActivation(x.ChainID, x.ActivationBlock)
 	default:
 		return false
 	}

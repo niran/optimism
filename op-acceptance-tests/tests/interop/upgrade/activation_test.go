@@ -34,85 +34,85 @@ func TestInteropActivation(gt *testing.T) {
 		// =====================================================================
 		t.Logger().Info("Step 1: Finding pre-activation block")
 		preActivationBlock := net.LatestBlockBeforeTimestamp(t, *interopTime)
-		t.Logger().Info("Found pre-activation block", 
-			"number", preActivationBlock.Number, 
+		t.Logger().Info("Found pre-activation block",
+			"number", preActivationBlock.Number,
 			"timestamp", preActivationBlock.Time)
-		
+
 		// Verify pre-activation block has timestamp before interop time
-		t.Require().Less(preActivationBlock.Time, *interopTime, 
+		t.Require().Less(preActivationBlock.Time, *interopTime,
 			"Pre-activation block timestamp should be before interop time")
-		
+
 		// =====================================================================
 		// Step 2: Wait for and verify the activation block
 		// =====================================================================
 		t.Logger().Info("Step 2: Waiting for activation block")
 		activationBlock := net.AwaitActivation(t, interopTime)
 		t.Require().NotNil(activationBlock)
-		t.Logger().Info("Found activation block", 
-			"number", activationBlock.Number, 
+		t.Logger().Info("Found activation block",
+			"number", activationBlock.Number,
 			"timestamp", activationBlock.Time)
-		
+
 		// Verify activation block has timestamp >= interop time
-		t.Require().GreaterOrEqual(activationBlock.Time, *interopTime, 
+		t.Require().GreaterOrEqual(activationBlock.Time, *interopTime,
 			"Activation block timestamp should be at or after interop time")
-		
+
 		// Verify activation block is a successor to pre-activation
 		t.Require().Greater(activationBlock.Number, preActivationBlock.Number,
 			"Activation block should have a higher number than pre-activation block")
-		
+
 		// =====================================================================
 		// Step 3: Verify post-activation block production
 		// =====================================================================
 		ctx, cancel := context.WithTimeout(t.Ctx(), 30*time.Second)
 		defer cancel()
-		
+
 		// Get the block right after activation
 		l2_el := net.Escape().L2ELNode(match.FirstL2EL)
 		initialLatest, err := l2_el.EthClient().InfoByLabel(ctx, eth.Unsafe)
 		t.Require().NoError(err, "Expected to get latest block info")
 		initialBlockNum := initialLatest.NumberU64()
-		
+
 		t.Logger().Info("Step 3: Verifying post-activation block production")
 		t.Logger().Info("Initial post-activation block", "number", initialBlockNum)
-		
+
 		// Wait for a few more blocks to ensure the system continues to operate
 		var latestBlockNum uint64
 		for i := 0; i < 5; i++ {
 			net.WaitForBlock()
-			
+
 			latest, err := l2_el.EthClient().InfoByLabel(ctx, eth.Unsafe)
 			t.Require().NoError(err, "Expected to get latest block info")
-			
+
 			latestBlockNum = latest.NumberU64()
 			t.Logger().Info("Additional post-activation block produced", "number", latestBlockNum)
 		}
-		
+
 		// Verify blocks continue to be produced after activation
-		t.Require().Greater(latestBlockNum, initialBlockNum, 
+		t.Require().Greater(latestBlockNum, initialBlockNum,
 			"Expected to produce more blocks after activation")
-		
-		t.Logger().Info("Verified post-activation block production", 
-			"initialBlock", initialBlockNum, 
+
+		t.Logger().Info("Verified post-activation block production",
+			"initialBlock", initialBlockNum,
 			"latestBlock", latestBlockNum)
 
 		// =====================================================================
 		// Step 4: Verify CrossL2Inbox contract deployment
 		// =====================================================================
 		t.Logger().Info("Step 4: Verifying CrossL2Inbox contract deployment")
-		
+
 		el := net.Escape().L2ELNode(match.FirstL2EL)
 		implAddrBytes, err := el.EthClient().GetStorageAt(t.Ctx(), predeploys.CrossL2InboxAddr,
 			genesis.ImplementationSlot, activationBlock.Hash.String())
 		t.Require().NoError(err, "Failed to get CrossL2Inbox implementation address")
-		
+
 		implAddr := common.BytesToAddress(implAddrBytes[:])
 		t.Require().NotEqual(common.Address{}, implAddr, "CrossL2Inbox implementation address should not be zero")
-		
+
 		code, err := el.EthClient().CodeAtHash(t.Ctx(), implAddr, activationBlock.Hash)
 		t.Require().NoError(err, "Failed to get code at implementation address")
 		t.Require().NotEmpty(code, "CrossL2Inbox implementation should have code")
-		
-		t.Logger().Info("Successfully verified CrossL2Inbox deployment", 
+
+		t.Logger().Info("Successfully verified CrossL2Inbox deployment",
 			"implAddr", implAddr.Hex(),
 			"codeSize", len(code))
 

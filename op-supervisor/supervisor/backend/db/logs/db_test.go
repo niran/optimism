@@ -1293,6 +1293,64 @@ func TestRewind(t *testing.T) {
 	})
 }
 
+func TestRewindToEmpty(t *testing.T) {
+	logger := testlog.Logger(t, log.LvlInfo)
+	testDir := t.TempDir()
+	dbPath := filepath.Join(testDir, "logs.db")
+	chainID := eth.ChainIDFromUInt64(123)
+	metrics := &stubMetrics{}
+
+	createTestHash := func(i int) common.Hash {
+		if i == -1 { // parent-hash of genesis is zero
+			return common.Hash{}
+		}
+		var data [9]byte
+		data[0] = 0xff
+		binary.BigEndian.PutUint64(data[1:], uint64(i))
+		return crypto.Keccak256Hash(data[:])
+	}
+
+	// Create a new database
+	db, err := NewFromFile(logger, metrics, chainID, dbPath, false)
+	require.NoError(t, err, "Failed to create database")
+	t.Cleanup(func() {
+		db.Close()
+	})
+
+	// Add some blocks to the database
+	block1 := eth.BlockRef{
+		Hash:       createTestHash(1),
+		Number:     1,
+		ParentHash: createTestHash(0),
+		Time:       1000,
+	}
+	err = db.SealBlock(common.Hash{}, eth.BlockID{Hash: block1.Hash, Number: block1.Number}, block1.Time)
+	require.NoError(t, err, "Failed to seal block")
+
+	block2 := eth.BlockRef{
+		Hash:       createTestHash(2),
+		Number:     2,
+		ParentHash: block1.Hash,
+		Time:       1010,
+	}
+	err = db.SealBlock(block1.Hash, eth.BlockID{Hash: block2.Hash, Number: block2.Number}, block2.Time)
+	require.NoError(t, err, "Failed to seal block")
+
+	// Verify blocks exist in the database
+	latest, ok := db.LatestSealedBlock()
+	require.True(t, ok, "Should have a latest sealed block")
+	require.Equal(t, block2.Hash, latest.Hash, "Latest block should be block2")
+
+	// Now rewind to empty
+	err = db.RewindToEmpty()
+	require.NoError(t, err, "Failed to rewind to empty")
+
+	// Verify database is empty
+	latest, ok = db.LatestSealedBlock()
+	require.False(t, ok, "Should not have a latest sealed block after rewind")
+	require.Equal(t, eth.BlockID{}, latest, "Latest block should be empty")
+}
+
 type stubMetrics struct {
 	entryCount           int64
 	entriesReadForSearch int64

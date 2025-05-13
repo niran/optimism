@@ -881,6 +881,15 @@ func (m *mockLogDB) Rewind(newHead eth.BlockID) error {
 	return nil
 }
 
+func (m *mockLogDB) RewindToEmpty() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.logs = make(map[uint64]map[uint32]types.ExecutingMessage)
+	m.blockSeals = make(map[uint64]types.BlockSeal)
+	return nil
+}
+
 func (m *mockLogDB) LatestSealedBlock() (id eth.BlockID, ok bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -1020,5 +1029,9 @@ func (m *mockDerivationDB) RewindToScope(scope eth.BlockID) error {
 }
 
 func (m *mockDerivationDB) RewindToFirstDerived(v eth.BlockID, revision types.Revision) error {
+	return nil
+}
+
+func (m *mockDerivationDB) RewindToEmpty() error {
 	return nil
 }
