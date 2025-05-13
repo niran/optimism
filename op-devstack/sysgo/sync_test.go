@@ -336,8 +336,8 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 		var chainAView *eth.SupervisorChainSyncStatus
 		require.Eventually(func() bool {
 			chainAView := querySyncStatusFromSupervisor(supervisor, elA2.ChainID())
-			logger.Info("supervisor safe head", "number", chainAView.Safe.Number)
-			return chainAView.Safe.Number > targetBlockNum2
+			logger.Info("supervisor safe head", "number", chainAView.CrossSafe.Number)
+			return chainAView.CrossSafe.Number > targetBlockNum2
 		}, 60*time.Second, waitTime)
 
 		// Restarted verifier will advance its unsafe head by reading L1 but not by P2P
@@ -362,7 +362,7 @@ func TestUnsafeChainKnownToL2CL(gt *testing.T) {
 			blockA2 := queryBlockFromEL(elA2, eth.Safe)
 			blockA := queryBlockFromELByNumber(elA, blockA2.Number)
 			require.Equal(blockA.Hash, blockA2.Hash)
-			logger.Info("safe head sync status", "sequencer CL", syncA.SafeL2.Number, "supervisor", chainAView.Safe.Number, "verifier CL", syncA2.SafeL2.Number, "verifier EL", blockA2.Number)
+			logger.Info("safe head sync status", "sequencer CL", syncA.SafeL2.Number, "supervisor", chainAView.CrossSafe.Number, "verifier CL", syncA2.SafeL2.Number, "verifier EL", blockA2.Number)
 			// verifier consolidated every previously known unsafe head to safe head
 			return syncA2.SafeL2.Number >= unsafeA2.Number
 		}, 60*time.Second, waitTime)
