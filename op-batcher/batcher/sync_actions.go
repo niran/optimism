@@ -62,6 +62,7 @@ func computeSyncActions[T channelStatuser](
 		"syncStatus.localSafeL2", newSyncStatus.LocalSafeL2.TerminalString(),
 		"syncStatus.safeL2", newSyncStatus.SafeL2.TerminalString(),
 		"syncStatus.unsafeL2", newSyncStatus.UnsafeL2.TerminalString(),
+		"syncStatus.crossUnsafeL2", newSyncStatus.CrossUnsafeL2.TerminalString(),
 	)
 
 	safeL2 := newSyncStatus.SafeL2
@@ -69,6 +70,10 @@ func computeSyncActions[T channelStatuser](
 		// This is preffered when running interop, but not yet enabled by default.
 		safeL2 = newSyncStatus.LocalSafeL2
 	}
+
+	// Pre-interop, all unsafe blocks are cross-unsafe.
+	// Post-interop, we don't want to submit local unsafe blocks until they are cross unsafe.
+	unsafeL2 := newSyncStatus.CrossUnsafeL2
 
 	// PART 1: Initial checks on the sync status
 	if newSyncStatus.HeadL1 == (eth.L1BlockRef{}) {
@@ -83,8 +88,8 @@ func computeSyncActions[T channelStatuser](
 	}
 
 	var allUnsafeBlocks *inclusiveBlockRange
-	if newSyncStatus.UnsafeL2.Number > safeL2.Number {
-		allUnsafeBlocks = &inclusiveBlockRange{safeL2.Number + 1, newSyncStatus.UnsafeL2.Number}
+	if unsafeL2.Number > safeL2.Number {
+		allUnsafeBlocks = &inclusiveBlockRange{safeL2.Number + 1, unsafeL2.Number}
 	}
 
 	// PART 2: checks involving only the oldest block in the state
@@ -170,8 +175,8 @@ func computeSyncActions[T channelStatuser](
 	}
 
 	var allUnsafeBlocksAboveState *inclusiveBlockRange
-	if newSyncStatus.UnsafeL2.Number > newestBlockInStateNum {
-		allUnsafeBlocksAboveState = &inclusiveBlockRange{newestBlockInStateNum + 1, newSyncStatus.UnsafeL2.Number}
+	if unsafeL2.Number > newestBlockInStateNum {
+		allUnsafeBlocksAboveState = &inclusiveBlockRange{newestBlockInStateNum + 1, unsafeL2.Number}
 	}
 
 	a := syncActions{
