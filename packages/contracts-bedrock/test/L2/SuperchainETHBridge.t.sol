@@ -13,8 +13,8 @@ import { IETHLiquidity } from "interfaces/L2/IETHLiquidity.sol";
 import { ISuperchainETHBridge } from "interfaces/L2/ISuperchainETHBridge.sol";
 import { IL2ToL2CrossDomainMessenger } from "interfaces/L2/IL2ToL2CrossDomainMessenger.sol";
 
-/// @title SuperchainETHBridge Test Init
-/// @notice Reusable test initialization for SuperchainETHBridge tests.
+/// @title SuperchainETHBridge_TestInit
+/// @notice Reusable test initialization for `SuperchainETHBridge` tests.
 contract SuperchainETHBridge_TestInit is CommonTest {
     event SendETH(address indexed from, address indexed to, uint256 amount, uint256 destination);
 

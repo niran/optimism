@@ -14,7 +14,7 @@ import { Identifier as CrossL2InboxIdentifier } from "interfaces/L2/ICrossL2Inbo
 import { ISuperchainTokenBridge } from "interfaces/L2/ISuperchainTokenBridge.sol";
 
 /// @title ExecutingMessageEmitted_TestInit
-/// @notice Reusable test initialization for ExecutingMessageEmitted tests.
+/// @notice Reusable test initialization for `ExecutingMessageEmitted` tests.
 contract ExecutingMessageEmitted_TestInit is CommonTest {
     bytes32 internal constant SENT_MESSAGE_EVENT_SELECTOR =
         0x382409ac69001e11931a28435afef442cbfd20d9891907e8fa373ba7d351f320;
@@ -45,7 +45,7 @@ contract ExecutingMessageEmitted_TestInit is CommonTest {
     }
 }
 
-/// @title ExecutingMessageEmittedTest
+/// @title ExecutingMessageEmitted_Test
 /// @notice Integration test that checks that the `ExecutingMessage` event is emitted on crosschain
 ///         mints.
 contract ExecutingMessageEmitted_Test is ExecutingMessageEmitted_TestInit {

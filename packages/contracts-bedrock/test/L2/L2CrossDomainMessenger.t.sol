@@ -18,13 +18,15 @@ import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.so
 import { IL2CrossDomainMessenger } from "interfaces/L2/IL2CrossDomainMessenger.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
 
+/// @title L2CrossDomainMessenger_TestInit
+/// @notice Reusable test initialization for `L2CrossDomainMessenger` tests.
 contract L2CrossDomainMessenger_TestInit is CommonTest {
     /// @notice Receiver address for testing
     address recipient = address(0xabbaacdc);
 }
 
 /// @title L2CrossDomainMessenger_Constructor_Test
-/// @notice Reusable test initialization for `L2CrossDomainMessenger` tests.
+/// @notice Tests the `constructor` of the `L2CrossDomainMessenger` contract.
 contract L2CrossDomainMessenger_Constructor_Test is L2CrossDomainMessenger_TestInit {
     /// @notice Tests that the implementation is initialized correctly.
     function test_constructor_succeeds() external view {

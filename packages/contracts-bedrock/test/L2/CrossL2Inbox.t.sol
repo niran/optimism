@@ -39,8 +39,8 @@ contract ValidateMessageRelayer is Test {
     }
 }
 
-/// @title CrossL2Inbox Test Init
-/// @notice Reusable test initialization for CrossL2Inbox tests.
+/// @title CrossL2Inbox_Test_Init
+/// @notice Reusable test initialization for `CrossL2Inbox` tests.
 contract CrossL2Inbox_TestInit is CommonTest {
     event ExecutingMessage(bytes32 indexed msgHash, Identifier id);
 
@@ -56,7 +56,7 @@ contract CrossL2Inbox_TestInit is CommonTest {
     }
 }
 
-/// @title CrossL2Inbox ValidateMessage Test
+/// @title CrossL2Inbox_ValidateMessage_Test
 /// @notice Tests the `validateMessage` function of the `CrossL2Inbox` contract.
 contract CrossL2Inbox_ValidateMessage_Test is CrossL2Inbox_TestInit {
     /// @notice Test that `validateMessage` reverts when the slot is not warm.
@@ -257,7 +257,7 @@ contract CrossL2Inbox_ValidateMessage_Test is CrossL2Inbox_TestInit {
     }
 }
 
-/// @title CrossL2Inbox CalculateChecksum Test
+/// @title CrossL2Inbox_CalculateChecksum_Test
 /// @notice Tests the `calculateChecksum` function of the `CrossL2Inbox` contract.
 contract CrossL2Inbox_CalculateChecksum_Test is CrossL2Inbox_TestInit {
     /// @notice Test that `calculateChecksum` reverts when the block number is greater than 2^64.

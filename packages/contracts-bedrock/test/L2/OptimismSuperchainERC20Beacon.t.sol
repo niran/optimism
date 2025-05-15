@@ -8,8 +8,8 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { IBeacon } from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 
-/// @title OptimismSuperchainERC20Beacon Test Init
-/// @notice Reusable test initialization for OptimismSuperchainERC20Beacon tests.
+/// @title OptimismSuperchainERC20Beacon_TestInit
+/// @notice Reusable test initialization for `OptimismSuperchainERC20Beacon` tests.
 contract OptimismSuperchainERC20Beacon_TestInit is CommonTest {
     /// @notice Sets up the test suite.
     function setUp() public override {

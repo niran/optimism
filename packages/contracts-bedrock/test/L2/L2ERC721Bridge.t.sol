@@ -66,7 +66,7 @@ contract NonCompliantERC721 {
 }
 
 /// @title L2ERC721Bridge_TestInit
-/// @notice Reusable test initialization for L2ERC721Bridge tests.
+/// @notice Reusable test initialization for `L2ERC721Bridge` tests.
 contract L2ERC721Bridge_TestInit is CommonTest {
     TestMintableERC721 internal localToken;
     TestERC721 internal remoteToken;

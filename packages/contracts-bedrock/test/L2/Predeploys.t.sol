@@ -10,7 +10,7 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 
 /// @title Predeploys_TestInit
-/// @notice Reusable test initialization for Predeploys tests.
+/// @notice Reusable test initialization for `Predeploys` tests.
 contract Predeploys_TestInit is CommonTest {
     //////////////////////////////////////////////////////
     /// Internal helpers

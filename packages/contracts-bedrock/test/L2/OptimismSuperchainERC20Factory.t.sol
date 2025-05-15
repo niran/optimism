@@ -11,8 +11,8 @@ import { CREATE3, Bytes32AddressLib } from "@rari-capital/solmate/src/utils/CREA
 import { IOptimismSuperchainERC20 } from "interfaces/L2/IOptimismSuperchainERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 
-/// @title OptimismSuperchainERC20Factory Test Init
-/// @notice Reusable test initialization for OptimismSuperchainERC20Factory tests.
+/// @title OptimismSuperchainERC20Factory_TestInit
+/// @notice Reusable test initialization for `OptimismSuperchainERC20Factory` tests.
 contract OptimismSuperchainERC20Factory_TestInit is CommonTest {
     using Bytes32AddressLib for bytes32;
 

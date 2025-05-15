@@ -5,8 +5,8 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 import { OptimismMintableERC721 } from "src/L2/OptimismMintableERC721.sol";
 import { OptimismMintableERC721Factory } from "src/L2/OptimismMintableERC721Factory.sol";
 
-/// @title OptimismMintableERC721Factory Test Init
-/// @notice Reusable test initialization for OptimismMintableERC721Factory tests.
+/// @title OptimismMintableERC721Factory_TestInit
+/// @notice Reusable test initialization for `OptimismMintableERC721Factory` tests.
 contract OptimismMintableERC721Factory_TestInit is CommonTest {
     event OptimismMintableERC721Created(address indexed localToken, address indexed remoteToken, address deployer);
 

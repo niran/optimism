@@ -16,8 +16,8 @@ import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC7802 } from "interfaces/L2/IERC7802.sol";
 import { MockSuperchainERC20Implementation } from "test/mocks/SuperchainERC20Implementation.sol";
 
-/// @title SuperchainTokenBridge Test Init
-/// @notice Reusable test initialization for SuperchainTokenBridge tests.
+/// @title SuperchainTokenBridge_TestInit
+/// @notice Reusable test initialization for `SuperchainTokenBridge` tests.
 contract SuperchainTokenBridge_TestInit is Test {
     address internal constant ZERO_ADDRESS = address(0);
     string internal constant NAME = "SuperchainERC20";

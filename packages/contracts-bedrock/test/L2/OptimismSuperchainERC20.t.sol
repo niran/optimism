@@ -22,7 +22,7 @@ import { IOptimismSuperchainERC20 } from "interfaces/L2/IOptimismSuperchainERC20
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 /// @title OptimismSuperchainERC20_TestInit
-/// @notice Reusable test initialization for OptimismSuperchainERC20 tests.
+/// @notice Reusable test initialization for `OptimismSuperchainERC20` tests.
 contract OptimismSuperchainERC20_TestInit is Test {
     address internal constant ZERO_ADDRESS = address(0);
     address internal constant REMOTE_TOKEN = address(0x123);

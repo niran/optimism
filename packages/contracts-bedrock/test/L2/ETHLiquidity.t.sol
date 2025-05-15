@@ -8,8 +8,8 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 import { Unauthorized } from "src/libraries/errors/CommonErrors.sol";
 import { InvalidAmount } from "src/libraries/errors/CommonErrors.sol";
 
-/// @title ETHLiquidity Test Init
-/// @notice Reusable test initialization for ETHLiquidity tests.
+/// @title ETHLiquidity_TestInit
+/// @notice Reusable test initialization for `ETHLiquidity` tests.
 contract ETHLiquidity_TestInit is CommonTest {
     /// @notice Emitted when an address burns ETH liquidity.
     event LiquidityBurned(address indexed caller, uint256 value);

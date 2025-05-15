@@ -9,8 +9,8 @@ import { Encoding } from "src/libraries/Encoding.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import "src/libraries/L1BlockErrors.sol";
 
-/// @title L1Block Test Init
-/// @notice Reusable test initialization for L1Block tests.
+/// @title L1Block_ TestInit
+/// @notice Reusable test initialization for `L1Block` tests.
 contract L1Block_TestInit is CommonTest {
     address depositor;
 

@@ -8,8 +8,8 @@ import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { OptimismMintableERC721, IOptimismMintableERC721 } from "src/L2/OptimismMintableERC721.sol";
 
-/// @title OptimismMintableERC721_Test_Init
-/// @notice Reusable test initialization for OptimismMintableERC721 tests.
+/// @title OptimismMintableERC721_TestInit
+/// @notice Reusable test initialization for `OptimismMintableERC721` tests.
 contract OptimismMintableERC721_TestInit is CommonTest {
     ERC721 internal L1NFT;
     OptimismMintableERC721 internal L2NFT;
@@ -71,7 +71,7 @@ contract OptimismMintableERC721_Constructor_Test is OptimismMintableERC721_TestI
 /// @notice Tests the `safeMint` function of the `OptimismMintableERC721` contract.
 contract OptimismMintableERC721_SafeMint_Test is OptimismMintableERC721_TestInit {
     /// @notice Tests that the `safeMint` function successfully mints a token when called by the
-    /// @notice bridge.
+    ///         bridge.
     function test_safeMint_succeeds() external {
         // Expect a transfer event.
         vm.expectEmit(true, true, true, true);
