@@ -1,9 +1,9 @@
 # Custom Deployments
 
-While OP Deployer was designed primarily for use with that are governed by Optimism, it also supports managing cusotm
-deployments. This is particularly common for RaaS providers, whose customers often request deployments with custom L1s
-(or L2s, in the case of L3s) or governance. This guide will walk you through the process of managing these chains using
-OP Deployer.
+While OP Deployer was designed primarily for use with chains that are governed by Optimism, it also supports managing
+custom deployments. This is particularly common for RaaS providers, whose customers often request deployments with
+custom L1s (or L2s, in the case of L3s) or governance. This guide will walk you through the process of managing these
+chains using OP Deployer.
 
 > [!danger]
 > Chains deployed in this way are not subject to Optimism Governance. They may be running customized or unaudited
@@ -13,8 +13,8 @@ OP Deployer.
 
 The first step to deploying a custom Superchain is to bootstrap it onto an L1. This process will:
 
-- Deploy contract implementations that will be shared among all OP Chains deployed using this Superchain.
 - Deploy Superchain-wide management contracts like `SuperchainConfig` and `SuperchainVersions`.
+- Deploy contract implementations that will be shared among all OP Chains deployed using this Superchain.
 - Set up ownership so that you can control the Superchain.
 
 You will use the `bootstrap` [family][bootstrap] of commands on `op-deployer` to do this.
