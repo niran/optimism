@@ -2,6 +2,7 @@
 #                        INSTALL                       #
 ########################################################
 
+
 # Installs dependencies.
 install:
   forge install
