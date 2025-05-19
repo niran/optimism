@@ -1,6 +1,6 @@
 [tools]
 
-# Core dependencies
+# Core dependencies 
 go = "1.23.8"
 rust = "1.83.0"
 python = "3.12.0"
