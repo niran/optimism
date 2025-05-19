@@ -25,6 +25,7 @@ type PlannedTx struct {
 	// Block that we schedule against
 	AgainstBlock  plan.Lazy[eth.BlockInfo]
 	Unsigned      plan.Lazy[types.TxData]
+	Called        plan.Lazy[[]byte]
 	Signed        plan.Lazy[*types.Transaction]
 	Submitted     plan.Lazy[struct{}]
 	Included      plan.Lazy[*types.Receipt]
@@ -199,6 +200,38 @@ func WithEstimator(cl Estimator, invalidateOnNewBlock bool) Option {
 			ratio := tx.GasRatio.Value()
 			gas = uint64(float64(gas) * ratio)
 			return gas, nil
+		})
+	}
+}
+
+type ContractCaller interface {
+	Call(ctx context.Context, msg ethereum.CallMsg) ([]byte, error)
+}
+
+func WithContractCall(cl ContractCaller) Option {
+	return func(tx *PlannedTx) {
+		tx.Called.DependOn(
+			&tx.Sender,
+			&tx.To,
+			&tx.GasFeeCap,
+			&tx.GasTipCap,
+			&tx.Value,
+			&tx.Data,
+			&tx.AccessList,
+		)
+		tx.Called.Fn(func(ctx context.Context) ([]byte, error) {
+			msg := ethereum.CallMsg{
+				From:       tx.Sender.Value(),
+				To:         tx.To.Value(),
+				Gas:        0, // auto estimated by the node
+				GasPrice:   nil,
+				GasFeeCap:  tx.GasFeeCap.Value(),
+				GasTipCap:  tx.GasTipCap.Value(),
+				Value:      tx.Value.Value(),
+				Data:       tx.Data.Value(),
+				AccessList: tx.AccessList.Value(),
+			}
+			return cl.Call(ctx, msg)
 		})
 	}
 }
