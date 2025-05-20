@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
@@ -105,6 +106,21 @@ func WithDeployer() stack.Option[*Orchestrator] {
 	}
 }
 
+type L2Deployment struct {
+	systemConfigProxyAddr   common.Address
+	disputeGameFactoryProxy common.Address
+}
+
+var _ stack.L2Deployment = &L2Deployment{}
+
+func (d *L2Deployment) SystemConfigProxyAddr() common.Address {
+	return d.systemConfigProxyAddr
+}
+
+func (d *L2Deployment) DisputeGameFactoryProxyAddr() common.Address {
+	return d.disputeGameFactoryProxy
+}
+
 type worldBuilder struct {
 	p devtest.P
 
@@ -200,6 +216,13 @@ func WithInteropAtGenesis() DeployerOption {
 		for _, l2Cfg := range builder.L2s() {
 			l2Cfg.WithForkAtOffset(rollup.Interop, new(uint64))
 		}
+	}
+}
+
+// WithSequencingWindow overrides the number of L1 blocks in a sequencing window, applied to all L2s.
+func WithSequencingWindow(n uint64) DeployerOption {
+	return func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {
+		builder.WithGlobalOverride("sequencerWindowSize", uint64(n))
 	}
 }
 
