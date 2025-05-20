@@ -1,6 +1,7 @@
 package seqwindow
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -9,14 +10,14 @@ import (
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-service/retry"
 )
 
 // TestSequencingWindowExpiry tests that the sequencing window may expire,
 // the chain reorgs because of it, and that the chain then recovers.
+// This test can take 2-3 minutes to run.
 func TestSequencingWindowExpiry(gt *testing.T) {
 	t := devtest.SerialT(gt)
-	// TODO(#15769): fix sequencing-window expiry interop functionality
-	t.Skip("Interop sequencing-window expiry interaction is known to not fully work yet.")
 
 	sys := presets.NewSimpleInterop(t)
 	require := t.Require()
@@ -39,7 +40,14 @@ func TestSequencingWindowExpiry(gt *testing.T) {
 	t.Logger().Info("Tx 1 is safe now")
 
 	// Stop the batcher of chain A, so the L2 unsafe blocks will not get submitted.
-	require.NoError(sys.L2BatcherA.ActivityAPI().StopBatcher(t.Ctx()))
+	// This may take a while, since the batcher is still actively submitting new data.
+	require.NoError(retry.Do0(t.Ctx(), 10, retry.Exponential(), func() error {
+		err := sys.L2BatcherA.ActivityAPI().StopBatcher(t.Ctx())
+		if err != nil && strings.Contains(err.Error(), "batcher is not running") {
+			return nil
+		}
+		return err
+	}))
 	stoppedAt := sys.L1Network.WaitForBlock() // wait for new block, in case there is any batch left
 	// Make sure the supervisor has synced enough of the L1, for the local-safe query to work.
 	sys.Supervisor.AwaitMinL1(stoppedAt.Number)
