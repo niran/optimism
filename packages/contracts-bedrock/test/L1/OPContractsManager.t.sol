@@ -1321,6 +1321,20 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
         runUpgradeTestAndChecks(upgrader);
     }
 
+    function test_verifyOpcmCorrectness_succeeds() public {
+        skipIfNotOpFork("test_verifyOpcmCorrectness_succeeds");
+        skipIfCoverage(); // Coverage changes bytecode and breaks the verification script.
+
+        // Run the upgrade test and checks
+        runUpgradeTestAndChecks(upgrader);
+
+        // Run the verification script without etherscan verificatin. Hard to run with etherscan
+        // verification in these tests, can do it but means we add even more dependencies to the
+        // test environment.
+        VerifyOPCM verify = new VerifyOPCM();
+        verify.run(address(opcm), true);
+    }
+
     function test_isRcFalseAfterCalledByUpgrader_works() public {
         skipIfNotOpFork("test_isRcFalseAfterCalledByUpgrader_works");
         assertTrue(opcm.isRC());
