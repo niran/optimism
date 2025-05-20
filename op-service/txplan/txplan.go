@@ -99,6 +99,12 @@ func WithNonce(nonce uint64) Option {
 	}
 }
 
+func WithSender(sender common.Address) Option {
+	return func(tx *PlannedTx) {
+		tx.Sender.Set(sender)
+	}
+}
+
 func WithStaticNonce(nonce uint64) Option {
 	return func(tx *PlannedTx) {
 		tx.Nonce.Set(nonce)
@@ -217,7 +223,6 @@ func WithContractCall(cl ContractCaller) Option {
 			&tx.GasTipCap,
 			&tx.Value,
 			&tx.Data,
-			&tx.AccessList,
 		)
 		tx.Called.Fn(func(ctx context.Context) ([]byte, error) {
 			msg := ethereum.CallMsg{
@@ -231,6 +236,8 @@ func WithContractCall(cl ContractCaller) Option {
 				Data:       tx.Data.Value(),
 				AccessList: tx.AccessList.Value(),
 			}
+			// s := fmt.Sprintf("%s %s %s", msg.From.Hex(), msg.To.Hex(), hex.EncodeToString(msg.Data))
+
 			return cl.Call(ctx, msg)
 		})
 	}

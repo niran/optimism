@@ -3,6 +3,7 @@ package txintent
 import (
 	"context"
 
+	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/plan"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
@@ -11,10 +12,30 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+type Input interface {
+	EncodeInput() ([]byte, error)
+}
+
+type Output[O any] interface {
+	DecodeOutput(data []byte) (dest O, err error)
+}
+
 type Call interface {
 	To() (*common.Address, error)
-	Data() ([]byte, error)
 	AccessList() (types.AccessList, error)
+	Input
+}
+
+type View[O any] interface {
+	Call
+	Endpoint
+	WithTo(target common.Address) View[O]
+	WithClient(client apis.EthClient) View[O]
+	Output[O]
+}
+
+type Endpoint interface {
+	Client() apis.EthClient
 }
 
 type Result interface {
@@ -38,7 +59,7 @@ func NewIntent[V Call, R Result](opts ...txplan.Option) *IntentTx[V, R] {
 	})
 	v.PlannedTx.Data.DependOn(&v.Content)
 	v.PlannedTx.Data.Fn(func(ctx context.Context) (hexutil.Bytes, error) {
-		return v.Content.Value().Data()
+		return v.Content.Value().EncodeInput()
 	})
 	v.PlannedTx.AccessList.DependOn(&v.Content)
 	v.PlannedTx.AccessList.Fn(func(ctx context.Context) (types.AccessList, error) {
