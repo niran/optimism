@@ -449,38 +449,30 @@ func (m *ManagedNode) Close() error {
 func (m *ManagedNode) resetIfInconsistent() {
 	ctx, cancel := context.WithTimeout(m.ctx, internalTimeout)
 	defer cancel()
-
-	// Handle the given seen block from the node if it is an inconsistency.
-	handle := func(name string, seenFromNode eth.BlockID) (inconsistent bool) {
-		if seenFromNode == (eth.BlockID{}) {
-			return false // if we haven't seen anything, then don't reset to it
-		}
-		m.log.Debug("Checking last seen block from node for consistency", "safety", name, "block", seenFromNode)
-		localSafeMatchErr := m.backend.IsLocalSafe(ctx, m.chainID, seenFromNode)
-		if errors.Is(localSafeMatchErr, types.ErrFuture) {
-			localSafeMatchErr = nil // do not count it when the node is ahead of us
-		}
-		if localSafeMatchErr != nil {
-			m.log.Warn("Last seen block from node is inconsistent with supervisor local-safe blocks",
-				"safety", name, "err", localSafeMatchErr)
-		}
-		if localSafeMatchErr != nil {
-			// If either mismatches, we want to reset back no further than latest local-safe
-			localSafe, err := m.backend.LocalSafe(ctx, m.chainID)
-			if err != nil {
-				m.log.Debug("Cannot determine how to handle inconsistency, no local-safe data available",
-					"localSafeMatchErr", localSafeMatchErr, "err", err)
-				return false
-			}
-			m.resetTracker.beginBisectionReset(localSafe.Derived)
-			return true
-		}
-		return false
+	seenFromNode := m.lastNodeLocalSafe
+	name := "local-safe"
+	if seenFromNode == (eth.BlockID{}) {
+		return // if we haven't seen anything, then don't reset to it
 	}
-	if handle("local-safe", m.lastNodeLocalSafe) {
+	m.log.Debug("Checking last seen block from node for consistency", "safety", name, "block", seenFromNode)
+	localSafeMatchErr := m.backend.IsLocalSafe(ctx, m.chainID, seenFromNode)
+	if localSafeMatchErr == nil {
 		return
 	}
-	m.log.Debug("no inconsistency found")
+	if errors.Is(localSafeMatchErr, types.ErrFuture) {
+		m.log.Debug("node is ahead of op-supervisor local-safe data")
+		return // resetIfAhead will handle this
+	}
+	m.log.Warn("Last seen block from node is inconsistent with supervisor local-safe blocks",
+		"safety", name, "err", localSafeMatchErr)
+	// If there is a mismatch, we want to reset back no further than latest local-safe
+	localSafe, err := m.backend.LocalSafe(ctx, m.chainID)
+	if err != nil {
+		m.log.Debug("Cannot determine how to handle inconsistency, no local-safe data available",
+			"localSafeMatchErr", localSafeMatchErr, "err", err)
+		return
+	}
+	m.resetTracker.beginBisectionReset(localSafe.Derived)
 }
 
 // resetIfAhead checks if the node is ahead of the local-safe db

@@ -79,17 +79,19 @@ func (t *resetTracker) bisectToTarget() {
 	internalCtx, iCancel := context.WithTimeout(t.managed.ctx, internalTimeout)
 	defer iCancel()
 
-	// TODO: this `if` is an artifact of trying to re-target bisection while the resetTracker is already active.
+	// TODO(#16026): this `if` is an artifact of trying to re-target bisection while the resetTracker is already active.
 	// We can simplify by targeting one thing at a time.
 
 	// initialize the start of the range if it is empty
 	if t.a == (eth.BlockID{}) {
 		t.managed.log.Debug("Start of range is empty, fetching the anchor block as starting point")
-		// TODO: change name: GetActivationBlock, Anchor point = get first block of DB
+		// TODO(#16026): change name: GetActivationBlock, Anchor point = get first block of DB
 		anchor, err := t.managed.backend.AnchorPoint(internalCtx, t.managed.chainID)
 		if err != nil {
 			if errors.Is(err, types.ErrFuture) {
-				// TODO: need to trigger pre-interop reset
+				// TODO(#16026): need to trigger pre-interop reset
+				t.managed.log.Info("Missing activation block", "err", err)
+				return
 			}
 			t.managed.log.Error("failed to initialize start of bisection range", "err", err)
 			t.endReset()
@@ -112,13 +114,13 @@ func (t *resetTracker) bisectToTarget() {
 	// if the first block in the range can't be found or is inconsistent, we can't do a reset
 	nodeA, err := t.managed.Node.BlockRefByNumber(nodeCtx, t.a.Number)
 	if err != nil {
-		// TODO: if notFound error -> pre-interop
+		// TODO(#16026): if notFound error -> pre-interop
 		t.managed.log.Error("failed to get block at start of range. cannot reset node", "err", err)
 		t.endReset()
 		return
 	}
 	if nodeA.ID() != t.a {
-		// TODO pre-interop reset, need to re-derive the activation block
+		// TODO(#16026) pre-interop reset, need to re-derive the activation block
 		t.managed.log.Error("start of range is inconsistent with logs db. cannot reset node",
 			"a", t.a,
 			"block", nodeA.ID())
@@ -182,8 +184,8 @@ func (t *resetTracker) bisect() error {
 	nodeI := nodeIRef.ID()
 	err = t.managed.backend.IsLocalSafe(internalCtx, t.managed.chainID, nodeI)
 	if err != nil {
-		// TODO: could abort with critical-error on data-corruption
-		// TODO: could gracefully exit on block-replacement (no need to reset what is already being built replacement for)
+		// TODO(#16026): could abort with critical-error on data-corruption
+		// TODO(#16026): could gracefully exit on block-replacement (no need to reset what is already being built replacement for)
 		// Primarily we handle ErrFuture and ErrConflict here: where the DB does not have what the node has.
 		t.managed.log.Debug("midpoint of range is inconsistent. pulling back end of range", "i", i)
 		t.z = nodeI
@@ -208,6 +210,7 @@ func (t *resetTracker) resetHeadsFromTarget(target eth.BlockID) {
 		return
 	}
 
+	// TODO(#16026): This function should be split off from the resetTracker
 	t.managed.log.Info("reset target identified", "target", target)
 	var lUnsafe, xUnsafe, lSafe, xSafe, finalized eth.BlockID
 
@@ -219,17 +222,15 @@ func (t *resetTracker) resetHeadsFromTarget(target eth.BlockID) {
 		if errors.Is(err, types.ErrConflict) {
 			lUnsafe = target
 		} else {
-			// TODO critical err
-			t.managed.log.Error("failed to check local-unsafe", "target", target, "err", err)
+			t.managed.log.Error("Failed to check local-unsafe", "target", target, "err", err)
 			t.endReset()
 			return
 		}
 	} else {
-		// TODO tip of unsafe
+		// TODO(#16026): cleanup how we fall back to the tip of unsafe chain
 		tip, err := t.managed.backend.LocalUnsafe(internalCtx, t.managed.chainID)
 		if err != nil {
-			// TODO
-			t.managed.log.Error("failed to get latest local-unsafe", "err", err)
+			t.managed.log.Error("Failed to get latest local-unsafe", "err", err)
 			t.endReset()
 			return
 		}
@@ -263,7 +264,7 @@ func (t *resetTracker) resetHeadsFromTarget(target eth.BlockID) {
 		xSafe = lastXSafe.Derived
 	} else {
 		xSafe = target
-		// TODO: investigate, maybe instead return an error that cross-safe changed.
+		// TODO(#16026): investigate, maybe instead return an error that cross-safe changed.
 		// Resetting to older block should be unneeded.
 		// Note: op-node may not have the same blocks as op-supervisor has,
 		// and thus needs to start from an old forkchoice state.
@@ -282,7 +283,7 @@ func (t *resetTracker) resetHeadsFromTarget(target eth.BlockID) {
 		finalized = lastFinalized
 	} else {
 		finalized = target
-		// TODO: same story as cross-safe.
+		// TODO(#16026): same story as cross-safe.
 	}
 
 	// trigger the reset
