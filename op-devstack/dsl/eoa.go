@@ -87,6 +87,23 @@ func (u *EOA) Transfer(to common.Address, amount eth.ETH) *txplan.PlannedTx {
 	return u.Transact(u.PlanTransfer(to, amount))
 }
 
+func View[O any](tc TypedCall[O]) (out O) {
+	// apply to planned tx
+	opts := tc.Inner
+	tx := txplan.NewPlannedTx(opts...)
+	raw, err := tx.Called.Eval()
+	var out O
+	err := tx.OutputDecoder.Value().Decode(&out, raw)
+	return
+}
+
+// TODO different package, cleaner name
+func TestView[O any](tc TestTypedCall[O]) (out O) {
+	out, err := View[O](tc)
+	tc.T.Require().NoError(err)
+	return out
+}
+
 // Transact plans and executes a tx.
 // The success-state, as defined by the tx-plan options, is required.
 // The resulting evaluated tx is returned.
