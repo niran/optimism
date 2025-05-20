@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
@@ -717,6 +718,7 @@ type L2InitializationConfig struct {
 	UpgradeScheduleDeployConfig
 	L2CoreDeployConfig
 	AltDADeployConfig
+	DependencySet *depset.StaticConfigDependencySet
 }
 
 func (d *L2InitializationConfig) Check(log log.Logger) error {
@@ -1097,6 +1099,7 @@ func (d *DeployConfig) RollupConfig(l1StartBlock *eth.BlockRef, l2GenesisBlockHa
 		ProtocolVersionsAddress: d.ProtocolVersionsProxy,
 		AltDAConfig:             altDA,
 		ChainOpConfig:           chainOpConfig,
+		DependencySet:           d.DependencySet,
 	}, nil
 }
 

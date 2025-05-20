@@ -714,6 +714,7 @@ func (cfg SystemConfig) Start(t *testing.T, startOpts ...StartOption) (*System, 
 				EIP1559Denominator:       cfg.DeployConfig.EIP1559Denominator,
 				EIP1559DenominatorCanyon: &cfg.DeployConfig.EIP1559DenominatorCanyon,
 			},
+			// TODO: Work out how to set DependencySet properly
 		}
 	}
 	defaultConfig := makeRollupConfig()

@@ -71,9 +71,9 @@ func TestInteropUpgrade(gt *testing.T) {
 	activationBlockIDB := eth.HeaderBlockID(activationBlockHeaderB)
 	require.Equal(t, activationBlockHeaderA.Number.Uint64(), activationBlockHeaderB.Number.Uint64())
 
-	require.True(t, rollupConfigA.IsInteropActivationBlock(activationBlockHeaderA.Time),
+	require.True(t, rollupConfigA.IsInteropPredeployBlock(activationBlockHeaderA.Time),
 		"Interop should be active at the first L1 inclusion block in chain A")
-	require.True(t, rollupConfigB.IsInteropActivationBlock(activationBlockHeaderB.Time),
+	require.True(t, rollupConfigB.IsInteropPredeployBlock(activationBlockHeaderB.Time),
 		"Interop should be active at the first L1 inclusion block in chain B")
 
 	activationBlock := actors.ChainA.SequencerEngine.L2Chain().GetBlockByHash(activationBlockHeaderA.Hash())

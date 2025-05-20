@@ -218,6 +218,7 @@ func Setup(t require.TestingT, deployParams *DeployParams, alloc *AllocParams) *
 			EIP1559Denominator:       deployConf.EIP1559Denominator,
 			EIP1559DenominatorCanyon: &deployConf.EIP1559DenominatorCanyon,
 		},
+		// TODO: Work out how to set DependencySet properly
 	}
 
 	require.NoError(t, rollupCfg.Check())

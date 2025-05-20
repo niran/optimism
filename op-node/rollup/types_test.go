@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -587,6 +588,9 @@ func TestConfig_Check(t *testing.T) {
 				cfg.IsthmusTime = &isthmusTime
 				cfg.JovianTime = &jovianTime
 				cfg.InteropTime = &interopTime
+				depSet, err := depset.NewStaticConfigDependencySet(nil)
+				require.NoError(t, err)
+				cfg.DependencySet = depSet
 			},
 			expectedErr: nil,
 		},

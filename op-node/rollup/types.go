@@ -11,6 +11,7 @@ import (
 
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -36,6 +37,7 @@ var (
 	ErrChainIDsSame                  = errors.New("L1 and L2 chain IDs must be different")
 	ErrL1ChainIDNotPositive          = errors.New("L1 chain ID must be non-zero and positive")
 	ErrL2ChainIDNotPositive          = errors.New("L2 chain ID must be non-zero and positive")
+	ErrMissingDependencySet          = errors.New("missing dependency set")
 )
 
 type Genesis struct {
@@ -162,6 +164,8 @@ type Config struct {
 	// This feature (de)activates by L1 origin timestamp, to keep a consistent L1 block info per L2
 	// epoch.
 	PectraBlobScheduleTime *uint64 `json:"pectra_blob_schedule_time,omitempty"`
+
+	DependencySet *depset.StaticConfigDependencySet `json:"dependency_set"`
 }
 
 // ValidateL1Config checks L1 config variables for errors.
@@ -331,6 +335,9 @@ func (cfg *Config) Check() error {
 	}
 	if err := validateAltDAConfig(cfg); err != nil {
 		return err
+	}
+	if cfg.InteropTime != nil && cfg.DependencySet == nil {
+		return ErrMissingDependencySet
 	}
 
 	if err := checkFork(cfg.RegolithTime, cfg.CanyonTime, Regolith, Canyon); err != nil {
@@ -545,6 +552,33 @@ func (c *Config) IsInteropActivationBlock(l2BlockTime uint64) bool {
 	return c.IsInterop(l2BlockTime) &&
 		l2BlockTime >= c.BlockTime &&
 		!c.IsInterop(l2BlockTime-c.BlockTime)
+}
+
+func (c *Config) IsInteropPredeployBlock(l2BlockTime uint64) bool {
+	return !c.HasInteropPredeploys(l2BlockTime-1) && c.HasInteropPredeploys(l2BlockTime)
+}
+
+func (c *Config) HasInteropPredeploys(l2BlockTime uint64) bool {
+	if c.DependencySet == nil || len(c.DependencySet.Chains()) < 2 {
+		return false
+	}
+	if isIncluded, err := c.DependencySet.CanExecuteAt(eth.ChainIDFromBig(c.L2ChainID), l2BlockTime); err != nil {
+		panic(err) // TODO: Not sure why dep set can return an error....
+	} else if !isIncluded {
+		return false // We aren't included in the dependency set yet, so no predeploys
+	}
+	count := 0
+	for _, id := range c.DependencySet.Chains() {
+		if ok, err := c.DependencySet.CanExecuteAt(id, l2BlockTime); err != nil {
+			panic(err) // TODO: Dep set errors are annoying...
+		} else if ok {
+			count++
+			if count >= 2 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // IsActivationBlock returns the fork which activates at the block with time newTime if the previous

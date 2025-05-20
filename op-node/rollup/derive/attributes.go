@@ -132,7 +132,7 @@ func (ba *FetchingAttributesBuilder) PreparePayloadAttributes(ctx context.Contex
 		upgradeTxs = append(upgradeTxs, isthmus...)
 	}
 
-	if ba.rollupCfg.IsInteropActivationBlock(nextL2Time) {
+	if ba.rollupCfg.IsInteropPredeployBlock(nextL2Time) {
 		interop, err := InteropNetworkUpgradeTransactions()
 		if err != nil {
 			return nil, NewCriticalError(fmt.Errorf("failed to build interop network upgrade txs: %w", err))

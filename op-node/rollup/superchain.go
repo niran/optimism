@@ -96,6 +96,8 @@ func LoadOPStackRollupConfig(chainID uint64) (*Config, error) {
 		L1SystemConfigAddress:  *addrs.SystemConfigProxy,
 		AltDAConfig:            altDA,
 		ChainOpConfig:          chOpConfig,
+
+		// TODO: Work out how to set DependencySet properly (it's not yet in the superchain-registry but will be)
 	}
 
 	cfg.ProtocolVersionsAddress = superConfig.ProtocolVersionsAddr
