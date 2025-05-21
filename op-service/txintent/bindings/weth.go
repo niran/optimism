@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
@@ -18,6 +19,10 @@ func NewWETHCallFactory(opts ...CallFactoryOption) *WETHCallFactory {
 	return &WETHCallFactory{BaseCallFactory: *NewBaseCallFactory(opts...)}
 }
 
+func (f *WETHCallFactory) WithDefaultAddr() {
+	f.ApplyFactoryOptions(WithTo(common.HexToAddress(predeploys.WETH)))
+}
+
 func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.CallView[eth.ETH] {
 	return &BalanceOfCall{Addr: addr, WETHCallFactory: *f}
 }
@@ -27,15 +32,17 @@ func (f *WETHCallFactory) Transfer(dest common.Address, amount eth.ETH) txintent
 }
 
 type WETH struct {
-	// Each field is a function, that is set up automatically with some reflection
+	WETHCallFactory
+
 	BalanceOf func(addr common.Address) txintent.CallView[eth.ETH]
 	Transfer  func(dest common.Address, amount eth.ETH) txintent.CallView[bool]
 }
 
 func NewWETH(f *WETHCallFactory) *WETH {
 	return &WETH{
-		BalanceOf: f.BalanceOf,
-		Transfer:  f.Transfer,
+		WETHCallFactory: *f,
+		BalanceOf:       f.BalanceOf,
+		Transfer:        f.Transfer,
 	}
 }
 
