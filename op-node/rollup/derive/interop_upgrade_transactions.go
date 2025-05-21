@@ -45,23 +45,10 @@ func InteropNetworkUpgradeTransactions() ([]hexutil.Bytes, error) {
 	}
 	upgradeTxns = append(upgradeTxns, deployCrossL2InboxTx)
 
-	// 2. Update CrossL2Inbox Proxy
-	updateCrossL2InboxProxyTx, err := types.NewTx(&types.DepositTx{
-		SourceHash:          updateCrossL2InboxProxySource.SourceHash(),
-		From:                common.Address{},
-		To:                  &predeploys.CrossL2InboxAddr,
-		Mint:                big.NewInt(0),
-		Value:               big.NewInt(0),
-		Gas:                 50_000,
-		IsSystemTransaction: false,
-		Data:                upgradeToCalldata(CrossL2InboxAddress),
-	}).MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	upgradeTxns = append(upgradeTxns, updateCrossL2InboxProxyTx)
+	// Note that the CrossL2Inbox proxy is not updated here.
+	// It is only updated when the chain is first in a dependency set with at least two active chains.
 
-	// 3. Deploy L2ToL2CrossDomainMessenger
+	// 2. Deploy L2ToL2CrossDomainMessenger
 	deployL2ToL2MessengerTx, err := types.NewTx(&types.DepositTx{
 		SourceHash:          deployL2ToL2MessengerSource.SourceHash(),
 		From:                l2ToL2MessengerDeployerAddress,
@@ -77,7 +64,7 @@ func InteropNetworkUpgradeTransactions() ([]hexutil.Bytes, error) {
 	}
 	upgradeTxns = append(upgradeTxns, deployL2ToL2MessengerTx)
 
-	// 4. Update L2ToL2CrossDomainMessenger Proxy
+	// 3. Update L2ToL2CrossDomainMessenger Proxy
 	updateL2ToL2MessengerProxyTx, err := types.NewTx(&types.DepositTx{
 		SourceHash:          updateL2ToL2MessengerProxySource.SourceHash(),
 		From:                common.Address{},
@@ -94,4 +81,22 @@ func InteropNetworkUpgradeTransactions() ([]hexutil.Bytes, error) {
 	upgradeTxns = append(upgradeTxns, updateL2ToL2MessengerProxyTx)
 
 	return upgradeTxns, nil
+}
+
+func InteropActivateCrossL2InboxTransaction() (hexutil.Bytes, error) {
+	// Update CrossL2Inbox Proxy
+	updateCrossL2InboxProxyTx, err := types.NewTx(&types.DepositTx{
+		SourceHash:          updateCrossL2InboxProxySource.SourceHash(),
+		From:                common.Address{},
+		To:                  &predeploys.CrossL2InboxAddr,
+		Mint:                big.NewInt(0),
+		Value:               big.NewInt(0),
+		Gas:                 50_000,
+		IsSystemTransaction: false,
+		Data:                upgradeToCalldata(CrossL2InboxAddress),
+	}).MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	return updateCrossL2InboxProxyTx, nil
 }

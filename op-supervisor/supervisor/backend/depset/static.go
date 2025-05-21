@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 
@@ -47,6 +48,9 @@ type StaticConfigDependencySet struct {
 	indexToID map[types.ChainIndex]eth.ChainID
 	// cached list of chain IDs, sorted by ID value
 	chainIDs []eth.ChainID
+	// cached earliest timestamp where there are two chains active
+	// math.MaxUint64 if there are less than two chains in the dependency set
+	earliestMultiChainTimestamp uint64
 	// overrideMessageExpiryWindow is the message expiry window to use for this dependency set
 	overrideMessageExpiryWindow uint64
 }
@@ -160,6 +164,7 @@ func (ds *StaticConfigDependencySet) UnmarshalTOML(v interface{}) error {
 func (ds *StaticConfigDependencySet) hydrate() error {
 	ds.indexToID = make(map[types.ChainIndex]eth.ChainID)
 	ds.chainIDs = make([]eth.ChainID, 0, len(ds.dependencies))
+	activationTimes := make([]uint64, 0, len(ds.dependencies))
 	for id, dep := range ds.dependencies {
 		if dep.ChainIndex.IsTopBitSet() {
 			return fmt.Errorf("%w: chain %s cannot have the top bit set, and this subset is reserved for internal use: %d", errUsingReservedChainIndex, id, dep.ChainIndex)
@@ -169,10 +174,17 @@ func (ds *StaticConfigDependencySet) hydrate() error {
 		}
 		ds.indexToID[dep.ChainIndex] = id
 		ds.chainIDs = append(ds.chainIDs, id)
+		activationTimes = append(activationTimes, dep.ActivationTime)
 	}
 	sort.Slice(ds.chainIDs, func(i, j int) bool {
 		return ds.chainIDs[i].Cmp(ds.chainIDs[j]) < 0
 	})
+	if len(activationTimes) > 1 {
+		sort.Slice(activationTimes, func(i, j int) bool { return activationTimes[i] < activationTimes[j] })
+		ds.earliestMultiChainTimestamp = activationTimes[1]
+	} else {
+		ds.earliestMultiChainTimestamp = math.MaxUint64
+	}
 	return nil
 }
 
@@ -198,6 +210,19 @@ func (ds *StaticConfigDependencySet) CanInitiateAt(chainID eth.ChainID, initTime
 		return false, nil
 	}
 	return initTimestamp >= dep.HistoryMinTime, nil
+}
+
+func (ds *StaticConfigDependencySet) HasCrossL2Inbox(chainID eth.ChainID, l2BlockTime uint64) (bool, error) {
+	if len(ds.chainIDs) < 2 || l2BlockTime < ds.earliestMultiChainTimestamp {
+		// CrossL2Inbox not configured prior to having two active chains in the dependency set
+		return false, nil
+	}
+	isIncluded, err := ds.CanExecuteAt(chainID, l2BlockTime)
+	if err != nil {
+		return false, err
+	}
+	// CrossL2Inbox not configured prior to chain being active
+	return isIncluded, nil
 }
 
 func (ds *StaticConfigDependencySet) Chains() []eth.ChainID {

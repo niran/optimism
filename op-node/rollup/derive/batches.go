@@ -134,7 +134,7 @@ func checkSingularBatch(cfg *rollup.Config, log log.Logger, l1Blocks []eth.L1Blo
 	}
 
 	// Future forks that contain upgrade transactions must be added here.
-	if (cfg.IsInteropPredeployBlock(batch.Timestamp)) && len(batch.Transactions) > 0 {
+	if (cfg.IsInteropActivationBlock(batch.Timestamp)) && len(batch.Transactions) > 0 {
 		log.Warn("dropping batch with user transactions in fork activation block")
 		return BatchDrop
 	}

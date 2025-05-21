@@ -204,6 +204,10 @@ func (m mockDependencySet) ChainIndexFromID(chain eth.ChainID) (types.ChainIndex
 	return types.ChainIndex(v.Uint64() + 1000), nil
 }
 
+func (m mockDependencySet) HasCrossL2Inbox(chainID eth.ChainID, l2BlockTime uint64) (bool, error) {
+	return m.CanExecuteAt(chainID, l2BlockTime)
+}
+
 func (m mockDependencySet) Chains() []eth.ChainID {
 	return nil
 }

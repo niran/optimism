@@ -172,6 +172,14 @@ func testChainCapabilities(t *testing.T, result DependencySet) {
 	require.NoError(t, err)
 	require.False(t, v)
 
+	v, err = result.HasCrossL2Inbox(eth.ChainIDFromUInt64(900), 42)
+	require.NoError(t, err)
+	require.True(t, v)
+
+	v, err = result.HasCrossL2Inbox(eth.ChainIDFromUInt64(900), 41)
+	require.NoError(t, err)
+	require.False(t, v)
+
 	// Test chain 901
 	v, err = result.CanExecuteAt(eth.ChainIDFromUInt64(901), 30)
 	require.NoError(t, err)
@@ -189,6 +197,22 @@ func testChainCapabilities(t *testing.T, result DependencySet) {
 	require.NoError(t, err)
 	require.False(t, v)
 
+	v, err = result.HasCrossL2Inbox(eth.ChainIDFromUInt64(901), 30)
+	require.NoError(t, err)
+	require.False(t, v, "should have activate CrossL2 with only one active chain")
+
+	v, err = result.HasCrossL2Inbox(eth.ChainIDFromUInt64(901), 42)
+	require.NoError(t, err)
+	require.True(t, v, "should have activate CrossL2 when at least two chains active")
+
+	v, err = result.HasCrossL2Inbox(eth.ChainIDFromUInt64(901), 41)
+	require.NoError(t, err)
+	require.False(t, v)
+
+	v, err = result.HasCrossL2Inbox(eth.ChainIDFromUInt64(901), 29)
+	require.NoError(t, err)
+	require.False(t, v)
+
 	// Test non-existent chain
 	v, err = result.CanExecuteAt(eth.ChainIDFromUInt64(902), 100000)
 	require.NoError(t, err)
@@ -197,4 +221,127 @@ func testChainCapabilities(t *testing.T, result DependencySet) {
 	v, err = result.CanInitiateAt(eth.ChainIDFromUInt64(902), 100000)
 	require.NoError(t, err)
 	require.False(t, v, "902 not a dependency")
+
+	v, err = result.HasCrossL2Inbox(eth.ChainIDFromUInt64(902), 100000)
+	require.NoError(t, err)
+	require.False(t, v, "902 not a dependency")
+}
+
+func TestHasCrossL2InboxDeployed(t *testing.T) {
+	requireNotDeployed := func(t *testing.T, depSet DependencySet, chainID eth.ChainID, l2BlockTime uint64) {
+		deployed, err := depSet.HasCrossL2Inbox(chainID, l2BlockTime)
+		require.NoError(t, err)
+		require.False(t, deployed)
+	}
+	requireDeployed := func(t *testing.T, depSet DependencySet, chainID eth.ChainID, l2BlockTime uint64) {
+		deployed, err := depSet.HasCrossL2Inbox(chainID, l2BlockTime)
+		require.NoError(t, err)
+		require.True(t, deployed)
+	}
+	t.Run("NotDeployedForDependencySetOf1", func(t *testing.T) {
+		chainID := eth.ChainIDFromUInt64(900)
+		depSet, err := NewStaticConfigDependencySet(
+			map[eth.ChainID]*StaticConfigDependency{
+				chainID: {
+					ChainIndex:     900,
+					ActivationTime: 42,
+					HistoryMinTime: 100,
+				},
+			})
+		require.NoError(t, err)
+		requireNotDeployed(t, depSet, chainID, 0)
+		requireNotDeployed(t, depSet, chainID, 41)
+		requireNotDeployed(t, depSet, chainID, 42)
+		requireNotDeployed(t, depSet, chainID, 98298248)
+	})
+
+	t.Run("DeployedWhenSecondChainActivates", func(t *testing.T) {
+		chainID1 := eth.ChainIDFromUInt64(900)
+		chainID2 := eth.ChainIDFromUInt64(901)
+		depSet, err := NewStaticConfigDependencySet(
+			map[eth.ChainID]*StaticConfigDependency{
+				chainID1: {
+					ChainIndex:     900,
+					ActivationTime: 50,
+					HistoryMinTime: 100,
+				},
+				chainID2: {
+					ChainIndex:     901,
+					ActivationTime: 42,
+					HistoryMinTime: 100,
+				},
+			})
+		require.NoError(t, err)
+		requireNotDeployed(t, depSet, chainID1, 0)
+		requireNotDeployed(t, depSet, chainID2, 0)
+
+		requireNotDeployed(t, depSet, chainID1, 41)
+		requireNotDeployed(t, depSet, chainID2, 41)
+
+		requireNotDeployed(t, depSet, chainID1, 42)
+		requireNotDeployed(t, depSet, chainID2, 42)
+
+		requireNotDeployed(t, depSet, chainID1, 49)
+		requireNotDeployed(t, depSet, chainID2, 49)
+
+		requireDeployed(t, depSet, chainID1, 50)
+		requireDeployed(t, depSet, chainID2, 50)
+	})
+
+	t.Run("NotDeployedUntilChainActivates", func(t *testing.T) {
+		chainID1 := eth.ChainIDFromUInt64(900)
+		chainID2 := eth.ChainIDFromUInt64(901)
+		chainID3 := eth.ChainIDFromUInt64(902)
+		depSet, err := NewStaticConfigDependencySet(
+			map[eth.ChainID]*StaticConfigDependency{
+				chainID1: {
+					ChainIndex:     900,
+					ActivationTime: 0,
+					HistoryMinTime: 100,
+				},
+				chainID2: {
+					ChainIndex:     901,
+					ActivationTime: 0,
+					HistoryMinTime: 100,
+				},
+				chainID3: {
+					ChainIndex:     902,
+					ActivationTime: 60,
+					HistoryMinTime: 100,
+				},
+			})
+		require.NoError(t, err)
+		requireDeployed(t, depSet, chainID1, 0)
+		requireDeployed(t, depSet, chainID2, 0)
+		requireNotDeployed(t, depSet, chainID3, 0)
+
+		requireDeployed(t, depSet, chainID1, 59)
+		requireDeployed(t, depSet, chainID2, 59)
+		requireNotDeployed(t, depSet, chainID3, 59)
+
+		requireDeployed(t, depSet, chainID1, 60)
+		requireDeployed(t, depSet, chainID2, 60)
+		requireDeployed(t, depSet, chainID3, 60)
+	})
+
+	t.Run("DeployedAtGenesis", func(t *testing.T) {
+		chainID1 := eth.ChainIDFromUInt64(900)
+		chainID2 := eth.ChainIDFromUInt64(901)
+		depSet, err := NewStaticConfigDependencySet(
+			map[eth.ChainID]*StaticConfigDependency{
+				chainID1: {
+					ChainIndex:     900,
+					ActivationTime: 0,
+					HistoryMinTime: 100,
+				},
+				chainID2: {
+					ChainIndex:     901,
+					ActivationTime: 0,
+					HistoryMinTime: 100,
+				},
+			})
+		require.NoError(t, err)
+		requireDeployed(t, depSet, chainID1, 0)
+		requireDeployed(t, depSet, chainID2, 0)
+	})
 }

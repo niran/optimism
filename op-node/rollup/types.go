@@ -555,31 +555,21 @@ func (c *Config) IsInteropActivationBlock(l2BlockTime uint64) bool {
 		!c.IsInterop(l2BlockTime-c.BlockTime)
 }
 
-func (c *Config) IsInteropPredeployBlock(l2BlockTime uint64) bool {
-	return !c.HasInteropPredeploys(l2BlockTime-1) && c.HasInteropPredeploys(l2BlockTime)
-}
-
-func (c *Config) HasInteropPredeploys(l2BlockTime uint64) bool {
-	if c.DependencySet == nil || len(c.DependencySet.Chains()) < 2 {
-		return false
+func (c *Config) IsCrossL2InboxDeploymentBlock(l2BlockTime uint64) (bool, error) {
+	if c.DependencySet == nil {
+		// Pre-interop so do not deploy
+		return false, nil
 	}
-	if isIncluded, err := c.DependencySet.CanExecuteAt(eth.ChainIDFromBig(c.L2ChainID), l2BlockTime); err != nil {
-		panic(err) // TODO: Not sure why dep set can return an error....
-	} else if !isIncluded {
-		return false // We aren't included in the dependency set yet, so no predeploys
+	chainID := eth.ChainIDFromBig(c.L2ChainID)
+	alreadyDeployed, err := c.DependencySet.HasCrossL2Inbox(chainID, l2BlockTime-1)
+	if err != nil {
+		return false, err
 	}
-	count := 0
-	for _, id := range c.DependencySet.Chains() {
-		if ok, err := c.DependencySet.CanExecuteAt(id, l2BlockTime); err != nil {
-			panic(err) // TODO: Dep set errors are annoying...
-		} else if ok {
-			count++
-			if count >= 2 {
-				return true
-			}
-		}
+	toBeDeployed, err := c.DependencySet.HasCrossL2Inbox(chainID, l2BlockTime)
+	if err != nil {
+		return false, err
 	}
-	return false
+	return !alreadyDeployed && toBeDeployed, nil
 }
 
 // IsActivationBlock returns the fork which activates at the block with time newTime if the previous
