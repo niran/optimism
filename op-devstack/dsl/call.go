@@ -25,7 +25,7 @@ func checkTestable[O any](call txintent.CallView[O]) TestCallView[O] {
 	return callTest
 }
 
-// Read views a tx execution result by using the planned contract bindings
+// Read executes a new message call without creating a transaction on the blockchain
 func Read[O any](call txintent.CallView[O], opts ...txplan.Option) O {
 	callTest := checkTestable(call)
 	o, err := txintent.Read(call, callTest.Test().Ctx(), opts...)
