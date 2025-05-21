@@ -165,6 +165,7 @@ type Config struct {
 	// epoch.
 	PectraBlobScheduleTime *uint64 `json:"pectra_blob_schedule_time,omitempty"`
 
+	// TODO(#16041): This is probably not the right thing to do...
 	DependencySet *depset.StaticConfigDependencySet `json:"dependency_set"`
 }
 
