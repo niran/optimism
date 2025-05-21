@@ -21,7 +21,6 @@ func TestMain(m *testing.M) {
 }
 
 type L2 struct {
-	Chain  *dsl.L2Network
 	EL     *dsl.L2ELNode
 	Funder *dsl.Funder
 }
@@ -42,13 +41,11 @@ func TestLoad(gt *testing.T) {
 
 	l2ELA := sys.L2ChainA.PublicRPC()
 	L2A := &L2{
-		Chain:  sys.L2ChainA,
 		EL:     l2ELA,
 		Funder: dsl.NewFunder(sys.Wallet, sys.FaucetA, l2ELA),
 	}
 	l2ELB := sys.L2ChainB.PublicRPC()
 	L2B := &L2{
-		Chain:  sys.L2ChainB,
 		EL:     l2ELB,
 		Funder: dsl.NewFunder(sys.Wallet, sys.FaucetB, l2ELB),
 	}
