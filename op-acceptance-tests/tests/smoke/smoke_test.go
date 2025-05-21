@@ -66,7 +66,7 @@ func TestWrapETH(gt *testing.T) {
 	// Will revert because tx.sender is not set
 	t.Require().Error(err)
 	// Provide tx.sender using txplan
-	// Success beacuse tx.sender(Alice) has enough WETH
+	// Success because tx.sender(Alice) has enough WETH
 	require.True(dsl.Read(weth.Transfer(bob.Address(), eth.OneEther), txplan.WithSender(alice.Address())))
 
 	// Write: Alice sends Bob 1 WETH
@@ -79,7 +79,7 @@ func TestWrapETH(gt *testing.T) {
 
 	// Write not using the DSL. Therefore you need to manually error handle
 	_, err = alice.Write(weth.Transfer(bob.Address(), eth.OneEther))
-	// Success beacuse tx.sender(Alice) has enough WETH
+	// Success because tx.sender(Alice) has enough WETH
 	require.NoError(err)
 
 	// Read: Alice has 0 WETH
