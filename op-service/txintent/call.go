@@ -18,7 +18,7 @@ type Input interface {
 	EncodeInput() ([]byte, error)
 }
 
-func Write(call Call, opts ...txplan.Option) (*types.Receipt, error) {
+func Write(call Call, ctx context.Context, opts ...txplan.Option) (*types.Receipt, error) {
 	target, _ := call.To()
 	calldata, err := call.EncodeInput()
 	if err != nil {
@@ -29,8 +29,7 @@ func Write(call Call, opts ...txplan.Option) (*types.Receipt, error) {
 		txplan.WithTo(target),
 		txplan.Combine(opts...),
 	)
-	// fixme for context
-	receipt, err := tx.Included.Eval(context.Background())
+	receipt, err := tx.Included.Eval(ctx)
 	if err != nil {
 		return nil, err
 	}

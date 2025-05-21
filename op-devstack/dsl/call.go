@@ -26,7 +26,7 @@ func checkTestable[O any](call txintent.CallView[O]) TestCallView[O] {
 
 func Read[O any](call txintent.CallView[O], opts ...txplan.Option) O {
 	callTest := checkTestable(call)
-	o, err := txintent.Read(call, opts...)
+	o, err := txintent.Read(call, callTest.Test().Ctx(), opts...)
 	callTest.Test().Require().NoError(err)
 	return o
 }
@@ -34,7 +34,7 @@ func Read[O any](call txintent.CallView[O], opts ...txplan.Option) O {
 func Write[O any](user *EOA, call txintent.CallView[O], opts ...txplan.Option) *types.Receipt {
 	callTest := checkTestable(call)
 	finalOpts := txplan.Combine(user.Plan(), txplan.Combine(opts...))
-	o, err := txintent.Write(call, finalOpts)
+	o, err := user.Write(call, finalOpts)
 	callTest.Test().Require().NoError(err)
 	return o
 }

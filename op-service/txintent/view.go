@@ -18,7 +18,7 @@ type CallView[O any] interface {
 	Output[O]
 }
 
-func Read[O any](view CallView[O], opts ...txplan.Option) (O, error) {
+func Read[O any](view CallView[O], ctx context.Context, opts ...txplan.Option) (O, error) {
 	target, err := view.To()
 	if err != nil {
 		return *new(O), err
@@ -37,9 +37,7 @@ func Read[O any](view CallView[O], opts ...txplan.Option) (O, error) {
 		txplan.WithSender(common.Address{}),
 		txplan.Combine(opts...),
 	)
-
-	// fixme for context
-	res, err := tx.Read.Eval(context.Background())
+	res, err := tx.Read.Eval(ctx)
 	if err != nil {
 		return *new(O), err
 	}

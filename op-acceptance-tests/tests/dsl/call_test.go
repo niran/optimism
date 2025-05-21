@@ -59,7 +59,7 @@ func TestCallViewWriteWETH(gt *testing.T) {
 
 	// read(manual error handling)
 	// without address sender so failure
-	_, err = txintent.Read(weth.Transfer(bob.Address(), eth.OneEther))
+	_, err = txintent.Read(weth.Transfer(bob.Address(), eth.OneEther), t.Ctx())
 	t.Require().Error(err)
 	// with address, msg.sender set
 	require.True(dsl.Read(weth.Transfer(bob.Address(), eth.OneEther), txplan.WithSender(alice.Address())))
