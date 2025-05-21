@@ -30,7 +30,7 @@ func Read[O any](view CallView[O], ctx context.Context, opts ...txplan.Option) (
 	client := view.Client()
 	tx := txplan.NewPlannedTx(
 		txplan.WithAgainstLatestBlock(client),
-		txplan.WithContractCall(client),
+		txplan.WithReader(client),
 		txplan.WithData(calldata),
 		txplan.WithTo(target),
 		// use default sender as null

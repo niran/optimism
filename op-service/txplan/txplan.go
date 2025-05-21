@@ -294,11 +294,11 @@ func WithAgainstLatestBlock(cl AgainstLatestBlock) Option {
 	}
 }
 
-type ContractCaller interface {
+type Reader interface {
 	Call(ctx context.Context, msg ethereum.CallMsg) ([]byte, error)
 }
 
-func WithContractCall(cl ContractCaller) Option {
+func WithReader(cl Reader) Option {
 	return func(tx *PlannedTx) {
 		tx.Read.DependOn(
 			&tx.Sender,
