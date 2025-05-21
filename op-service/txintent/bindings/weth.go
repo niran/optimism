@@ -37,11 +37,11 @@ func (f *WETHCallFactory) WithTest(t devtest.T) *WETHCallFactory {
 }
 
 func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.CallView[eth.ETH] {
-	return BalanceOfCall{Addr: addr, target: f.Target, client: f.Client, t: f.T}
+	return &BalanceOfCall{Addr: addr, target: f.Target, client: f.Client, t: f.T}
 }
 
 func (f *WETHCallFactory) Transfer(dest common.Address, amount eth.ETH) txintent.CallView[bool] {
-	return TransferCall{Dest: dest, Amount: amount, target: f.Target, client: f.Client, t: f.T}
+	return &TransferCall{Dest: dest, Amount: amount, target: f.Target, client: f.Client, t: f.T}
 }
 
 type WETH struct {
@@ -65,13 +65,13 @@ type BalanceOfCall struct {
 	t      devtest.T
 }
 
-func (c BalanceOfCall) EncodeInput() ([]byte, error) {
+func (c *BalanceOfCall) EncodeInput() ([]byte, error) {
 	abi := w3.MustNewFunc("balanceOf(address)", "uint256")
 	calldata, err := abi.EncodeArgs(c.Addr)
 	return calldata, err
 }
 
-func (c BalanceOfCall) DecodeOutput(data []byte) (eth.ETH, error) {
+func (c *BalanceOfCall) DecodeOutput(data []byte) (eth.ETH, error) {
 	abi := w3.MustNewFunc("balanceOf(address)", "uint256")
 	var result *big.Int // w3 does not like static types and panics
 	err := abi.DecodeReturns(data, &result)
@@ -82,19 +82,19 @@ func (c BalanceOfCall) DecodeOutput(data []byte) (eth.ETH, error) {
 	return res, err
 }
 
-func (c BalanceOfCall) To() (*common.Address, error) {
+func (c *BalanceOfCall) To() (*common.Address, error) {
 	return &c.target, nil
 }
 
-func (c BalanceOfCall) Client() apis.EthClient {
+func (c *BalanceOfCall) Client() apis.EthClient {
 	return c.client
 }
 
-func (c BalanceOfCall) AccessList() (types.AccessList, error) {
+func (c *BalanceOfCall) AccessList() (types.AccessList, error) {
 	return types.AccessList{}, nil
 }
 
-func (c BalanceOfCall) Test() devtest.T {
+func (c *BalanceOfCall) Test() devtest.T {
 	return c.t
 }
 
@@ -107,33 +107,33 @@ type TransferCall struct {
 	t      devtest.T
 }
 
-func (c TransferCall) EncodeInput() ([]byte, error) {
+func (c *TransferCall) EncodeInput() ([]byte, error) {
 	amount := c.Amount.ToBig()
 	abi := w3.MustNewFunc("transfer(address, uint256)", "bool")
 	calldata, err := abi.EncodeArgs(c.Dest, amount)
 	return calldata, err
 }
 
-func (c TransferCall) DecodeOutput(data []byte) (bool, error) {
+func (c *TransferCall) DecodeOutput(data []byte) (bool, error) {
 	abi := w3.MustNewFunc("transfer(address, uint256)", "bool")
 	var result bool
 	err := abi.DecodeReturns(data, &result)
 	return result, err
 }
 
-func (c TransferCall) To() (*common.Address, error) {
+func (c *TransferCall) To() (*common.Address, error) {
 	return &c.target, nil
 }
 
-func (c TransferCall) Client() apis.EthClient {
+func (c *TransferCall) Client() apis.EthClient {
 	return c.client
 }
 
-func (c TransferCall) AccessList() (types.AccessList, error) {
+func (c *TransferCall) AccessList() (types.AccessList, error) {
 	return types.AccessList{}, nil
 }
 
-func (c TransferCall) Test() devtest.T {
+func (c *TransferCall) Test() devtest.T {
 	return c.t
 }
 
