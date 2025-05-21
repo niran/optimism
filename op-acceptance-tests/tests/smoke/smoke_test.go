@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
-	"github.com/ethereum-optimism/optimism/op-devstack/dsl/contractdsl"
+	"github.com/ethereum-optimism/optimism/op-devstack/dsl/contract"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txintent/bindings"
@@ -42,24 +42,24 @@ func TestWrapETH(gt *testing.T) {
 	require.NotEqual(alice.Address(), bob.Address())
 
 	// Alice and Bob has zero WETH
-	require.Equal(eth.ZeroWei, contractdsl.Read(weth.BalanceOf(alice.Address())))
-	require.Equal(eth.ZeroWei, contractdsl.Read(weth.BalanceOf(bob.Address())))
+	require.Equal(eth.ZeroWei, contract.Read(weth.BalanceOf(alice.Address())))
+	require.Equal(eth.ZeroWei, contract.Read(weth.BalanceOf(bob.Address())))
 
 	// Write: Alice wraps 1 WETH
 	alice.Transfer(*wethAddr, eth.OneEther)
 
 	// Read: Alice has 1 WETH
-	require.Equal(eth.OneEther, contractdsl.Read(weth.BalanceOf(alice.Address())))
+	require.Equal(eth.OneEther, contract.Read(weth.BalanceOf(alice.Address())))
 	// Read: Bob has 0 WETH
-	require.Equal(eth.ZeroWei, contractdsl.Read(weth.BalanceOf(bob.Address())))
+	require.Equal(eth.ZeroWei, contract.Read(weth.BalanceOf(bob.Address())))
 
 	// Write: Alice wraps 1 WETH again
 	alice.Transfer(*wethAddr, eth.OneEther)
 
 	// Read: Alice has 2 WETH
-	require.Equal(eth.Ether(2), contractdsl.Read(weth.BalanceOf(alice.Address())))
+	require.Equal(eth.Ether(2), contract.Read(weth.BalanceOf(alice.Address())))
 	// Read: Bob has 0 WETH
-	require.Equal(eth.ZeroWei, contractdsl.Read(weth.BalanceOf(bob.Address())))
+	require.Equal(eth.ZeroWei, contract.Read(weth.BalanceOf(bob.Address())))
 
 	// Read not using the DSL. Therefore you need to manually error handle and also set context
 	_, err := contractio.Read(weth.Transfer(bob.Address(), eth.OneEther), t.Ctx())
@@ -67,21 +67,21 @@ func TestWrapETH(gt *testing.T) {
 	t.Require().Error(err)
 	// Provide tx.sender using txplan
 	// Success because tx.sender(Alice) has enough WETH
-	require.True(contractdsl.Read(weth.Transfer(bob.Address(), eth.OneEther), txplan.WithSender(alice.Address())))
+	require.True(contract.Read(weth.Transfer(bob.Address(), eth.OneEther), txplan.WithSender(alice.Address())))
 
 	// Write: Alice sends Bob 1 WETH
-	contractdsl.Write(alice, weth.Transfer(bob.Address(), eth.OneEther))
+	contract.Write(alice, weth.Transfer(bob.Address(), eth.OneEther))
 
 	// Read: Alice has 1 WETH
-	require.Equal(eth.OneEther, contractdsl.Read(weth.BalanceOf(alice.Address())))
+	require.Equal(eth.OneEther, contract.Read(weth.BalanceOf(alice.Address())))
 	// Read: Bob has 1 WETH
-	require.Equal(eth.OneEther, contractdsl.Read(weth.BalanceOf(bob.Address())))
+	require.Equal(eth.OneEther, contract.Read(weth.BalanceOf(bob.Address())))
 
 	// Write: Alice sends Bob 1 WETH
-	contractdsl.Write(alice, weth.Transfer(bob.Address(), eth.OneEther))
+	contract.Write(alice, weth.Transfer(bob.Address(), eth.OneEther))
 
 	// Read: Alice has 0 WETH
-	require.Equal(eth.ZeroWei, contractdsl.Read(weth.BalanceOf(alice.Address())))
+	require.Equal(eth.ZeroWei, contract.Read(weth.BalanceOf(alice.Address())))
 	// Read: Bob has 2 WETH
-	require.Equal(eth.Ether(2), contractdsl.Read(weth.BalanceOf(bob.Address())))
+	require.Equal(eth.Ether(2), contract.Read(weth.BalanceOf(bob.Address())))
 }

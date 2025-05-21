@@ -1,4 +1,4 @@
-package contractdsl
+package contract
 
 import (
 	"fmt"
