@@ -18,29 +18,26 @@ import (
 )
 
 type Relayer interface {
-	Relay(t devtest.T, msgs []types.Message)
+	Relay(devtest.T, []types.Message, txplan.Option)
 }
 
 type ValidRelayer struct {
-	el  *dsl.L2ELNode
-	eoa *dsl.EOA
+	el *dsl.L2ELNode
 	// supervisor is used to check if executing messages are cross-safe.
 	supervisor *dsl.Supervisor
-
-	counter *nonceCounter
 }
 
-func NewValidRelayer(funder *dsl.Funder, el *dsl.L2ELNode, supervisor *dsl.Supervisor) *ValidRelayer {
+var _ Relayer = (*ValidRelayer)(nil)
+
+func NewValidRelayer(el *dsl.L2ELNode, supervisor *dsl.Supervisor) *ValidRelayer {
 	return &ValidRelayer{
 		el:         el,
-		eoa:        funder.NewFundedEOA(eth.MillionEther),
 		supervisor: supervisor,
-		counter:    new(nonceCounter),
 	}
 }
 
-func (e *ValidRelayer) Relay(t devtest.T, msgs []types.Message) {
-	tx := buildRelayTx(e.eoa, e.el, msgs, retryForever(e.el.Escape().EthClient()), txplan.WithStaticNonce(e.counter.Next()))
+func (e *ValidRelayer) Relay(t devtest.T, msgs []types.Message, opt txplan.Option) {
+	tx := buildRelayTx(e.el, msgs, opt, retryForever(e.el.Escape().EthClient()))
 	receipt, err := tx.Included.Eval(t.Ctx())
 	t.Require().NoError(err)
 	_, err = tx.Success.Eval(t.Ctx())
@@ -71,6 +68,8 @@ type DelayedRelayer struct {
 	wg    *sync.WaitGroup
 }
 
+var _ Relayer = (*DelayedRelayer)(nil)
+
 func NewDelayedRelayer(e *ValidRelayer, wg *sync.WaitGroup, delay time.Duration) *DelayedRelayer {
 	return &DelayedRelayer{
 		e:     e,
@@ -79,14 +78,14 @@ func NewDelayedRelayer(e *ValidRelayer, wg *sync.WaitGroup, delay time.Duration)
 	}
 }
 
-func (de *DelayedRelayer) Relay(t devtest.T, msgs []types.Message) {
+func (de *DelayedRelayer) Relay(t devtest.T, msgs []types.Message, opt txplan.Option) {
 	de.wg.Add(1)
 	go func() {
 		defer de.wg.Done()
 		select {
 		case <-t.Ctx().Done():
 		case <-time.After(de.delay):
-			de.e.Relay(t, msgs)
+			de.e.Relay(t, msgs, opt)
 		}
 	}()
 }
@@ -94,26 +93,26 @@ func (de *DelayedRelayer) Relay(t devtest.T, msgs []types.Message) {
 type ToInvalidMsgFn func(types.Message) types.Message
 
 type InvalidRelayer struct {
-	eoa         *dsl.EOA
 	el          *dsl.L2ELNode
 	makeInvalid ToInvalidMsgFn
 }
 
-func NewInvalidRelayer(funder *dsl.Funder, el *dsl.L2ELNode, makeInvalid ToInvalidMsgFn) *InvalidRelayer {
+var _ Relayer = (*InvalidRelayer)(nil)
+
+func NewInvalidRelayer(el *dsl.L2ELNode, makeInvalid ToInvalidMsgFn) *InvalidRelayer {
 	return &InvalidRelayer{
 		el:          el,
-		eoa:         funder.NewFundedEOA(eth.MillionEther),
 		makeInvalid: makeInvalid,
 	}
 }
 
-func (ie *InvalidRelayer) Relay(t devtest.T, validMsgs []types.Message) {
+func (ie *InvalidRelayer) Relay(t devtest.T, validMsgs []types.Message, opt txplan.Option) {
 	msgs := make([]types.Message, len(validMsgs))
 	copy(msgs, validMsgs)
 	// Replace the last message with the invalid message.
 	// Merely appending can cause us to hit tx size limits if the original slice has a lot of messages.
 	msgs = append(msgs[:len(msgs)-1], ie.makeInvalid(msgs[len(msgs)-1]))
-	tx := buildRelayTx(ie.eoa, ie.el, msgs)
+	tx := buildRelayTx(ie.el, msgs, opt)
 	_, err := tx.Submitted.Eval(t.Ctx())
 	t.Require().ErrorContains(err, core.ErrTxFilteredOut.Error())
 }
@@ -154,7 +153,7 @@ func makeInvalidPayloadHash(msg types.Message) types.Message {
 	return msg
 }
 
-func buildRelayTx(eoa *dsl.EOA, el *dsl.L2ELNode, msgs []types.Message, opts ...txplan.Option) *txplan.PlannedTx {
+func buildRelayTx(el *dsl.L2ELNode, msgs []types.Message, opts ...txplan.Option) *txplan.PlannedTx {
 	execCalls := make([]txintent.Call, 0, len(msgs))
 	for _, msg := range msgs {
 		execCalls = append(execCalls, &txintent.ExecTrigger{
@@ -162,7 +161,7 @@ func buildRelayTx(eoa *dsl.EOA, el *dsl.L2ELNode, msgs []types.Message, opts ...
 			Msg:      msg,
 		})
 	}
-	tx := txintent.NewIntent[*txintent.MultiTrigger, txintent.Result](eoa.Plan(), txplan.Combine(opts...))
+	tx := txintent.NewIntent[*txintent.MultiTrigger, txintent.Result](txplan.Combine(opts...))
 	tx.Content.Set(&txintent.MultiTrigger{
 		Emitter: constants.MultiCall3,
 		Calls:   execCalls,

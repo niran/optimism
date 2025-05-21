@@ -67,33 +67,48 @@ func TestLoad(gt *testing.T) {
 	}()
 }
 
+func fundEOAs(num uint64, funder *dsl.Funder) []*dsl.EOA {
+	eoas := make([]*dsl.EOA, 0, num)
+	for range num {
+		eoas = append(eoas, funder.NewFundedEOA(eth.OneEther))
+	}
+	return eoas
+}
+
 func SpamInteropTxs(t devtest.T, numInitTxs uint64, source *L2, dest *L2, supervisor *dsl.Supervisor) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	msgsCh := make(chan []types.Message, 100)
 	defer close(msgsCh)
 
+	// Mempool implementations may limit the number of concurrent transactions per account.
+	// We spam transactions from multiple EOAs to mitigate the possibility of mempool
+	// implementations being a limiting factor.
+
 	// Spam executing messages.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		dest.Funder.NewFundedEOA(eth.MillionEther.Mul(100))
 		relayers := []Relayer{
-			NewValidRelayer(dest.Funder, dest.EL, supervisor),
-			NewDelayedRelayer(NewValidRelayer(dest.Funder, dest.EL, supervisor), &wg, time.Minute),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidChainID),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidBlockNumber),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidLogIndex),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidOrigin),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidPayloadHash),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidTimestamp),
+			NewValidRelayer(dest.EL, supervisor),
+			NewDelayedRelayer(NewValidRelayer(dest.EL, supervisor), &wg, time.Minute),
+			NewInvalidRelayer(dest.EL, makeInvalidChainID),
+			NewInvalidRelayer(dest.EL, makeInvalidBlockNumber),
+			NewInvalidRelayer(dest.EL, makeInvalidLogIndex),
+			NewInvalidRelayer(dest.EL, makeInvalidOrigin),
+			NewInvalidRelayer(dest.EL, makeInvalidPayloadHash),
+			NewInvalidRelayer(dest.EL, makeInvalidTimestamp),
 		}
+		eoas := fundEOAs(uint64(len(relayers))*numInitTxs, dest.Funder) // Fund EOAs before spamming relay transactions.
+		var eoaIdx int
 		for msgs := range msgsCh {
 			for _, relayer := range relayers {
+				plan := eoas[eoaIdx].Plan()
+				eoaIdx++
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					relayer.Relay(t, msgs)
+					relayer.Relay(t, msgs, plan)
 				}()
 			}
 		}
@@ -102,10 +117,11 @@ func SpamInteropTxs(t devtest.T, numInitTxs uint64, source *L2, dest *L2, superv
 	// Spam initiating messages.
 	eventLogger := source.Funder.NewFundedEOA(eth.OneEther).DeployEventLogger()
 	initiators := []Initiator{
-		NewManyMsgsInitiator(source.Funder, source.EL, eventLogger),
-		NewLargeMsgInitiator(source.Funder, source.EL, eventLogger),
+		NewManyMsgsInitiator(source.EL, eventLogger),
+		NewLargeMsgInitiator(source.EL, eventLogger),
 	}
+	eoas := fundEOAs(numInitTxs, source.Funder) // Fund EOAs before spamming initiating transactions.
 	for i := range numInitTxs {
-		msgsCh <- initiators[i%uint64(len(initiators))].Initiate(t)
+		msgsCh <- initiators[i%uint64(len(initiators))].Initiate(t, eoas[i].Plan())
 	}
 }

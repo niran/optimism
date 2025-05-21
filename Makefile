@@ -13,7 +13,7 @@ help: ## Prints this help message
 build: build-go build-contracts ## Builds Go components and contracts-bedrock
 .PHONY: build
 
-build-go: submodules op-node op-proposer op-batcher ## Builds op-node, op-proposer and op-batcher
+build-go: submodules op-node op-proposer op-batcher op-program cannon cannon-prestates ## Builds op-node, op-proposer, op-batcher, op-program, cannon, and cannon-prestates
 .PHONY: build-go
 
 build-contracts:
