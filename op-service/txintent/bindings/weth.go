@@ -15,11 +15,7 @@ type WETHCallFactory struct {
 }
 
 func NewWETHCallFactory(opts ...CallFactoryOption) *WETHCallFactory {
-	b := &BaseCallFactory{}
-	for _, opt := range opts {
-		opt(b)
-	}
-	return &WETHCallFactory{BaseCallFactory: *b}
+	return &WETHCallFactory{BaseCallFactory: *NewBaseCallFactory(opts...)}
 }
 
 func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.CallView[eth.ETH] {
