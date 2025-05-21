@@ -19,20 +19,15 @@ type CallView[O any] interface {
 }
 
 func Read[O any](view CallView[O], ctx context.Context, opts ...txplan.Option) (O, error) {
-	target, err := view.To()
-	if err != nil {
-		return *new(O), err
-	}
-	calldata, err := view.EncodeInput()
+	plan, err := Plan(view)
 	if err != nil {
 		return *new(O), err
 	}
 	client := view.Client()
 	tx := txplan.NewPlannedTx(
+		plan,
 		txplan.WithAgainstLatestBlock(client),
 		txplan.WithReader(client),
-		txplan.WithData(calldata),
-		txplan.WithTo(target),
 		// use default sender as null
 		txplan.WithSender(common.Address{}),
 		txplan.Combine(opts...),
