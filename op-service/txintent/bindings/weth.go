@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
 	"github.com/lmittmann/w3"
 )
@@ -37,11 +36,13 @@ func (f *WETHCallFactory) WithTest(t devtest.T) *WETHCallFactory {
 }
 
 func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.CallView[eth.ETH] {
-	return &BalanceOfCall{Addr: addr, target: f.Target, client: f.Client, t: f.T}
+	return &BalanceOfCall{Addr: addr,
+		BaseCall: f.BaseCall, BaseCallView: f.BaseCallView, BaseCallTest: f.BaseCallTest}
 }
 
 func (f *WETHCallFactory) Transfer(dest common.Address, amount eth.ETH) txintent.CallView[bool] {
-	return &TransferCall{Dest: dest, Amount: amount, target: f.Target, client: f.Client, t: f.T}
+	return &TransferCall{Dest: dest, Amount: amount,
+		BaseCall: f.BaseCall, BaseCallView: f.BaseCallView, BaseCallTest: f.BaseCallTest}
 }
 
 type WETH struct {
@@ -58,11 +59,11 @@ func NewWETH(f *WETHCallFactory) *WETH {
 }
 
 type BalanceOfCall struct {
-	Addr common.Address
+	BaseCall
+	BaseCallView
+	BaseCallTest
 
-	target common.Address
-	client apis.EthClient
-	t      devtest.T
+	Addr common.Address
 }
 
 func (c *BalanceOfCall) EncodeInput() ([]byte, error) {
@@ -82,29 +83,13 @@ func (c *BalanceOfCall) DecodeOutput(data []byte) (eth.ETH, error) {
 	return res, err
 }
 
-func (c *BalanceOfCall) To() (*common.Address, error) {
-	return &c.target, nil
-}
-
-func (c *BalanceOfCall) Client() apis.EthClient {
-	return c.client
-}
-
-func (c *BalanceOfCall) AccessList() (types.AccessList, error) {
-	return types.AccessList{}, nil
-}
-
-func (c *BalanceOfCall) Test() devtest.T {
-	return c.t
-}
-
 type TransferCall struct {
+	BaseCall
+	BaseCallView
+	BaseCallTest
+
 	Dest   common.Address
 	Amount eth.ETH
-
-	target common.Address
-	client apis.EthClient
-	t      devtest.T
 }
 
 func (c *TransferCall) EncodeInput() ([]byte, error) {
@@ -119,22 +104,6 @@ func (c *TransferCall) DecodeOutput(data []byte) (bool, error) {
 	var result bool
 	err := abi.DecodeReturns(data, &result)
 	return result, err
-}
-
-func (c *TransferCall) To() (*common.Address, error) {
-	return &c.target, nil
-}
-
-func (c *TransferCall) Client() apis.EthClient {
-	return c.client
-}
-
-func (c *TransferCall) AccessList() (types.AccessList, error) {
-	return types.AccessList{}, nil
-}
-
-func (c *TransferCall) Test() devtest.T {
-	return c.t
 }
 
 var _ txintent.CallView[eth.ETH] = (*BalanceOfCall)(nil)
