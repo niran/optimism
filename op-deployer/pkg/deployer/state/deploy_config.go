@@ -7,8 +7,6 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/standard"
 
-	op_service "github.com/ethereum-optimism/optimism/op-service"
-
 	"github.com/ethereum-optimism/optimism/op-service/jsonutil"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -27,12 +25,6 @@ var (
 
 func CombineDeployConfig(intent *Intent, chainIntent *ChainIntent, state *State, chainState *ChainState) (genesis.DeployConfig, error) {
 	upgradeSchedule := standard.DefaultHardforkScheduleForTag(intent.L1ContractsLocator.Tag)
-	if intent.UseInterop {
-		if upgradeSchedule.L2GenesisIsthmusTimeOffset == nil {
-			return genesis.DeployConfig{}, errors.New("expecting isthmus fork to be enabled for interop deployments")
-		}
-		upgradeSchedule.UseInterop = true
-	}
 
 	cfg := genesis.DeployConfig{
 		L1DependenciesConfig: genesis.L1DependenciesConfig{
@@ -115,8 +107,11 @@ func CombineDeployConfig(intent *Intent, chainIntent *ChainIntent, state *State,
 		},
 	}
 
-	if intent.UseInterop {
-		cfg.L2InitializationConfig.UpgradeScheduleDeployConfig.L2GenesisInteropTimeOffset = op_service.U64UtilPtr(0)
+	if intent.InteropTimeOffset != nil {
+		if upgradeSchedule.L2GenesisIsthmusTimeOffset == nil {
+			return genesis.DeployConfig{}, errors.New("expecting isthmus fork to be enabled for interop deployments")
+		}
+		cfg.L2InitializationConfig.UpgradeScheduleDeployConfig.L2GenesisInteropTimeOffset = intent.InteropTimeOffset
 	}
 
 	if chainState.StartBlock == nil {

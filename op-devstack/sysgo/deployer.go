@@ -305,7 +305,7 @@ func (wb *worldBuilder) Build() {
 	intent, err := wb.builder.Build()
 	wb.require.NoError(err)
 
-	inDepSetAtGenesis := false
+	var minInteropTimeOffset *hexutil.Uint64
 	for _, ch := range intent.Chains {
 		v, ok := ch.DeployOverrides["l2GenesisInteropTimeOffset"]
 		if !ok {
@@ -315,14 +315,14 @@ func (wb *worldBuilder) Build() {
 		if !ok {
 			continue
 		}
-		if *offset == 0 {
-			inDepSetAtGenesis = true
+		if minInteropTimeOffset == nil || *offset < *minInteropTimeOffset {
+			minInteropTimeOffset = offset
 		}
 	}
-	wb.logger.Info("Dependency set setting", "atGenesis", inDepSetAtGenesis)
+	wb.logger.Info("Dependency set setting", "interopTime", minInteropTimeOffset)
 
 	// If any chains are activating interop at genesis, then set useInterop to true
-	intent.UseInterop = inDepSetAtGenesis
+	intent.InteropTimeOffset = minInteropTimeOffset
 
 	pipelineOpts := deployer.ApplyPipelineOpts{
 		DeploymentTarget:   deployer.DeploymentTargetGenesis,

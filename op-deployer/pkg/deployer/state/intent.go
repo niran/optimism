@@ -66,7 +66,7 @@ type Intent struct {
 	SuperchainConfigProxy *common.Address            `json:"superchainConfigProxy" toml:"superchainConfigProxy"`
 	SuperchainRoles       *addresses.SuperchainRoles `json:"superchainRoles" toml:"superchainRoles,omitempty"`
 	FundDevAccounts       bool                       `json:"fundDevAccounts" toml:"fundDevAccounts"`
-	UseInterop            bool                       `json:"useInterop" toml:"useInterop"`
+	InteropTimeOffset     *hexutil.Uint64            `json:"interopTimeOffset" toml:"interopTimeOffset"`
 	L1ContractsLocator    *artifacts.Locator         `json:"l1ContractsLocator" toml:"l1ContractsLocator"`
 	L2ContractsLocator    *artifacts.Locator         `json:"l2ContractsLocator" toml:"l2ContractsLocator"`
 	Chains                []*ChainIntent             `json:"chains" toml:"chains"`

@@ -46,7 +46,7 @@ func GeneratePreState(ctx context.Context, pEnv *Env, globalIntent *state.Intent
 		))
 	}
 
-	if globalIntent.UseInterop {
+	if globalIntent.InteropTimeOffset != nil {
 		lgr.Info("adding the interop deployment set option to the prestate builder")
 		prestateBuilderOpts = append(prestateBuilderOpts, prestate.WithGeneratedInteropDepSet())
 	}

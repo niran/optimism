@@ -80,7 +80,6 @@ func testImplementations(t *testing.T, forkRPCURL string, cacheDir string) {
 			SuperchainConfigProxy:           superchain.SuperchainConfigAddr,
 			ProtocolVersionsProxy:           superchain.ProtocolVersionsAddr,
 			UpgradeController:               proxyAdminOwner,
-			UseInterop:                      false,
 			CacheDir:                        cacheDir,
 		})
 		require.NoError(t, err)

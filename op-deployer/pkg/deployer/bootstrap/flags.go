@@ -123,11 +123,6 @@ var (
 		Usage:   "Upgrade controller.",
 		EnvVars: deployer.PrefixEnvVar("UPGRADE_CONTROLLER"),
 	}
-	UseInteropFlag = &cli.BoolFlag{
-		Name:    "use-interop",
-		Usage:   "If true, deploy Interop implementations.",
-		EnvVars: deployer.PrefixEnvVar("USE_INTEROP"),
-	}
 	ConfigFileFlag = &cli.StringFlag{
 		Name:    "config",
 		Usage:   "Path to a JSON file",
@@ -149,7 +144,6 @@ var ImplementationsFlags = []cli.Flag{
 	SuperchainConfigProxyFlag,
 	ProtocolVersionsProxyFlag,
 	UpgradeControllerFlag,
-	UseInteropFlag,
 }
 
 var ProxyFlags = []cli.Flag{

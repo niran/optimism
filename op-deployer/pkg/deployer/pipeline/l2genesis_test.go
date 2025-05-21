@@ -138,7 +138,7 @@ func TestCalculateL2GenesisOverrides(t *testing.T) {
 			name: "interop mode",
 			intent: &state.Intent{
 				L1ContractsLocator: &artifacts.Locator{},
-				UseInterop:         true,
+				InteropTimeOffset:  op_service.U64UtilPtr(0),
 			},
 			chainIntent:       &state.ChainIntent{},
 			expectError:       false,
@@ -146,7 +146,6 @@ func TestCalculateL2GenesisOverrides(t *testing.T) {
 			expectedSchedule: func() *genesis.UpgradeScheduleDeployConfig {
 				schedule := standard.DefaultHardforkScheduleForTag("")
 				schedule.L2GenesisInteropTimeOffset = op_service.U64UtilPtr(0)
-				schedule.UseInterop = true
 				return schedule
 			},
 		},

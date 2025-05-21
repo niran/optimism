@@ -13,7 +13,7 @@ import (
 func GenerateInteropDepset(ctx context.Context, pEnv *Env, globalIntent *state.Intent, st *state.State) error {
 	lgr := pEnv.Logger.New("stage", "generate-interop-depset")
 
-	if !globalIntent.UseInterop {
+	if globalIntent.InteropTimeOffset == nil {
 		lgr.Warn("interop not enabled - skipping interop depset generation")
 		return nil
 	}

@@ -390,7 +390,7 @@ func ApplyPipeline(
 	}
 
 	// Generate the interop dependency set if interop is enabled
-	if intent.UseInterop {
+	if intent.InteropTimeOffset != nil {
 		pline = append(pline, pipelineStage{
 			"generate-interop-depset",
 			func() error {
