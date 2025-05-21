@@ -308,7 +308,7 @@ func GenesisL2(l2Host *script.Host, cfg *L2Config, deployment *L2Deployment) err
 		GovernanceTokenOwner:                     cfg.GovernanceTokenOwner,
 		Fork:                                     big.NewInt(cfg.SolidityForkNumber(1)),
 		// Only include interop predeploys if it is activating at genesis
-		UseInterop:       cfg.L2GenesisInteropTimeOffset != nil && *cfg.L2GenesisIsthmusTimeOffset == 0,
+		UseInterop:       cfg.L2GenesisInteropTimeOffset != nil && *cfg.L2GenesisInteropTimeOffset == 0,
 		EnableGovernance: cfg.EnableGovernance,
 		FundDevAccounts:  cfg.FundDevAccounts,
 	}); err != nil {
