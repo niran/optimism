@@ -1,4 +1,4 @@
-package call
+package smoke
 
 import (
 	"testing"
@@ -13,19 +13,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func TestMain(m *testing.M) {
-	presets.DoMain(m, presets.WithSimpleInterop())
-}
-
-func TestCallViewWriteWETH(gt *testing.T) {
+func TestWrapETH(gt *testing.T) {
 	t := devtest.SerialT(gt)
 	require := t.Require()
-	sys := presets.NewSimpleInterop(t)
+	sys := presets.NewMinimal(t)
 
-	alice := sys.FunderA.NewFundedEOA(eth.ThousandEther)
-	bob := sys.FunderA.NewFundedEOA(eth.ThousandEther)
+	alice := sys.Funder.NewFundedEOA(eth.ThousandEther)
+	bob := sys.Funder.NewFundedEOA(eth.ThousandEther)
 
-	client := sys.L2ELA.Escape().EthClient()
+	client := sys.L2EL.Escape().EthClient()
 	wethAddr := common.HexToAddress("0x4200000000000000000000000000000000000006")
 
 	// dsl prep
