@@ -9,35 +9,48 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 
-/// @title Predeploys_TestInit
-/// @notice Reusable test initialization for `Predeploys` tests.
-contract Predeploys_TestInit is CommonTest {
+/// @title PredeploysTest
+contract PredeploysBaseTest is CommonTest {
     //////////////////////////////////////////////////////
     /// Internal helpers
     //////////////////////////////////////////////////////
 
-    /// @notice Returns true if the address is a predeploy that has a different code in the interop
-    ///         mode.
+    /// @dev Returns true if the address is a predeploy that has a different code in the interop mode.
     function _interopCodeDiffer(address _addr) internal pure returns (bool) {
         return _addr == Predeploys.L1_BLOCK_ATTRIBUTES || _addr == Predeploys.L2_STANDARD_BRIDGE;
     }
 
-    /// @notice Returns true if the account is not meant to be in the L2 genesis anymore.
+    /// @dev Returns true if the account is not meant to be in the L2 genesis anymore.
     function _isOmitted(address _addr) internal pure returns (bool) {
         return _addr == Predeploys.L1_MESSAGE_SENDER;
     }
 
-    /// @notice Returns true if the predeploy is initializable.
+    /// @dev Returns true if the predeploy is initializable.
     function _isInitializable(address _addr) internal pure returns (bool) {
         return _addr == Predeploys.L2_CROSS_DOMAIN_MESSENGER || _addr == Predeploys.L2_STANDARD_BRIDGE
             || _addr == Predeploys.L2_ERC721_BRIDGE || _addr == Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY;
     }
 
-    /// @notice Returns true if the predeploy uses immutables.
+    /// @dev Returns true if the predeploy uses immutables.
     function _usesImmutables(address _addr) internal pure returns (bool) {
         return _addr == Predeploys.OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == Predeploys.SEQUENCER_FEE_WALLET
             || _addr == Predeploys.BASE_FEE_VAULT || _addr == Predeploys.L1_FEE_VAULT
             || _addr == Predeploys.OPERATOR_FEE_VAULT || _addr == Predeploys.EAS || _addr == Predeploys.GOVERNANCE_TOKEN;
+    }
+
+    function test_predeployToCodeNamespace_works() external pure {
+        assertEq(
+            address(0xc0D3C0d3C0d3C0D3c0d3C0d3c0D3C0d3c0d30000),
+            Predeploys.predeployToCodeNamespace(Predeploys.LEGACY_MESSAGE_PASSER)
+        );
+        assertEq(
+            address(0xc0d3C0d3C0d3c0D3C0D3C0d3C0d3C0D3C0D3000f),
+            Predeploys.predeployToCodeNamespace(Predeploys.GAS_PRICE_ORACLE)
+        );
+        assertEq(
+            address(0xC0d3C0d3c0d3c0d3C0d3c0D3c0D3c0D3C0d30420),
+            Predeploys.predeployToCodeNamespace(address(0x4200000000000000000000000000000000000420))
+        );
     }
 
     function _test_predeploys(bool _useInterop) internal {
@@ -75,7 +88,7 @@ contract Predeploys_TestInit is CommonTest {
             assertNotEq(supposedCode.length, 0, "must have supposed code");
 
             if (proxied == false) {
-                // Can't check bytecode if it's modified with immutables in genesis.
+                // can't check bytecode if it's modified with immutables in genesis.
                 if (!_usesImmutables(addr)) {
                     assertEq(code, supposedCode, "non-proxy contract should be deployed in-place");
                 }
@@ -92,7 +105,7 @@ contract Predeploys_TestInit is CommonTest {
             );
             assertNotEq(implAddr.code.length, 0, "predeploy implementation account must have code");
             if (!_usesImmutables(addr) && !_interopCodeDiffer(addr)) {
-                // Can't check bytecode if it's modified with immutables in genesis.
+                // can't check bytecode if it's modified with immutables in genesis.
                 assertEq(implAddr.code, supposedCode, "proxy implementation contract should match contract source");
             }
 
@@ -104,42 +117,23 @@ contract Predeploys_TestInit is CommonTest {
     }
 }
 
-/// @title Predeploys_Test
-/// @notice Predeploys test with interop disabled.
-contract Predeploys_Test is Predeploys_TestInit {
-    /// @notice Tests that the predeploy addresses are set correctly. They have code and the
-    ///         proxied accounts have the correct admin.
+contract PredeploysTest is PredeploysBaseTest {
+    /// @dev Tests that the predeploy addresses are set correctly. They have code
+    ///      and the proxied accounts have the correct admin.
     function test_predeploys_succeeds() external {
         _test_predeploys(false);
     }
-
-    function test_predeployToCodeNamespace_works() external pure {
-        assertEq(
-            address(0xc0D3C0d3C0d3C0D3c0d3C0d3c0D3C0d3c0d30000),
-            Predeploys.predeployToCodeNamespace(Predeploys.LEGACY_MESSAGE_PASSER)
-        );
-        assertEq(
-            address(0xc0d3C0d3C0d3c0D3C0D3C0d3C0d3C0D3C0D3000f),
-            Predeploys.predeployToCodeNamespace(Predeploys.GAS_PRICE_ORACLE)
-        );
-        assertEq(
-            address(0xC0d3C0d3c0d3c0d3C0d3c0D3c0D3c0D3C0d30420),
-            Predeploys.predeployToCodeNamespace(address(0x4200000000000000000000000000000000000420))
-        );
-    }
 }
 
-/// @title Predeploys_Interop_Test
-/// @notice Predeploys test with interop enabled.
-contract Predeploys_Interop_Test is Predeploys_TestInit {
+contract PredeploysInteropTest is PredeploysBaseTest {
     /// @notice Test setup. Enabling interop to get all predeploys.
     function setUp() public virtual override {
         super.enableInterop();
         super.setUp();
     }
 
-    /// @notice Tests that the predeploy addresses are set correctly. They have code and the
-    ///         proxied accounts have the correct admin. Using interop.
+    /// @dev Tests that the predeploy addresses are set correctly. They have code
+    ///      and the proxied accounts have the correct admin. Using interop.
     function test_predeploys_succeeds() external {
         _test_predeploys(true);
     }
