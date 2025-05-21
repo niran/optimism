@@ -64,7 +64,7 @@ func (c *BalanceOfCall) DecodeOutput(data []byte) (eth.ETH, error) {
 	err := abi.DecodeReturns(data, &result)
 	var res eth.ETH
 	if (*uint256.Int)(&res).SetFromBig(result) {
-		panic("not fit in uint256")
+		panic("balanceOf result conversion failure: does not fit in uint256")
 	}
 	return res, err
 }

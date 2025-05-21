@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+// Call expresses minimal representation to plan transaction to write.
 type Call interface {
 	To() (*common.Address, error)
 	AccessList() (types.AccessList, error)
@@ -18,6 +19,7 @@ type Input interface {
 	EncodeInput() ([]byte, error)
 }
 
+// Write receives a Call and uses to plan transaction, and attempts to write.
 func Write(call Call, ctx context.Context, opts ...txplan.Option) (*types.Receipt, error) {
 	plan, err := Plan(call)
 	if err != nil {

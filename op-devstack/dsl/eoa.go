@@ -98,6 +98,7 @@ func (u *EOA) Transact(opts ...txplan.Option) *txplan.PlannedTx {
 	return tx
 }
 
+// Write executes a tx by using the planned contract binding
 func (u *EOA) Write(call txintent.Call, opts ...txplan.Option) (*types.Receipt, error) {
 	finalOpts := txplan.Combine(u.Plan(), txplan.Combine(opts...))
 	return txintent.Write(call, u.ctx, finalOpts)

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// BaseCall contains fields to populate fields of txplan
 type BaseCall struct {
 	target     common.Address
 	accessList types.AccessList
@@ -22,6 +23,7 @@ func (c *BaseCall) AccessList() (types.AccessList, error) {
 	return c.accessList, nil
 }
 
+// BaseCall contains client for reading the blockchain
 type BaseCallView struct {
 	client apis.EthClient
 }
@@ -30,11 +32,13 @@ func (c *BaseCallView) Client() apis.EthClient {
 	return c.client
 }
 
+// BaseCall represents minimal testing interface
 type BaseTest interface {
 	Require() *require.Assertions
 	Ctx() context.Context
 }
 
+// BaseCallTest contains tester to embed for the CallFactory
 type BaseCallTest struct {
 	t BaseTest
 }
@@ -43,12 +47,15 @@ func (c *BaseCallTest) Test() BaseTest {
 	return c.t
 }
 
+// BaseCallFactory composes building blocks for initializing contract factory.
+// Intended to be embedded while adding contract binding factory.
 type BaseCallFactory struct {
 	BaseCall
 	BaseCallView
 	BaseCallTest
 }
 
+// Options to populate the factory
 type CallFactoryOption func(*BaseCallFactory)
 
 func WithTo(target common.Address) CallFactoryOption {

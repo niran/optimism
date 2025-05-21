@@ -8,16 +8,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// CallView expresses minimal representation to plan transaction to view, embedding Call interface.
+// It is typed for interpreting the read result, and binds client for viewing.
+type CallView[O any] interface {
+	Call
+	Output[O]
+	Client() apis.EthClient
+}
+
 type Output[O any] interface {
 	DecodeOutput(data []byte) (dest O, err error)
 }
 
-type CallView[O any] interface {
-	Call
-	Client() apis.EthClient
-	Output[O]
-}
-
+// Read receives a CallView and uses to plan transaction, and attempts to read.
 func Read[O any](view CallView[O], ctx context.Context, opts ...txplan.Option) (O, error) {
 	plan, err := Plan(view)
 	if err != nil {

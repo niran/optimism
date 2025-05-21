@@ -10,11 +10,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+// TestCallView is used in devstack for wrapping errors
 type TestCallView[O any] interface {
 	txintent.CallView[O]
 	Test() bindings.BaseTest
 }
 
+// checkTestable checks whether the Call can be used as a DSL using the testing context
 func checkTestable[O any](call txintent.CallView[O]) TestCallView[O] {
 	callTest, ok := call.(TestCallView[O])
 	if !ok || callTest.Test() == nil {
@@ -23,6 +25,7 @@ func checkTestable[O any](call txintent.CallView[O]) TestCallView[O] {
 	return callTest
 }
 
+// Read views a tx execution result by using the planned contract bindings
 func Read[O any](call txintent.CallView[O], opts ...txplan.Option) O {
 	callTest := checkTestable(call)
 	o, err := txintent.Read(call, callTest.Test().Ctx(), opts...)
@@ -30,6 +33,7 @@ func Read[O any](call txintent.CallView[O], opts ...txplan.Option) O {
 	return o
 }
 
+// Write makes a user to write a tx by using the planned contract bindings
 func Write[O any](user *EOA, call txintent.CallView[O], opts ...txplan.Option) *types.Receipt {
 	callTest := checkTestable(call)
 	finalOpts := txplan.Combine(user.Plan(), txplan.Combine(opts...))

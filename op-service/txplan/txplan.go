@@ -294,6 +294,8 @@ func WithAgainstLatestBlock(cl AgainstLatestBlock) Option {
 	}
 }
 
+// Reader uses eth_call to view(read) the blockchain, and does not write in perspective of chain.
+// The chain will return byte strings when viewing, and does not return receipt.
 type Reader interface {
 	Call(ctx context.Context, msg ethereum.CallMsg) ([]byte, error)
 }
