@@ -139,5 +139,3 @@ func (c TransferCall) Test() devtest.T {
 
 var _ txintent.CallView[eth.ETH] = (*BalanceOfCall)(nil)
 var _ txintent.CallView[bool] = (*TransferCall)(nil)
-var _ txintent.TestCallView[eth.ETH] = (*BalanceOfCall)(nil)
-var _ txintent.TestCallView[bool] = (*TransferCall)(nil)

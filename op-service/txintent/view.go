@@ -3,7 +3,6 @@ package txintent
 import (
 	"context"
 
-	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum/go-ethereum/common"
@@ -17,11 +16,6 @@ type CallView[O any] interface {
 	Call
 	Client() apis.EthClient
 	Output[O]
-}
-
-type TestCallView[O any] interface {
-	CallView[O]
-	Test() devtest.T
 }
 
 func Read[O any](view CallView[O], opts ...txplan.Option) (O, error) {

@@ -3,13 +3,21 @@ package dsl
 import (
 	"fmt"
 
+	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
+	"github.com/ethereum-optimism/optimism/op-service/txintent/bindings"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-func checkTestable[O any](call txintent.CallView[O]) txintent.TestCallView[O] {
-	callTest, ok := call.(txintent.TestCallView[O])
+type TestCallView[O any] interface {
+	txintent.CallView[O]
+	Test() devtest.T
+}
+
+func checkTestable[O any](call txintent.CallView[O]) TestCallView[O] {
+	callTest, ok := call.(TestCallView[O])
 	if !ok || callTest.Test() == nil {
 		panic(fmt.Sprintf("call of type %T does not support testing", call))
 	}
@@ -30,3 +38,6 @@ func Write[O any](user *EOA, call txintent.CallView[O], opts ...txplan.Option) *
 	callTest.Test().Require().NoError(err)
 	return o
 }
+
+var _ TestCallView[eth.ETH] = (*bindings.BalanceOfCall)(nil)
+var _ TestCallView[bool] = (*bindings.TransferCall)(nil)
