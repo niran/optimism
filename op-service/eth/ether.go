@@ -39,10 +39,9 @@ var (
 	MillionEther  = Ether(1000_000)
 	ThousandEther = Ether(1000)
 	OneEther      = Ether(1)
-
-	OneGWei = GWei(1)
-	OneWei  = WeiU64(1)
-	ZeroWei = WeiU64(0)
+	OneGWei       = GWei(1)
+	OneWei        = WeiU64(1)
+	ZeroWei       = WeiU64(0)
 )
 
 // some internal helper constant values

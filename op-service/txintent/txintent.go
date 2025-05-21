@@ -3,6 +3,7 @@ package txintent
 import (
 	"context"
 
+	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/plan"
@@ -28,14 +29,13 @@ type Call interface {
 
 type View[O any] interface {
 	Call
-	Endpoint
-	WithTo(target common.Address) View[O]
-	WithClient(client apis.EthClient) View[O]
+	Client() apis.EthClient
 	Output[O]
 }
 
-type Endpoint interface {
-	Client() apis.EthClient
+type TestView[O any] interface {
+	View[O]
+	Test() devtest.T
 }
 
 type Result interface {

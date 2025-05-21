@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-service/txintent"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -18,73 +17,50 @@ func TestMain(m *testing.M) {
 
 func TestCallViewWriteWETH(gt *testing.T) {
 	t := devtest.SerialT(gt)
+	require := t.Require()
 	sys := presets.NewSimpleInterop(t)
 
 	alice := sys.FunderA.NewFundedEOA(eth.ThousandEther)
 	bob := sys.FunderA.NewFundedEOA(eth.ThousandEther)
 
+	client := sys.L2ELA.Escape().EthClient()
 	wethAddr := common.HexToAddress("0x4200000000000000000000000000000000000006")
 	// dsl prep
-	// TODO: delegate this initialization to somewhere else
-	balanceOf := func(addr common.Address) txintent.View[eth.ETH] {
-		return dsl.BalanceOfCall{Addr: addr}
-	}
-	transfer := func(dest common.Address, amount eth.ETH) txintent.View[bool] {
-		return dsl.TransferCall{Dest: dest, Amount: amount}
-	}
-	unboundWETH := dsl.UnboundWETH{BalanceOf: balanceOf, Transfer: transfer}
+	factory := &dsl.WETHCallFactory{}
+	factory = factory.WithTo(wethAddr).WithClient(client).WithTest(t)
+	weth := dsl.NewWETH(factory)
 
-	weth := &dsl.WETH{UnboundWETH: unboundWETH}
-	// hydration phase
-	client := sys.L2ELA.Escape().EthClient()
-	weth = weth.WithTo(wethAddr).WithClient(client)
-
-	var balance eth.ETH
 	var err error
 	// alice and bob has zero WETH
-	t.Require().NotEqual(alice.Address(), bob.Address())
+	require.NotEqual(alice.Address(), bob.Address())
 
-	balance, err = dsl.View(weth.BalanceOf(alice.Address()))
-	t.Require().NoError(err)
-	t.Require().Equal(eth.ZeroWei, balance)
-	balance, err = dsl.View(weth.BalanceOf(bob.Address()))
-	t.Require().NoError(err)
-	t.Require().Equal(eth.ZeroWei, balance)
+	require.Equal(eth.ZeroWei, dsl.TestView(weth.BalanceOf(alice.Address())))
+	require.Equal(eth.ZeroWei, dsl.TestView(weth.BalanceOf(bob.Address())))
 
 	// alice wraps 1 WETH
 	alice.Transfer(wethAddr, eth.OneEther)
 
 	// view
 	// alice has 1 WETH
-	balance, err = dsl.View(weth.BalanceOf(alice.Address()))
-	t.Require().NoError(err)
-	t.Require().Equal(eth.OneEther, balance)
+	require.Equal(eth.OneEther, dsl.TestView(weth.BalanceOf(alice.Address())))
 	// bob has 0 WETH.
-	balance, err = dsl.View(weth.BalanceOf(bob.Address()))
-	t.Require().NoError(err)
-	t.Require().Equal(eth.ZeroWei, balance)
+	require.Equal(eth.ZeroWei, dsl.TestView(weth.BalanceOf(bob.Address())))
 
 	// alice wraps 1 WETH again
 	alice.Transfer(wethAddr, eth.OneEther)
 
 	// view
 	// alice has 2 WETH
-	balance, err = dsl.View(weth.BalanceOf(alice.Address()))
-	t.Require().NoError(err)
-	t.Require().Equal(eth.Ether(2), balance)
+	require.Equal(eth.Ether(2), dsl.TestView(weth.BalanceOf(alice.Address())))
 	// bob has 0 WETH.
-	balance, err = dsl.View(weth.BalanceOf(bob.Address()))
-	t.Require().NoError(err)
-	t.Require().Equal(eth.ZeroWei, balance)
+	require.Equal(eth.ZeroWei, dsl.TestView(weth.BalanceOf(bob.Address())))
 
 	// view
 	// without address sender so failure
 	_, err = dsl.View(weth.Transfer(bob.Address(), eth.OneEther))
 	t.Require().Error(err)
 	// with address, msg.sender set
-	res, err := dsl.View(weth.Transfer(bob.Address(), eth.OneEther), txplan.WithSender(alice.Address()))
-	t.Require().NoError(err)
-	t.Require().True(res)
+	require.True(dsl.TestView(weth.Transfer(bob.Address(), eth.OneEther), txplan.WithSender(alice.Address())))
 
 	// write
 	// alice sends bob 1 WETH
@@ -92,11 +68,7 @@ func TestCallViewWriteWETH(gt *testing.T) {
 
 	// view
 	// alice has 1 WETH
-	balance, err = dsl.View(weth.BalanceOf(alice.Address()))
-	t.Require().NoError(err)
-	t.Require().Equal(eth.OneEther, balance)
+	require.Equal(eth.OneEther, dsl.TestView(weth.BalanceOf(alice.Address())))
 	// bob has 1 WETH.
-	balance, err = dsl.View(weth.BalanceOf(bob.Address()))
-	t.Require().NoError(err)
-	t.Require().Equal(eth.OneEther, balance)
+	require.Equal(eth.OneEther, dsl.TestView(weth.BalanceOf(bob.Address())))
 }

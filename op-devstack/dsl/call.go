@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
@@ -14,43 +15,65 @@ import (
 	"github.com/lmittmann/w3"
 )
 
-type UnboundWETH struct {
+type BaseCallFactory struct {
+	Target common.Address
+	Client apis.EthClient
+	T      devtest.T // optional
+}
+
+func (f *BaseCallFactory) WithTo(target common.Address) *BaseCallFactory {
+	f.Target = target
+	return f
+}
+
+func (f *BaseCallFactory) WithClient(client apis.EthClient) *BaseCallFactory {
+	f.Client = client
+	return f
+}
+
+func (f *BaseCallFactory) WithTest(t devtest.T) *BaseCallFactory {
+	f.T = t
+	return f
+}
+
+type WETHCallFactory struct {
+	BaseCallFactory
+}
+
+func (f *WETHCallFactory) WithTo(addr common.Address) *WETHCallFactory {
+	f.BaseCallFactory.WithTo(addr)
+	return f
+}
+
+func (f *WETHCallFactory) WithClient(c apis.EthClient) *WETHCallFactory {
+	f.BaseCallFactory.WithClient(c)
+	return f
+}
+
+func (f *WETHCallFactory) WithTest(t devtest.T) *WETHCallFactory {
+	f.BaseCallFactory.WithTest(t)
+	return f
+}
+
+func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.View[eth.ETH] {
+	return BalanceOfCall{Addr: addr, target: f.Target, client: f.Client, t: f.T}
+}
+
+func (f *WETHCallFactory) Transfer(dest common.Address, amount eth.ETH) txintent.View[bool] {
+	return TransferCall{Dest: dest, Amount: amount, target: f.Target, client: f.Client, t: f.T}
+}
+
+type WETH struct {
 	// Each field is a function, that is set up automatically with some reflection
 	BalanceOf func(addr common.Address) txintent.View[eth.ETH]
 	Transfer  func(dest common.Address, amount eth.ETH) txintent.View[bool]
 }
 
-type WETH struct {
-	UnboundWETH
-
-	target common.Address
-	client apis.EthClient
-}
-
-func (c *WETH) WithTo(target common.Address) *WETH {
-	c.target = target
-	originalBalanceOf := c.BalanceOf
-	c.BalanceOf = func(addr common.Address) txintent.View[eth.ETH] {
-		return originalBalanceOf(addr).WithTo(c.target)
+func NewWETH(f *WETHCallFactory) *WETH {
+	return &WETH{
+		BalanceOf: f.BalanceOf,
+		Transfer:  f.Transfer,
 	}
-	originalTransfer := c.Transfer
-	c.Transfer = func(dest common.Address, amount eth.ETH) txintent.View[bool] {
-		return originalTransfer(dest, amount).WithTo(c.target)
-	}
-	return c
-}
-
-func (c *WETH) WithClient(client apis.EthClient) *WETH {
-	c.client = client
-	originalBalanceOf := c.BalanceOf
-	c.BalanceOf = func(addr common.Address) txintent.View[eth.ETH] {
-		return originalBalanceOf(addr).WithClient(c.client)
-	}
-	originalTransfer := c.Transfer
-	c.Transfer = func(dest common.Address, amount eth.ETH) txintent.View[bool] {
-		return originalTransfer(dest, amount).WithClient(c.client)
-	}
-	return c
 }
 
 type BalanceOfCall struct {
@@ -58,6 +81,7 @@ type BalanceOfCall struct {
 
 	target common.Address
 	client apis.EthClient
+	t      devtest.T // optional
 }
 
 func (c BalanceOfCall) EncodeInput() ([]byte, error) {
@@ -104,12 +128,17 @@ func (c BalanceOfCall) AccessList() (gethTypes.AccessList, error) {
 	return gethTypes.AccessList{}, nil
 }
 
+func (c BalanceOfCall) Test() devtest.T {
+	return c.t
+}
+
 type TransferCall struct {
 	Dest   common.Address
 	Amount eth.ETH
 
 	target common.Address
 	client apis.EthClient
+	t      devtest.T // optional
 }
 
 func (c TransferCall) EncodeInput() ([]byte, error) {
@@ -151,6 +180,10 @@ func (c TransferCall) Client() apis.EthClient {
 
 func (c TransferCall) AccessList() (gethTypes.AccessList, error) {
 	return gethTypes.AccessList{}, nil
+}
+
+func (c TransferCall) Test() devtest.T {
+	return c.t
 }
 
 // type check
@@ -243,6 +276,16 @@ func View[O any](call txintent.View[O], opts ...txplan.Option) (O, error) {
 	return decoded, nil
 }
 
+func TestView[O any](call txintent.View[O], opts ...txplan.Option) O {
+	callTest, ok := call.(txintent.TestView[O])
+	if !ok {
+		panic("call does not support testing")
+	}
+	o, err := View(call, opts...)
+	callTest.Test().Require().NoError(err)
+	return o
+}
+
 // Write calls does not return values. just success/failure
 func Write[O any](user *EOA, call txintent.View[O]) (*gethTypes.Receipt, error) {
 	target, _ := call.To()
@@ -264,16 +307,15 @@ func Write[O any](user *EOA, call txintent.View[O]) (*gethTypes.Receipt, error) 
 	return receipt, nil
 }
 
-// TODO: bind user and address to call
-func Plan[O any](call txintent.View[O]) txplan.Option {
+func Plan[O any](call txintent.View[O]) (txplan.Option, error) {
+	target, _ := call.To()
 	calldata, err := call.EncodeInput()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	target, _ := call.To()
 	opt := txplan.Combine(
 		txplan.WithData(calldata),
 		txplan.WithTo(target),
 	)
-	return opt
+	return opt, nil
 }
