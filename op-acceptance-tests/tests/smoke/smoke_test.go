@@ -25,7 +25,11 @@ func TestWrapETH(gt *testing.T) {
 	wethAddr := common.HexToAddress("0x4200000000000000000000000000000000000006")
 
 	// dsl prep
-	factory := bindings.NewWETHCallFactory(bindings.WithTo(wethAddr), bindings.WithClient(client), bindings.WithTest(t))
+	factory := bindings.NewWETHCallFactory(bindings.WithTo(wethAddr), bindings.WithClient(client))
+	// can bind factory options later
+	factory.ApplyFactoryOptions(bindings.WithTest(t))
+
+	// initialize bindings from binding factory
 	weth := bindings.NewWETH(factory)
 
 	var err error

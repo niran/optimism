@@ -64,8 +64,12 @@ func WithTest(t devtest.T) CallFactoryOption {
 
 func NewBaseCallFactory(opts ...CallFactoryOption) *BaseCallFactory {
 	b := &BaseCallFactory{}
+	b.ApplyFactoryOptions(opts...)
+	return b
+}
+
+func (b *BaseCallFactory) ApplyFactoryOptions(opts ...CallFactoryOption) {
 	for _, opt := range opts {
 		opt(b)
 	}
-	return b
 }
