@@ -1,10 +1,12 @@
 package bindings
 
 import (
-	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
+	"context"
+
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/require"
 )
 
 type BaseCall struct {
@@ -28,11 +30,16 @@ func (c *BaseCallView) Client() apis.EthClient {
 	return c.client
 }
 
-type BaseCallTest struct {
-	t devtest.T
+type BaseTest interface {
+	Require() *require.Assertions
+	Ctx() context.Context
 }
 
-func (c *BaseCallTest) Test() devtest.T {
+type BaseCallTest struct {
+	t BaseTest
+}
+
+func (c *BaseCallTest) Test() BaseTest {
 	return c.t
 }
 
@@ -56,7 +63,7 @@ func WithClient(client apis.EthClient) CallFactoryOption {
 	}
 }
 
-func WithTest(t devtest.T) CallFactoryOption {
+func WithTest(t BaseTest) CallFactoryOption {
 	return func(f *BaseCallFactory) {
 		f.t = t
 	}

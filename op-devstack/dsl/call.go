@@ -3,7 +3,6 @@ package dsl
 import (
 	"fmt"
 
-	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
 	"github.com/ethereum-optimism/optimism/op-service/txintent/bindings"
@@ -13,7 +12,7 @@ import (
 
 type TestCallView[O any] interface {
 	txintent.CallView[O]
-	Test() devtest.T
+	Test() bindings.BaseTest
 }
 
 func checkTestable[O any](call txintent.CallView[O]) TestCallView[O] {
