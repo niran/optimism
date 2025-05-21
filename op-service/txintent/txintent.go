@@ -11,16 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-type Input interface {
-	EncodeInput() ([]byte, error)
-}
-
-type Call interface {
-	To() (*common.Address, error)
-	Input
-	AccessList() (types.AccessList, error)
-}
-
 type Result interface {
 	FromReceipt(ctx context.Context, rec *types.Receipt, includedIn eth.BlockRef, chainID eth.ChainID) error
 	Init() Result
