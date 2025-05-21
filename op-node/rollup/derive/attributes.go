@@ -206,18 +206,19 @@ func (ba *FetchingAttributesBuilder) deployCrossL2InboxTxs(nextL2Time uint64) ([
 		return nil, NewCriticalError(fmt.Errorf("interop is active but no dependency set provided"))
 	}
 	chainID := eth.ChainIDFromBig(ba.rollupCfg.L2ChainID)
-	alreadyDeployed, err := ba.depSet.HasCrossL2Inbox(chainID, nextL2Time-1)
-	if err != nil {
-		return nil, NewTemporaryError(fmt.Errorf("failed to check if CrossL2Inbox already active: %w", err))
-	}
-	if alreadyDeployed {
-		return nil, nil
-	}
 	toBeDeployed, err := ba.depSet.HasCrossL2Inbox(chainID, nextL2Time)
 	if err != nil {
 		return nil, NewTemporaryError(fmt.Errorf("failed to check if CrossL2Inbox should become active: %w", err))
 	}
 	if !toBeDeployed {
+		return nil, nil
+	}
+	alreadyDeployed, err := ba.depSet.HasCrossL2Inbox(chainID, nextL2Time-1)
+	if err != nil {
+		return nil, NewTemporaryError(fmt.Errorf("failed to check if CrossL2Inbox already active: %w", err))
+	}
+	// This is the interop activation block but the chain was in the dependency set even before now
+	if !alreadyDeployed && !ba.rollupCfg.IsInteropActivationBlock(nextL2Time) {
 		return nil, nil
 	}
 
