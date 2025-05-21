@@ -120,6 +120,7 @@ All other components and packages should be considered development components on
 
 ### Development branch
 
+
 The primary development branch is [`develop`](https://github.com/ethereum-optimism/optimism/tree/develop/).
 `develop` contains the most up-to-date software that remains backwards compatible with the latest experimental [network deployments](https://docs.optimism.io/chain/networks).
 If you're making a backwards compatible change, please direct your pull request towards `develop`.
