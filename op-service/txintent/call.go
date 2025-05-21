@@ -1,9 +1,7 @@
 package txintent
 
 import (
-	"context"
-
-	"github.com/ethereum-optimism/optimism/op-service/txplan"
+	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -19,32 +17,14 @@ type Input interface {
 	EncodeInput() ([]byte, error)
 }
 
-// Write receives a Call and uses to plan transaction, and attempts to write.
-func Write(call Call, ctx context.Context, opts ...txplan.Option) (*types.Receipt, error) {
-	plan, err := Plan(call)
-	if err != nil {
-		return nil, err
-	}
-	tx := txplan.NewPlannedTx(plan, txplan.Combine(opts...))
-	receipt, err := tx.Included.Eval(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return receipt, nil
+// CallView expresses minimal representation to plan transaction to view, embedding Call interface.
+// It is typed for interpreting the read result, and binds client for viewing.
+type CallView[O any] interface {
+	Call
+	Output[O]
+	Client() apis.EthClient
 }
 
-func Plan(call Call) (txplan.Option, error) {
-	target, err := call.To()
-	if err != nil {
-		return nil, err
-	}
-	calldata, err := call.EncodeInput()
-	if err != nil {
-		return nil, err
-	}
-	tx := txplan.Combine(
-		txplan.WithData(calldata),
-		txplan.WithTo(target),
-	)
-	return tx, nil
+type Output[O any] interface {
+	DecodeOutput(data []byte) (dest O, err error)
 }
