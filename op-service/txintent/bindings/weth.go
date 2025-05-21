@@ -19,13 +19,11 @@ func NewWETHCallFactory(opts ...CallFactoryOption) *WETHCallFactory {
 }
 
 func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.CallView[eth.ETH] {
-	return &BalanceOfCall{Addr: addr,
-		BaseCall: f.BaseCall, BaseCallView: f.BaseCallView, BaseCallTest: f.BaseCallTest}
+	return &BalanceOfCall{Addr: addr, WETHCallFactory: *f}
 }
 
 func (f *WETHCallFactory) Transfer(dest common.Address, amount eth.ETH) txintent.CallView[bool] {
-	return &TransferCall{Dest: dest, Amount: amount,
-		BaseCall: f.BaseCall, BaseCallView: f.BaseCallView, BaseCallTest: f.BaseCallTest}
+	return &TransferCall{Dest: dest, Amount: amount, WETHCallFactory: *f}
 }
 
 type WETH struct {
@@ -42,9 +40,7 @@ func NewWETH(f *WETHCallFactory) *WETH {
 }
 
 type BalanceOfCall struct {
-	BaseCall
-	BaseCallView
-	BaseCallTest
+	WETHCallFactory
 
 	Addr common.Address
 }
@@ -67,9 +63,7 @@ func (c *BalanceOfCall) DecodeOutput(data []byte) (eth.ETH, error) {
 }
 
 type TransferCall struct {
-	BaseCall
-	BaseCallView
-	BaseCallTest
+	WETHCallFactory
 
 	Dest   common.Address
 	Amount eth.ETH
