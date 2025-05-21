@@ -278,7 +278,7 @@ func View[O any](call txintent.View[O], opts ...txplan.Option) (O, error) {
 
 func TestView[O any](call txintent.View[O], opts ...txplan.Option) O {
 	callTest, ok := call.(txintent.TestView[O])
-	if !ok {
+	if !ok || callTest.Test() == nil {
 		panic("call does not support testing")
 	}
 	o, err := View(call, opts...)
@@ -287,7 +287,7 @@ func TestView[O any](call txintent.View[O], opts ...txplan.Option) O {
 }
 
 // Write calls does not return values. just success/failure
-func Write[O any](user *EOA, call txintent.View[O]) (*gethTypes.Receipt, error) {
+func Write[O any](user *EOA, call txintent.View[O], opts ...txplan.Option) (*gethTypes.Receipt, error) {
 	target, _ := call.To()
 	calldata, err := call.EncodeInput()
 	if err != nil {
@@ -299,12 +299,24 @@ func Write[O any](user *EOA, call txintent.View[O]) (*gethTypes.Receipt, error) 
 		user.Plan(),
 		txplan.WithData(calldata),
 		txplan.WithTo(target),
+		// add optional tx options
+		txplan.Combine(opts...),
 	)
 	receipt, err := tx.Included.Eval(user.ctx)
 	if err != nil {
 		return nil, err
 	}
 	return receipt, nil
+}
+
+func TestWrite[O any](user *EOA, call txintent.View[O], opts ...txplan.Option) *gethTypes.Receipt {
+	callTest, ok := call.(txintent.TestView[O])
+	if !ok || callTest.Test() == nil {
+		panic("call does not support testing")
+	}
+	o, err := Write(user, call, opts...)
+	callTest.Test().Require().NoError(err)
+	return o
 }
 
 func Plan[O any](call txintent.View[O]) (txplan.Option, error) {

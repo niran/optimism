@@ -64,7 +64,7 @@ func TestCallViewWriteWETH(gt *testing.T) {
 
 	// write
 	// alice sends bob 1 WETH
-	dsl.Write(alice, weth.Transfer(bob.Address(), eth.OneEther))
+	dsl.TestWrite(alice, weth.Transfer(bob.Address(), eth.OneEther))
 
 	// view
 	// alice has 1 WETH
