@@ -85,3 +85,20 @@ func TestWrapETH(gt *testing.T) {
 	// Read: Bob has 2 WETH
 	require.Equal(eth.Ether(2), contract.Read(weth.BalanceOf(bob.Address())))
 }
+
+func TestL1ToL2Deposit(gt *testing.T) {
+	t := devtest.SerialT(gt)
+	sys := presets.NewMinimal(t)
+
+	alice := sys.Funder.NewFundedEOA(eth.ThousandEther)
+
+	client := sys.L2EL.Escape().EthClient()
+
+	depositContractAddr := sys.L2Chain.Escape().RollupConfig().DepositContractAddress
+	factory := bindings.NewOptimismPortal2Factory(bindings.WithClient(client),
+		bindings.WithTo(depositContractAddr), bindings.WithTest(t))
+
+	portal := bindings.NewOptimismPortal2(factory)
+
+	contract.Write(alice, portal.DepositTransaction(alice.Address(), eth.OneEther, uint64(300_000), false, []byte{}))
+}
