@@ -15,6 +15,7 @@ import (
 	"github.com/lmittmann/w3"
 )
 
+// never change this
 type BaseCallFactory struct {
 	Target common.Address
 	Client apis.EthClient
@@ -36,8 +37,13 @@ func (f *BaseCallFactory) WithTest(t devtest.T) *BaseCallFactory {
 	return f
 }
 
+// implement this per contract
 type WETHCallFactory struct {
 	BaseCallFactory
+}
+
+func NewWETHCallFactory(b *BaseCallFactory) *WETHCallFactory {
+	return &WETHCallFactory{*b}
 }
 
 func (f *WETHCallFactory) WithTo(addr common.Address) *WETHCallFactory {
@@ -106,18 +112,8 @@ func (c BalanceOfCall) DecodeOutput(data []byte) (eth.ETH, error) {
 	return res, err
 }
 
-func (c BalanceOfCall) WithTo(target common.Address) txintent.View[eth.ETH] {
-	c.target = target
-	return c
-}
-
 func (c BalanceOfCall) To() (*common.Address, error) {
 	return &c.target, nil
-}
-
-func (c BalanceOfCall) WithClient(client apis.EthClient) txintent.View[eth.ETH] {
-	c.client = client
-	return c
 }
 
 func (c BalanceOfCall) Client() apis.EthClient {
@@ -160,18 +156,8 @@ func (c TransferCall) DecodeOutput(data []byte) (bool, error) {
 	return result, err
 }
 
-func (c TransferCall) WithTo(target common.Address) txintent.View[bool] {
-	c.target = target
-	return c
-}
-
 func (c TransferCall) To() (*common.Address, error) {
 	return &c.target, nil
-}
-
-func (c TransferCall) WithClient(client apis.EthClient) txintent.View[bool] {
-	c.client = client
-	return c
 }
 
 func (c TransferCall) Client() apis.EthClient {
@@ -189,6 +175,8 @@ func (c TransferCall) Test() devtest.T {
 // type check
 var _ txintent.View[eth.ETH] = (*BalanceOfCall)(nil)
 var _ txintent.View[bool] = (*TransferCall)(nil)
+var _ txintent.TestView[eth.ETH] = (*BalanceOfCall)(nil)
+var _ txintent.TestView[bool] = (*TransferCall)(nil)
 
 // // TODO: fill me
 // type EventLogger struct {
@@ -277,10 +265,7 @@ func View[O any](call txintent.View[O], opts ...txplan.Option) (O, error) {
 }
 
 func TestView[O any](call txintent.View[O], opts ...txplan.Option) O {
-	callTest, ok := call.(txintent.TestView[O])
-	if !ok || callTest.Test() == nil {
-		panic("call does not support testing")
-	}
+	callTest := toTestView(call)
 	o, err := View(call, opts...)
 	callTest.Test().Require().NoError(err)
 	return o
@@ -309,11 +294,16 @@ func Write[O any](user *EOA, call txintent.View[O], opts ...txplan.Option) (*get
 	return receipt, nil
 }
 
-func TestWrite[O any](user *EOA, call txintent.View[O], opts ...txplan.Option) *gethTypes.Receipt {
+func toTestView[O any](call txintent.View[O]) txintent.TestView[O] {
 	callTest, ok := call.(txintent.TestView[O])
 	if !ok || callTest.Test() == nil {
 		panic("call does not support testing")
 	}
+	return callTest
+}
+
+func TestWrite[O any](user *EOA, call txintent.View[O], opts ...txplan.Option) *gethTypes.Receipt {
+	callTest := toTestView(call)
 	o, err := Write(user, call, opts...)
 	callTest.Test().Require().NoError(err)
 	return o

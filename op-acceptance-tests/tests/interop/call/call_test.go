@@ -25,10 +25,10 @@ func TestCallViewWriteWETH(gt *testing.T) {
 
 	client := sys.L2ELA.Escape().EthClient()
 	wethAddr := common.HexToAddress("0x4200000000000000000000000000000000000006")
+
 	// dsl prep
-	factory := &dsl.WETHCallFactory{}
-	factory = factory.WithTo(wethAddr).WithClient(client).WithTest(t)
-	weth := dsl.NewWETH(factory)
+	factory := dsl.NewWETHCallFactory(&dsl.BaseCallFactory{Target: wethAddr, Client: client})
+	weth := dsl.NewWETH(factory.WithTest(t))
 
 	var err error
 	// alice and bob has zero WETH
@@ -55,7 +55,7 @@ func TestCallViewWriteWETH(gt *testing.T) {
 	// bob has 0 WETH.
 	require.Equal(eth.ZeroWei, dsl.TestView(weth.BalanceOf(bob.Address())))
 
-	// view
+	// view(manual error handling)
 	// without address sender so failure
 	_, err = dsl.View(weth.Transfer(bob.Address(), eth.OneEther))
 	t.Require().Error(err)
@@ -71,4 +71,13 @@ func TestCallViewWriteWETH(gt *testing.T) {
 	require.Equal(eth.OneEther, dsl.TestView(weth.BalanceOf(alice.Address())))
 	// bob has 1 WETH.
 	require.Equal(eth.OneEther, dsl.TestView(weth.BalanceOf(bob.Address())))
+
+	// write(manual error handling)
+	// alice sends bob 1 WETH
+	_, err = dsl.Write(alice, weth.Transfer(bob.Address(), eth.OneEther))
+	require.NoError(err)
+	// alice has 0 WETH
+	require.Equal(eth.ZeroWei, dsl.TestView(weth.BalanceOf(alice.Address())))
+	// bob has 2 WETH.
+	require.Equal(eth.Ether(2), dsl.TestView(weth.BalanceOf(bob.Address())))
 }
