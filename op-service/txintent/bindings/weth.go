@@ -36,18 +36,18 @@ func (f *WETHCallFactory) WithTest(t devtest.T) *WETHCallFactory {
 	return f
 }
 
-func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.View[eth.ETH] {
+func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.CallView[eth.ETH] {
 	return BalanceOfCall{Addr: addr, target: f.Target, client: f.Client, t: f.T}
 }
 
-func (f *WETHCallFactory) Transfer(dest common.Address, amount eth.ETH) txintent.View[bool] {
+func (f *WETHCallFactory) Transfer(dest common.Address, amount eth.ETH) txintent.CallView[bool] {
 	return TransferCall{Dest: dest, Amount: amount, target: f.Target, client: f.Client, t: f.T}
 }
 
 type WETH struct {
 	// Each field is a function, that is set up automatically with some reflection
-	BalanceOf func(addr common.Address) txintent.View[eth.ETH]
-	Transfer  func(dest common.Address, amount eth.ETH) txintent.View[bool]
+	BalanceOf func(addr common.Address) txintent.CallView[eth.ETH]
+	Transfer  func(dest common.Address, amount eth.ETH) txintent.CallView[bool]
 }
 
 func NewWETH(f *WETHCallFactory) *WETH {
@@ -137,7 +137,7 @@ func (c TransferCall) Test() devtest.T {
 	return c.t
 }
 
-var _ txintent.View[eth.ETH] = (*BalanceOfCall)(nil)
-var _ txintent.View[bool] = (*TransferCall)(nil)
-var _ txintent.TestView[eth.ETH] = (*BalanceOfCall)(nil)
-var _ txintent.TestView[bool] = (*TransferCall)(nil)
+var _ txintent.CallView[eth.ETH] = (*BalanceOfCall)(nil)
+var _ txintent.CallView[bool] = (*TransferCall)(nil)
+var _ txintent.TestCallView[eth.ETH] = (*BalanceOfCall)(nil)
+var _ txintent.TestCallView[bool] = (*TransferCall)(nil)

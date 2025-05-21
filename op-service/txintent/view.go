@@ -13,18 +13,18 @@ type Output[O any] interface {
 	DecodeOutput(data []byte) (dest O, err error)
 }
 
-type View[O any] interface {
+type CallView[O any] interface {
 	Call
 	Client() apis.EthClient
 	Output[O]
 }
 
-type TestView[O any] interface {
-	View[O]
+type TestCallView[O any] interface {
+	CallView[O]
 	Test() devtest.T
 }
 
-func Read[O any](view View[O], opts ...txplan.Option) (O, error) {
+func Read[O any](view CallView[O], opts ...txplan.Option) (O, error) {
 	target, err := view.To()
 	if err != nil {
 		return *new(O), err
