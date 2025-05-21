@@ -29,8 +29,8 @@ func TestCallViewWriteWETH(gt *testing.T) {
 	wethAddr := common.HexToAddress("0x4200000000000000000000000000000000000006")
 
 	// dsl prep
-	factory := bindings.NewWETHCallFactory(&bindings.BaseCallFactory{})
-	weth := bindings.NewWETH(factory.WithTest(t).WithClient(client).WithTo(wethAddr))
+	factory := bindings.NewWETHCallFactory(bindings.WithTo(wethAddr), bindings.WithClient(client), bindings.WithTest(t))
+	weth := bindings.NewWETH(factory)
 
 	var err error
 	// alice and bob has zero WETH

@@ -3,8 +3,6 @@ package bindings
 import (
 	"math/big"
 
-	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
-	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,23 +14,12 @@ type WETHCallFactory struct {
 	BaseCallFactory
 }
 
-func NewWETHCallFactory(b *BaseCallFactory) *WETHCallFactory {
-	return &WETHCallFactory{*b}
-}
-
-func (f *WETHCallFactory) WithTo(addr common.Address) *WETHCallFactory {
-	f.BaseCallFactory.WithTo(addr)
-	return f
-}
-
-func (f *WETHCallFactory) WithClient(c apis.EthClient) *WETHCallFactory {
-	f.BaseCallFactory.WithClient(c)
-	return f
-}
-
-func (f *WETHCallFactory) WithTest(t devtest.T) *WETHCallFactory {
-	f.BaseCallFactory.WithTest(t)
-	return f
+func NewWETHCallFactory(opts ...CallFactoryOption) *WETHCallFactory {
+	b := &BaseCallFactory{}
+	for _, opt := range opts {
+		opt(b)
+	}
+	return &WETHCallFactory{BaseCallFactory: *b}
 }
 
 func (f *WETHCallFactory) BalanceOf(addr common.Address) txintent.CallView[eth.ETH] {

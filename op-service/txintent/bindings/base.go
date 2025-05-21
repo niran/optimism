@@ -42,25 +42,22 @@ type BaseCallFactory struct {
 	BaseCallTest
 }
 
-func (f *BaseCallFactory) WithTo(target common.Address) CallFactory {
-	f.target = target
-	return f
+type CallFactoryOption func(*BaseCallFactory)
+
+func WithTo(target common.Address) CallFactoryOption {
+	return func(f *BaseCallFactory) {
+		f.target = target
+	}
 }
 
-func (f *BaseCallFactory) WithClient(client apis.EthClient) CallFactory {
-	f.client = client
-	return f
+func WithClient(client apis.EthClient) CallFactoryOption {
+	return func(f *BaseCallFactory) {
+		f.client = client
+	}
 }
 
-func (f *BaseCallFactory) WithTest(t devtest.T) CallFactory {
-	f.t = t
-	return f
+func WithTest(t devtest.T) CallFactoryOption {
+	return func(f *BaseCallFactory) {
+		f.t = t
+	}
 }
-
-type CallFactory interface {
-	WithTo(common.Address) CallFactory
-	WithClient(apis.EthClient) CallFactory
-	WithTest(devtest.T) CallFactory
-}
-
-var _ CallFactory = (*BaseCallFactory)(nil)
