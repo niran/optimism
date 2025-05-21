@@ -154,8 +154,8 @@ contract L1CrossDomainMessenger_Upgrade_Test is L1CrossDomainMessenger_TestInit 
         vm.prank(address(l1CrossDomainMessenger.proxyAdmin()));
         l1CrossDomainMessenger.upgrade(newSystemConfig);
 
-        StorageSlot memory spacerSlot = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "spacer_251_0_20");
-        assertEq(vm.load(address(l1CrossDomainMessenger), bytes32(spacerSlot.slot)), bytes32(0));
+        // Verify that the systemConfig was updated.
+        assertEq(address(l1CrossDomainMessenger.systemConfig()), address(newSystemConfig));
     }
 
     /// @notice Tests that the upgrade() function reverts if called a second time.

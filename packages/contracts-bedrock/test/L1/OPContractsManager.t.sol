@@ -1308,21 +1308,17 @@ contract OPContractsManager_UpdatePrestate_Test is OPContractsManager_TestInit {
 /// @title OPContractsManager_Upgrade_Test
 /// @notice Tests the `upgrade` function of the `OPContractsManager` contract.
 contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
-    // Upgrade to U14 first
     function setUp() public override {
-        skipIfNotOpFork("test_upgrade_notDelegateCalled_reverts");
+        skipIfNotOpFork("OPContractsManager_Upgrade_Test");
         super.setUp();
-        runUpgrade13UpgradeAndChecks(upgrader);
     }
 
     function test_upgradeOPChainOnly_succeeds() public {
-        skipIfNotOpFork("test_upgradeOPChainOnly_succeeds");
         // Run the upgrade test and checks
         runUpgradeTestAndChecks(upgrader);
     }
 
     function test_verifyOpcmCorrectness_succeeds() public {
-        skipIfNotOpFork("test_verifyOpcmCorrectness_succeeds");
         skipIfCoverage(); // Coverage changes bytecode and breaks the verification script.
 
         // Run the upgrade test and checks
@@ -1336,7 +1332,6 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     }
 
     function test_isRcFalseAfterCalledByUpgrader_works() public {
-        skipIfNotOpFork("test_isRcFalseAfterCalledByUpgrader_works");
         assertTrue(opcm.isRC());
         bytes memory releaseBytes = bytes(opcm.l1ContractsRelease());
         assertEq(Bytes.slice(releaseBytes, releaseBytes.length - 3, 3), "-rc", "release should end with '-rc'");
@@ -1353,7 +1348,6 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     )
         public
     {
-        skipIfNotOpFork("testFuzz_upgrade_nonUpgradeControllerDelegatecallerShouldNotSetIsRCToFalse_works");
         if (
             _nonUpgradeController == upgrader || _nonUpgradeController == address(0)
                 || _nonUpgradeController < address(0x4200000000000000000000000000000000000000)
@@ -1382,8 +1376,6 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     }
 
     function test_upgrade_duplicateL2ChainId_succeeds() public {
-        skipIfNotOpFork("test_upgrade_duplicateL2ChainId_succeeds");
-
         // Deploy a new OPChain with the same L2 chain ID as the current OPChain
         Deploy deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
         IOPContractsManager.DeployInput memory deployInput = deploy.getDeployInput();
@@ -1469,12 +1461,16 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     }
 
     function test_upgrade_notDelegateCalled_reverts() public {
+        runUpgrade13UpgradeAndChecks(upgrader);
+
         vm.prank(upgrader);
         vm.expectRevert(IOPContractsManager.OnlyDelegatecall.selector);
         opcm.upgrade(opChainConfigs);
     }
 
     function test_upgrade_notProxyAdminOwner_reverts() public {
+        runUpgrade13UpgradeAndChecks(upgrader);
+
         address delegateCaller = makeAddr("delegateCaller");
         vm.etch(delegateCaller, vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
 
@@ -1490,6 +1486,8 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     /// @notice Tests that upgrade reverts when absolutePrestate is zero and the existing game also
     ///         has an absolute prestate of zero.
     function test_upgrade_absolutePrestateNotSet_reverts() public {
+        runUpgrade13UpgradeAndChecks(upgrader);
+
         // Set the config to try to update the absolutePrestate to zero.
         opChainConfigs[0].absolutePrestate = Claim.wrap(bytes32(0));
 
