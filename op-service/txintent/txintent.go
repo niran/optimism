@@ -11,9 +11,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+type Input interface {
+	EncodeInput() ([]byte, error)
+}
+
 type Call interface {
 	To() (*common.Address, error)
-	Data() ([]byte, error)
+	Input
 	AccessList() (types.AccessList, error)
 }
 
@@ -38,7 +42,7 @@ func NewIntent[V Call, R Result](opts ...txplan.Option) *IntentTx[V, R] {
 	})
 	v.PlannedTx.Data.DependOn(&v.Content)
 	v.PlannedTx.Data.Fn(func(ctx context.Context) (hexutil.Bytes, error) {
-		return v.Content.Value().Data()
+		return v.Content.Value().EncodeInput()
 	})
 	v.PlannedTx.AccessList.DependOn(&v.Content)
 	v.PlannedTx.AccessList.Fn(func(ctx context.Context) (types.AccessList, error) {
