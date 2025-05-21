@@ -139,6 +139,9 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 		l2EL, ok := orch.l2ELs.Get(l2ELID)
 		require.True(ok, "l2 EL node required")
 
+		cluster, ok := orch.ClusterForL2(l2ELID.ChainID)
+		require.True(ok, "l2 must be in known cluster")
+
 		jwtPath, jwtSecret := orch.writeDefaultJWT()
 
 		logger := orch.P().Logger().New("service", "op-node", "id", l2CLID)
@@ -206,8 +209,9 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 			Driver: driver.Config{
 				SequencerEnabled: isSequencer,
 			},
-			Rollup:    *l2Net.rollupCfg,
-			P2PSigner: p2pSignerSetup, // nil when not sequencer
+			Rollup:        *l2Net.rollupCfg,
+			DependencySet: cluster.depset,
+			P2PSigner:     p2pSignerSetup, // nil when not sequencer
 			RPC: node.RPCConfig{
 				ListenAddr: "127.0.0.1",
 				// When L2CL starts, store its RPC port here

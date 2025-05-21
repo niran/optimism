@@ -13,6 +13,13 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 )
 
+type DependencySet interface {
+	// HasCrossL2Inbox determines if the CrossL2Inbox predeploy is available
+	// for a block at the specified timestamp. The first block for which this returns
+	// true must include the upgrade transactions to deploy the CrossL2Inbox.
+	HasCrossL2Inbox(chainID eth.ChainID, l2BlockTime uint64) (bool, error)
+}
+
 // L1ReceiptsFetcher fetches L1 header info and receipts for the payload attributes derivation (the info tx and deposits)
 type L1ReceiptsFetcher interface {
 	InfoByHash(ctx context.Context, hash common.Hash) (eth.BlockInfo, error)
@@ -26,15 +33,17 @@ type SystemConfigL2Fetcher interface {
 // FetchingAttributesBuilder fetches inputs for the building of L2 payload attributes on the fly.
 type FetchingAttributesBuilder struct {
 	rollupCfg *rollup.Config
+	depSet    DependencySet
 	l1        L1ReceiptsFetcher
 	l2        SystemConfigL2Fetcher
 	// whether to skip the L1 origin timestamp check - only for testing purposes
 	testSkipL1OriginCheck bool
 }
 
-func NewFetchingAttributesBuilder(rollupCfg *rollup.Config, l1 L1ReceiptsFetcher, l2 SystemConfigL2Fetcher) *FetchingAttributesBuilder {
+func NewFetchingAttributesBuilder(rollupCfg *rollup.Config, depSet DependencySet, l1 L1ReceiptsFetcher, l2 SystemConfigL2Fetcher) *FetchingAttributesBuilder {
 	return &FetchingAttributesBuilder{
 		rollupCfg: rollupCfg,
+		depSet:    depSet,
 		l1:        l1,
 		l2:        l2,
 	}
@@ -140,14 +149,12 @@ func (ba *FetchingAttributesBuilder) PreparePayloadAttributes(ctx context.Contex
 		upgradeTxs = append(upgradeTxs, interop...)
 	}
 
-	if isDeployBlock, err := ba.rollupCfg.IsCrossL2InboxDeploymentBlock(nextL2Time); err != nil {
-		return nil, NewTemporaryError(fmt.Errorf("failed to check interop predeploy block: %w", err))
-	} else if isDeployBlock {
-		tx, err := InteropActivateCrossL2InboxTransaction()
+	if ba.rollupCfg.IsInterop(nextL2Time) {
+		txs, err := ba.deployCrossL2InboxTxs(nextL2Time)
 		if err != nil {
-			return nil, NewCriticalError(fmt.Errorf("failed to build interop activate cross l2 inbox tx: %w", err))
+			return nil, err
 		}
-		upgradeTxs = append(upgradeTxs, tx)
+		upgradeTxs = append(upgradeTxs, txs...)
 	}
 
 	l1InfoTx, err := L1InfoDepositBytes(ba.rollupCfg, sysConfig, seqNumber, l1Info, nextL2Time)
@@ -192,4 +199,33 @@ func (ba *FetchingAttributesBuilder) PreparePayloadAttributes(ctx context.Contex
 	}
 
 	return r, nil
+}
+
+func (ba *FetchingAttributesBuilder) deployCrossL2InboxTxs(nextL2Time uint64) ([]hexutil.Bytes, error) {
+	if ba.depSet == nil {
+		return nil, NewCriticalError(fmt.Errorf("interop is active but no dependency set provided"))
+	}
+	chainID := eth.ChainIDFromBig(ba.rollupCfg.L2ChainID)
+	alreadyDeployed, err := ba.depSet.HasCrossL2Inbox(chainID, nextL2Time-1)
+	if err != nil {
+		return nil, NewTemporaryError(fmt.Errorf("failed to check if CrossL2Inbox already active: %w", err))
+	}
+	if alreadyDeployed {
+		return nil, nil
+	}
+	toBeDeployed, err := ba.depSet.HasCrossL2Inbox(chainID, nextL2Time)
+	if err != nil {
+		return nil, NewTemporaryError(fmt.Errorf("failed to check if CrossL2Inbox should become active: %w", err))
+	}
+	if !toBeDeployed {
+		return nil, nil
+	}
+
+	// Select the right activation transaction based on the current hard fork, currently there's only initial interop
+	// If later hard forks update the CrossL2Inbox, update them here.
+	tx, err := InteropActivateCrossL2InboxTransaction()
+	if err != nil {
+		return nil, NewCriticalError(fmt.Errorf("failed to build interop activate cross l2 inbox tx: %w", err))
+	}
+	return []hexutil.Bytes{tx}, nil
 }

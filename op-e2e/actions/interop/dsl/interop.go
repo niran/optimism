@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor"
 	"github.com/ethereum/go-ethereum/core"
@@ -42,9 +43,10 @@ const (
 type Chain struct {
 	ChainID eth.ChainID
 
-	RollupCfg   *rollup.Config
-	L2Genesis   *core.Genesis
-	BatcherAddr common.Address
+	RollupCfg     *rollup.Config
+	DependencySet derive.DependencySet
+	L2Genesis     *core.Genesis
+	BatcherAddr   common.Address
 
 	Sequencer       *helpers.L2Sequencer
 	SequencerEngine *helpers.L2Engine
@@ -200,8 +202,8 @@ func (is *InteropSetup) CreateActors() *InteropActors {
 	is.T.Cleanup(func() {
 		require.NoError(is.T, supervisorAPI.backend.Stop(context.Background()))
 	})
-	chainA := createL2Services(is.T, is.Log, l1Miner, is.Keys, is.Out.L2s["900200"])
-	chainB := createL2Services(is.T, is.Log, l1Miner, is.Keys, is.Out.L2s["900201"])
+	chainA := createL2Services(is.T, is.Log, l1Miner, is.Keys, is.Out.L2s["900200"], is.DepSet)
+	chainB := createL2Services(is.T, is.Log, l1Miner, is.Keys, is.Out.L2s["900201"], is.DepSet)
 	// Hook up L2 RPCs to supervisor, to fetch event data from
 	srcA := chainA.Sequencer.InteropSyncNode(is.T)
 	srcB := chainB.Sequencer.InteropSyncNode(is.T)
@@ -291,6 +293,7 @@ func createL2Services(
 	l1Miner *helpers.L1Miner,
 	keys devkeys.Keys,
 	output *interopgen.L2Output,
+	depSet depset.DependencySet,
 ) *Chain {
 	logger = logger.New("chain", output.Genesis.Config.ChainID)
 
@@ -306,7 +309,7 @@ func createL2Services(
 	require.NoError(t, err)
 
 	seq := helpers.NewL2Sequencer(t, logger.New("role", "sequencer"), l1F,
-		l1Miner.BlobStore(), altda.Disabled, seqCl, output.RollupCfg,
+		l1Miner.BlobStore(), altda.Disabled, seqCl, output.RollupCfg, depSet,
 		0)
 
 	batcherKey, err := keys.Secret(devkeys.ChainOperatorKey{
@@ -329,6 +332,7 @@ func createL2Services(
 	return &Chain{
 		ChainID:         eth.ChainIDFromBig(output.Genesis.Config.ChainID),
 		RollupCfg:       output.RollupCfg,
+		DependencySet:   depSet,
 		L2Genesis:       output.Genesis,
 		BatcherAddr:     crypto.PubkeyToAddress(batcherKey.PublicKey),
 		Sequencer:       seq,

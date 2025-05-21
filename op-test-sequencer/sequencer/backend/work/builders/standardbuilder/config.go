@@ -70,7 +70,8 @@ func (c *Config) Start(ctx context.Context, id seqtypes.BuilderID, opts *work.Se
 	if err != nil {
 		return nil, err
 	}
-	fb := derive.NewFetchingAttributesBuilder(cfg, l1Cl, l2Cl)
+	// TODO(#16041): Fetch the dependency set from op-node (will need a new RPC endpoint)
+	fb := derive.NewFetchingAttributesBuilder(cfg, nil, l1Cl, l2Cl)
 
 	fb.TestSkipL1OriginCheck()
 

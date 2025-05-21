@@ -1543,6 +1543,7 @@ func createVerifierWithOnlyCanonicalBlocks(t helpers.StatefulTesting, l1Miner *h
 		altda.Disabled,
 		canonicalOnlyEngine.EngineClient(t, chain.RollupCfg),
 		chain.RollupCfg,
+		chain.DependencySet,
 		&sync2.Config{},
 		safedb.Disabled)
 	return verifier, canonicalOnlyEngine

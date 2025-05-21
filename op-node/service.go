@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
@@ -43,6 +44,9 @@ func NewConfig(ctx *cli.Context, log log.Logger) (*node.Config, error) {
 		log.Info("Not opted in to ProtocolVersions signal loading, disabling ProtocolVersions contract now.")
 		rollupConfig.ProtocolVersionsAddress = common.Address{}
 	}
+
+	// TODO(#16041): Add CLI flags to set the dependency set
+	var depSet derive.DependencySet
 
 	configPersistence := NewConfigPersistence(ctx)
 
@@ -85,6 +89,7 @@ func NewConfig(ctx *cli.Context, log log.Logger) (*node.Config, error) {
 		L1:            l1Endpoint,
 		L2:            l2Endpoint,
 		Rollup:        *rollupConfig,
+		DependencySet: depSet,
 		Driver:        *driverConfig,
 		Beacon:        NewBeaconEndpointConfig(ctx),
 		InteropConfig: NewSupervisorEndpointConfig(ctx),

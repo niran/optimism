@@ -11,7 +11,6 @@ import (
 
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -37,7 +36,6 @@ var (
 	ErrChainIDsSame                  = errors.New("L1 and L2 chain IDs must be different")
 	ErrL1ChainIDNotPositive          = errors.New("L1 chain ID must be non-zero and positive")
 	ErrL2ChainIDNotPositive          = errors.New("L2 chain ID must be non-zero and positive")
-	ErrMissingDependencySet          = errors.New("missing dependency set")
 )
 
 type Genesis struct {
@@ -164,9 +162,6 @@ type Config struct {
 	// This feature (de)activates by L1 origin timestamp, to keep a consistent L1 block info per L2
 	// epoch.
 	PectraBlobScheduleTime *uint64 `json:"pectra_blob_schedule_time,omitempty"`
-
-	// TODO(#16041): This is probably not the right thing to do...
-	DependencySet *depset.StaticConfigDependencySet `json:"dependency_set"`
 }
 
 // ValidateL1Config checks L1 config variables for errors.
@@ -336,9 +331,6 @@ func (cfg *Config) Check() error {
 	}
 	if err := validateAltDAConfig(cfg); err != nil {
 		return err
-	}
-	if cfg.InteropTime != nil && cfg.DependencySet == nil {
-		return ErrMissingDependencySet
 	}
 
 	if err := checkFork(cfg.RegolithTime, cfg.CanyonTime, Regolith, Canyon); err != nil {
@@ -553,23 +545,6 @@ func (c *Config) IsInteropActivationBlock(l2BlockTime uint64) bool {
 	return c.IsInterop(l2BlockTime) &&
 		l2BlockTime >= c.BlockTime &&
 		!c.IsInterop(l2BlockTime-c.BlockTime)
-}
-
-func (c *Config) IsCrossL2InboxDeploymentBlock(l2BlockTime uint64) (bool, error) {
-	if c.DependencySet == nil {
-		// Pre-interop so do not deploy
-		return false, nil
-	}
-	chainID := eth.ChainIDFromBig(c.L2ChainID)
-	alreadyDeployed, err := c.DependencySet.HasCrossL2Inbox(chainID, l2BlockTime-1)
-	if err != nil {
-		return false, err
-	}
-	toBeDeployed, err := c.DependencySet.HasCrossL2Inbox(chainID, l2BlockTime)
-	if err != nil {
-		return false, err
-	}
-	return !alreadyDeployed && toBeDeployed, nil
 }
 
 // IsActivationBlock returns the fork which activates at the block with time newTime if the previous

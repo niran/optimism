@@ -27,7 +27,7 @@ type DependencySet interface {
 	// E.g. if the DependencySet is syncing new changes.
 	CanInitiateAt(chainID eth.ChainID, initTimestamp uint64) (bool, error)
 
-	// HasCrossL2InboxDeployed determines if the CrossL2Inbox predeploy is available
+	// HasCrossL2Inbox determines if the CrossL2Inbox predeploy is available
 	// for a block at the specified timestamp. The first block for which this returns
 	// true must include the upgrade transactions to deploy the CrossL2Inbox.
 	HasCrossL2Inbox(chainID eth.ChainID, l2BlockTime uint64) (bool, error)
