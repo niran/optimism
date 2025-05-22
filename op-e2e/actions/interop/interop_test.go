@@ -1,6 +1,8 @@
 package interop
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,6 +17,8 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/managed"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+
+	superevents "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/superevents"
 	stypes "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
@@ -424,7 +428,30 @@ func TestInteropCrossSafeDependencyDelay(gt *testing.T) {
 	require.NoError(t, err)
 
 	actors.Supervisor.SignalLatestL1(t)
-	actors.Supervisor.ProcessFull(t)
+	// Drain filter to only pass events for chain A
+	drainFilter := func(ev event.Event) bool {
+		exampleB := superevents.UpdateCrossSafeRequestEvent{}
+		exampleB.ChainID = actors.ChainB.ChainID
+		exampleVal := reflect.ValueOf(exampleB)
+		exampleField := exampleVal.FieldByName("ChainID")
+
+		val := reflect.ValueOf(ev)
+		if val.Kind() == reflect.Ptr {
+			val = val.Elem()
+		}
+		chainIDField := val.FieldByName("ChainID")
+		if !chainIDField.IsValid() {
+			fmt.Println("AXELAXEL event has no chainid:", ev.String())
+			return true
+		}
+
+		ret := exampleField.Equal(chainIDField)
+		if !ret {
+			fmt.Println("AXELAXEL filtered event:", ev.String(), "chainID:", actors.ChainB.ChainID)
+		}
+		return ret
+	}
+	actors.Supervisor.ProcessFullFiltered(t, drainFilter)
 
 	actors.ChainA.Sequencer.ActL1HeadSignal(t)
 	actors.ChainB.Sequencer.ActL1HeadSignal(t)
@@ -435,7 +462,7 @@ func TestInteropCrossSafeDependencyDelay(gt *testing.T) {
 	for i := 0; i < 5; i++ {
 		actors.ChainA.Sequencer.SyncSupervisor(t)
 		actors.ChainB.Sequencer.SyncSupervisor(t)
-		actors.Supervisor.ProcessFull(t)
+		actors.Supervisor.ProcessFullFiltered(t, drainFilter)
 		actors.ChainA.Sequencer.ActL2PipelineFull(t)
 		actors.ChainB.Sequencer.ActL2PipelineFull(t)
 	}

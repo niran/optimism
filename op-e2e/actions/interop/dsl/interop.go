@@ -230,6 +230,10 @@ func (sa *SupervisorActor) ProcessFull(t helpers.Testing) {
 	require.NoError(t, sa.exec.Drain(), "process all supervisor events")
 }
 
+func (sa *SupervisorActor) ProcessFullFiltered(t helpers.Testing, filter func(event.Event) bool) {
+	require.NoError(t, sa.exec.FilteredDrain(filter), "process all supervisor events")
+}
+
 func (sa *SupervisorActor) SignalLatestL1(t helpers.Testing) {
 	require.NoError(t, sa.backend.PullLatestL1())
 }

@@ -86,6 +86,7 @@ func CrossSafeUpdate(logger log.Logger, chainID eth.ChainID, d CrossSafeDeps) er
 // with the current scope that will need to be expanded for further progress.
 func scopedCrossSafeUpdate(logger log.Logger, chainID eth.ChainID, d CrossSafeDeps) (update types.DerivedBlockRefPair, err error) {
 	candidate, err := d.CandidateCrossSafe(chainID)
+	logger.Info("AXELAXEL scopedCrossSafeUpdate candidate", "candidate", candidate, "err", err)
 	if err != nil {
 		return candidate, fmt.Errorf("failed to determine candidate block for cross-safe: %w", err)
 	}
@@ -93,8 +94,10 @@ func scopedCrossSafeUpdate(logger log.Logger, chainID eth.ChainID, d CrossSafeDe
 
 	hazards, err := CrossSafeHazards(d, logger, chainID, candidate.Source.ID(), types.BlockSealFromRef(candidate.Derived))
 	if err != nil {
+		logger.Info("AXELAXEL error in CrossSafeHazards", "candidate", candidate, "err", err)
 		return candidate, fmt.Errorf("failed to determine dependencies of cross-safe candidate %s: %w", candidate.Derived, err)
 	}
+	logger.Info("AXELAXEL hazard checking with", "candidate", candidate)
 	if err := HazardSafeFrontierChecks(d, candidate.Source.ID(), hazards); err != nil {
 		return candidate, fmt.Errorf("failed to verify block %s in cross-safe frontier: %w", candidate.Derived, err)
 	}

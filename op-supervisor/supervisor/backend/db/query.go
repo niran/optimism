@@ -365,6 +365,7 @@ func (db *ChainsDB) CandidateCrossSafe(chain eth.ChainID) (result types.DerivedB
 			}
 			// the first derived must be the genesis block, panic otherwise
 			derivedRef := first.Derived.MustWithParent(eth.BlockID{})
+			db.logger.Info("AXELAXEL Candidate cross-safe Genesis", "chainID", chain, "source", sourceRef, "derived", derivedRef)
 			return types.DerivedBlockRefPair{
 				Source:  sourceRef,
 				Derived: derivedRef,
@@ -380,12 +381,14 @@ func (db *ChainsDB) CandidateCrossSafe(chain eth.ChainID) (result types.DerivedB
 	candidate, err := lDB.Candidate(crossSafe.Source.ID(), crossSafe.Derived.ID(), revision)
 	if err != nil {
 		// forward candidate value, even if error, in case a scope-bump is needed
+		db.logger.Info("AXELAXEL Candidate cross-safe", "chainID", chain, "candidate", candidate, "err", err)
 		return candidate, err
 	}
 	db.logger.Debug("Determined cross-safe candidate block revision", "crossSafe", crossSafe)
 
 	if candidate.Source.Number < crossSafe.Source.Number {
 		db.logger.Error("Candidate block has lower source", "crossSafe", crossSafe, "candidate", candidate)
+		db.logger.Info("AXELAXEL Candidate cross-safe In Case of Data Corruption", "chainID", chain, "source", candidate.Source, "derived", candidate.Derived)
 		return candidate, types.ErrDataCorruption
 	}
 	return candidate, nil

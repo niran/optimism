@@ -181,6 +181,10 @@ func (db *ChainsDB) initializedUpdateCrossSafe(chain eth.ChainID, l1View eth.Blo
 		return err
 	}
 	db.logger.Info("Updated cross-safe", "chain", chain, "l1View", l1View, "lastCrossDerived", lastCrossDerived)
+	db.logger.Info("AXELAXEL Updated cross-safe", "chain", chain, "l1View", l1View, "lastCrossDerived", lastCrossDerived)
+	crossLatest, _ := crossDB.Last()
+	localLatest, _ := localDB.Last()
+	db.logger.Info("AXELAXEL Now things look like:", "chain", chain, "crossLatestFrom", crossLatest.Source.Number, "crossLatestTo", crossLatest.Derived.Number, "localLatestFrom", localLatest.Source.Number, "localLatestTo", localLatest.Derived.Number)
 	db.emitter.Emit(superevents.CrossSafeUpdateEvent{
 		ChainID: chain,
 		NewCrossSafe: types.DerivedBlockSealPair{
