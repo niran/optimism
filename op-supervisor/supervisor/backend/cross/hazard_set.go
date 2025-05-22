@@ -24,7 +24,7 @@ type HazardDeps interface {
 
 // HazardSet tracks blocks that must be checked before a candidate can be promoted
 type HazardSet struct {
-	entries map[types.ChainIndex]types.BlockSeal
+	entries map[types.ChainCode]types.BlockSeal
 }
 
 // NewHazardSet creates a new HazardSet with the given dependencies and initial block
@@ -33,7 +33,7 @@ func NewHazardSet(deps HazardDeps, logger log.Logger, chainID eth.ChainID, block
 		return nil, errHazardSetNilDeps
 	}
 	h := &HazardSet{
-		entries: make(map[types.ChainIndex]types.BlockSeal),
+		entries: make(map[types.ChainCode]types.BlockSeal),
 	}
 	logger.Debug("Building new HazardSet", "chainID", chainID, "block", block)
 	if err := h.build(deps, logger, chainID, block); err != nil {
@@ -43,7 +43,7 @@ func NewHazardSet(deps HazardDeps, logger log.Logger, chainID eth.ChainID, block
 	return h, nil
 }
 
-func NewHazardSetFromEntries(entries map[types.ChainIndex]types.BlockSeal) *HazardSet {
+func NewHazardSetFromEntries(entries map[types.ChainCode]types.BlockSeal) *HazardSet {
 	return &HazardSet{entries: entries}
 }
 
@@ -150,7 +150,7 @@ func (h *HazardSet) build(deps HazardDeps, logger log.Logger, chainID eth.ChainI
 			logger.Debug("Processing message", "chainID", destChainID, "block", candidate, "msg", msg)
 
 			// Get the source chain, ensure it's allowed to initiate messages, and contains the initiating message.
-			srcChainID, err := depSet.ChainIDFromIndex(msg.Chain)
+			srcChainID, err := depSet.ChainIDFromCode(msg.Chain)
 			if err != nil {
 				if errors.Is(err, types.ErrUnknownChain) {
 					err = fmt.Errorf("msg %s may not execute from unknown chain %s: %w", msg, msg.Chain, types.ErrConflict)
@@ -202,7 +202,7 @@ func (h *HazardSet) build(deps HazardDeps, logger log.Logger, chainID eth.ChainI
 	return nil
 }
 
-func (h *HazardSet) Entries() map[types.ChainIndex]types.BlockSeal {
+func (h *HazardSet) Entries() map[types.ChainCode]types.BlockSeal {
 	if h == nil {
 		return nil
 	}

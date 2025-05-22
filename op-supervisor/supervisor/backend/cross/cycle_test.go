@@ -18,10 +18,10 @@ const testDefaultTimestamp = 100
 var errUnexpectedChain = errors.New("unexpected chain")
 
 type testDepSet struct {
-	mapping map[types.ChainIndex]eth.ChainID
+	mapping map[types.ChainCode]eth.ChainID
 }
 
-func (t testDepSet) ChainIDFromIndex(index types.ChainIndex) (eth.ChainID, error) {
+func (t testDepSet) ChainIDFromCode(index types.ChainCode) (eth.ChainID, error) {
 	v, ok := t.mapping[index]
 	if !ok {
 		return eth.ChainID{}, types.ErrUnknownChain
@@ -29,7 +29,7 @@ func (t testDepSet) ChainIDFromIndex(index types.ChainIndex) (eth.ChainID, error
 	return v, nil
 }
 
-var _ depset.ChainIDFromIndex = (*testDepSet)(nil)
+var _ depset.ChainIDFromCode = (*testDepSet)(nil)
 
 type mockCycleCheckDeps struct {
 	openBlockFn func(chainID eth.ChainID, blockNum uint64) (eth.BlockRef, uint32, map[uint32]*types.ExecutingMessage, error)
@@ -53,7 +53,7 @@ type hazardCycleChecksTestCase struct {
 	msg               string
 
 	// Optional overrides
-	hazards     map[types.ChainIndex]types.BlockSeal
+	hazards     map[types.ChainCode]types.BlockSeal
 	openBlockFn func(chainID eth.ChainID, blockNum uint64) (eth.BlockRef, uint32, map[uint32]*types.ExecutingMessage, error)
 }
 
@@ -88,21 +88,21 @@ func runHazardCycleChecksTestCase(t *testing.T, tc hazardCycleChecksTestCase) {
 	}
 
 	// Generate hazards map automatically if not explicitly provided
-	var hazards map[types.ChainIndex]types.BlockSeal
+	var hazards map[types.ChainCode]types.BlockSeal
 	if tc.hazards != nil {
 		hazards = tc.hazards
 	} else {
-		hazards = make(map[types.ChainIndex]types.BlockSeal)
+		hazards = make(map[types.ChainCode]types.BlockSeal)
 		for chainStr := range tc.chainBlocks {
-			hazards[chainIndex(chainStr)] = types.BlockSeal{Number: 1}
+			hazards[chainCode(chainStr)] = types.BlockSeal{Number: 1}
 		}
 	}
 
 	depSet := &testDepSet{
-		mapping: make(map[types.ChainIndex]eth.ChainID),
+		mapping: make(map[types.ChainCode]eth.ChainID),
 	}
 	for chainStr := range tc.chainBlocks {
-		index := chainIndex(chainStr)
+		index := chainCode(chainStr)
 		depSet.mapping[index] = eth.ChainIDFromUInt64(uint64(index))
 	}
 	// Run the test
@@ -124,12 +124,12 @@ func runHazardCycleChecksTestCase(t *testing.T, tc hazardCycleChecksTestCase) {
 	}
 }
 
-func chainIndex(s string) types.ChainIndex {
+func chainCode(s string) types.ChainCode {
 	id, err := strconv.ParseUint(s, 10, 32)
 	if err != nil {
-		panic(fmt.Sprintf("invalid chain index in test: %v", err))
+		panic(fmt.Sprintf("invalid chain code in test: %v", err))
 	}
-	return types.ChainIndex(id)
+	return types.ChainCode(id)
 }
 
 func execMsg(chain string, logIdx uint32) *types.ExecutingMessage {
@@ -138,7 +138,7 @@ func execMsg(chain string, logIdx uint32) *types.ExecutingMessage {
 
 func execMsgWithTimestamp(chain string, logIdx uint32, timestamp uint64) *types.ExecutingMessage {
 	return &types.ExecutingMessage{
-		Chain:     chainIndex(chain),
+		Chain:     chainCode(chain),
 		LogIdx:    logIdx,
 		Timestamp: timestamp,
 	}
@@ -160,7 +160,7 @@ func TestHazardCycleChecksFailures(t *testing.T) {
 		{
 			name:        "empty hazards",
 			chainBlocks: emptyChainBlocks,
-			hazards:     make(map[types.ChainIndex]types.BlockSeal),
+			hazards:     make(map[types.ChainCode]types.BlockSeal),
 			expectErr:   nil,
 			msg:         "expected no error when there are no hazards",
 		},
@@ -215,7 +215,7 @@ func TestHazardCycleChecksFailures(t *testing.T) {
 					},
 				},
 			},
-			hazards: map[types.ChainIndex]types.BlockSeal{
+			hazards: map[types.ChainCode]types.BlockSeal{
 				1: {Number: 1},
 				2: {Number: 1},
 			},
@@ -258,7 +258,7 @@ func TestHazardCycleChecksFailures(t *testing.T) {
 					},
 				},
 			},
-			hazards: map[types.ChainIndex]types.BlockSeal{
+			hazards: map[types.ChainCode]types.BlockSeal{
 				1: {Number: 1}, // Only include chain 1.
 			},
 			expectErr: ErrExecMsgUnknownChain,
@@ -533,7 +533,7 @@ func TestHazardCycleChecksCycle(t *testing.T) {
 				"3": {},
 			},
 			expectErr: ErrCycle,
-			hazards: map[types.ChainIndex]types.BlockSeal{
+			hazards: map[types.ChainCode]types.BlockSeal{
 				1: {Number: 1},
 				2: {Number: 1},
 				3: {Number: 1},

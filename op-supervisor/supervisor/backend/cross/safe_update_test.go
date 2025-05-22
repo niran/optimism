@@ -395,8 +395,8 @@ func TestScopedCrossSafeUpdate(t *testing.T) {
 			}, nil
 		}
 		opened := eth.BlockRef{Number: 1, Time: 1}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 1, LogIdx: 2}
-		em2 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 1, LogIdx: 1}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 1, LogIdx: 2}
+		em2 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 1, LogIdx: 1}
 		csd.openBlockFn = func(chainID eth.ChainID, blockNum uint64) (ref eth.BlockRef, logCount uint32, execMsgs map[uint32]*types.ExecutingMessage, err error) {
 			return opened, 3, map[uint32]*types.ExecutingMessage{1: em1, 2: em2}, nil
 		}

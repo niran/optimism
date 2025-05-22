@@ -133,8 +133,8 @@ func TestCrossUnsafeUpdate(t *testing.T) {
 			return crossUnsafe, nil
 		}
 		bl := eth.BlockRef{ParentHash: common.Hash{0x01}, Number: 1, Time: 1}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 1, LogIdx: 2}
-		em2 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 1, LogIdx: 1}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 1, LogIdx: 2}
+		em2 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 1, LogIdx: 1}
 		usd.openBlockFn = func(chainID eth.ChainID, blockNum uint64) (ref eth.BlockRef, logCount uint32, execMsgs map[uint32]*types.ExecutingMessage, err error) {
 			return bl, 3, map[uint32]*types.ExecutingMessage{1: em1, 2: em2}, nil
 		}

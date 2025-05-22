@@ -26,29 +26,29 @@ var (
 
 var ExecutingMessageEventTopic = crypto.Keccak256Hash([]byte("ExecutingMessage(bytes32,(address,uint256,uint256,uint256,uint256))"))
 
-// ChainIndex represents the lifetime of a chain in a dependency set.
+// ChainCode represents the lifetime of a chain in a dependency set.
 // Warning: JSON-encoded as string, in base-10.
-type ChainIndex uint32
+type ChainCode uint32
 
-func (ci ChainIndex) String() string {
+func (ci ChainCode) String() string {
 	return strconv.FormatUint(uint64(ci), 10)
 }
 
-func (ci ChainIndex) MarshalText() ([]byte, error) {
+func (ci ChainCode) MarshalText() ([]byte, error) {
 	return []byte(ci.String()), nil
 }
 
-func (ci *ChainIndex) UnmarshalText(data []byte) error {
+func (ci *ChainCode) UnmarshalText(data []byte) error {
 	v, err := strconv.ParseUint(string(data), 10, 32)
 	if err != nil {
 		return err
 	}
-	*ci = ChainIndex(v)
+	*ci = ChainCode(v)
 	return nil
 }
 
-// IsTopBitSet returns true if the top bit is set. Used to check for reserved values, such as NotFoundChainIndex.
-func (ci ChainIndex) IsTopBitSet() bool {
+// IsTopBitSet returns true if the top bit is set. Used to check for reserved values, such as NotFoundChainCode.
+func (ci ChainCode) IsTopBitSet() bool {
 	return ci&(1<<31) != 0
 }
 
@@ -105,7 +105,7 @@ type ContainsQuery struct {
 }
 
 type ExecutingMessage struct {
-	Chain     ChainIndex // same as ChainID for now, but will be indirect, i.e. translated to full ID, later
+	Chain     ChainCode // same as ChainID for now, but will be indirect, i.e. translated to full ID, later
 	BlockNum  uint64
 	LogIdx    uint32
 	Timestamp uint64
@@ -113,7 +113,7 @@ type ExecutingMessage struct {
 }
 
 func (s *ExecutingMessage) String() string {
-	return fmt.Sprintf("ExecMsg(chainIndex: %s, block: %d, log: %d, time: %d, logHash: %s)",
+	return fmt.Sprintf("ExecMsg(chainCode: %s, block: %d, log: %d, time: %d, logHash: %s)",
 		s.Chain, s.BlockNum, s.LogIdx, s.Timestamp, s.Hash)
 }
 

@@ -123,7 +123,7 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		usd.deps = mockDependencySet{}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Timestamp: 2}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 10}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 10}
 		usd.openBlockFn = newOpenBlockFn(em1)
 		// when there is one execMsg, and the timestamp is greater than the candidate,
 		// an error is returned
@@ -139,7 +139,7 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		usd.deps = mockDependencySet{}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Timestamp: 2}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 2}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 2}
 		usd.openBlockFn = newOpenBlockFn(em1)
 		// when there is one execMsg, and the timestamp is equal to the candidate,
 		// and check returns an error,
@@ -157,8 +157,8 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		usd.deps = mockDependencySet{}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Hash: common.BytesToHash([]byte{0x04}), Number: 4, Timestamp: 2}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 2}
-		em2 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 2}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 2}
+		em2 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 2}
 		usd.openBlockFn = func(chainID eth.ChainID, blockNum uint64) (ref eth.BlockRef, logCount uint32, execMsgs map[uint32]*types.ExecutingMessage, err error) {
 			if blockNum == 4 {
 				return eth.BlockRef{
@@ -178,7 +178,7 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		// they load the hazards once, and return no error
 		hazards, err := CrossUnsafeHazards(usd, newTestLogger(t), chainID, candidate)
 		require.NoError(t, err)
-		require.Equal(t, map[types.ChainIndex]types.BlockSeal{types.ChainIndex(0): sampleBlockSeal}, hazards.Entries())
+		require.Equal(t, map[types.ChainCode]types.BlockSeal{types.ChainCode(0): sampleBlockSeal}, hazards.Entries())
 	})
 	t.Run("timestamp is equal, different hazards", func(t *testing.T) {
 		usd := &mockUnsafeStartDeps{}
@@ -196,8 +196,8 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		usd.deps = mockDependencySet{}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Timestamp: 2}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 2}
-		em2 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 2}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 2}
+		em2 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 2}
 		usd.openBlockFn = newOpenBlockFn(em1, em2)
 		// when there are two execMsgs, and both are equal time to the candidate,
 		// and check returns different includedIn for the two,
@@ -214,7 +214,7 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		usd.deps = mockDependencySet{}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Timestamp: 2}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 1}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 1}
 		usd.openBlockFn = newOpenBlockFn(em1)
 		// when there is one execMsg, and the timestamp is less than the candidate,
 		// and check returns an error,
@@ -235,7 +235,7 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		usd.deps = mockDependencySet{}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Timestamp: 2}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 1}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 1}
 		usd.openBlockFn = newOpenBlockFn(em1)
 		// when there is one execMsg, and the timestamp is less than the candidate,
 		// and IsCrossUnsafe returns an error,
@@ -256,7 +256,7 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		usd.deps = mockDependencySet{}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Timestamp: 2}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 0}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 0}
 		usd.openBlockFn = newOpenBlockFn(em1)
 		// when there is one execMsg, and the timestamp is less than the candidate,
 		// and IsCrossUnsafe returns no error,
@@ -275,7 +275,7 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Timestamp: 12}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 1}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 1}
 		usd.openBlockFn = newOpenBlockFn(em1)
 		// when there is one execMsg that has just expired,
 		// ErrExpired is returned
@@ -294,7 +294,7 @@ func TestCrossUnsafeHazards(t *testing.T) {
 		}
 		chainID := eth.ChainIDFromUInt64(0)
 		candidate := types.BlockSeal{Timestamp: 11}
-		em1 := &types.ExecutingMessage{Chain: types.ChainIndex(0), Timestamp: 1}
+		em1 := &types.ExecutingMessage{Chain: types.ChainCode(0), Timestamp: 1}
 		usd.openBlockFn = newOpenBlockFn(em1)
 		// when there is one execMsg that is near expiry, then no error is returned
 		hazards, err := CrossUnsafeHazards(usd, logger, chainID, candidate)

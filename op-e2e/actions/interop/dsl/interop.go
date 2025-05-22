@@ -247,7 +247,7 @@ func RecipeToDepSet(t helpers.Testing, recipe *interopgen.InteropDevRecipe) *dep
 	depSetCfg := make(map[eth.ChainID]*depset.StaticConfigDependency)
 	for _, out := range recipe.L2s {
 		depSetCfg[eth.ChainIDFromUInt64(out.ChainID)] = &depset.StaticConfigDependency{
-			ChainIndex:     types.ChainIndex(out.ChainID),
+			ChainCode:      types.ChainCode(out.ChainID),
 			ActivationTime: 0,
 			HistoryMinTime: 0,
 		}

@@ -196,12 +196,12 @@ func createTestDepSets(t *testing.T) map[string]descriptors.DepSet {
 	// Create the dependency set for the superchain
 	depSetData := map[eth.ChainID]*depset.StaticConfigDependency{
 		eth.ChainIDFromUInt64(2151908): {
-			ChainIndex:     2151908,
+			ChainCode:      2151908,
 			ActivationTime: 0,
 			HistoryMinTime: 0,
 		},
 		eth.ChainIDFromUInt64(2151909): {
-			ChainIndex:     2151909,
+			ChainCode:      2151909,
 			ActivationTime: 0,
 			HistoryMinTime: 0,
 		},
@@ -317,8 +317,8 @@ func TestTriageFunctions(t *testing.T) {
 
 		// Create a dependency set
 		depSetData := map[eth.ChainID]*depset.StaticConfigDependency{
-			chain1: {ChainIndex: 123456},
-			chain2: {ChainIndex: 654321},
+			chain1: {ChainCode: 123456},
+			chain2: {ChainCode: 654321},
 		}
 		depSet, err := depset.NewStaticConfigDependencySet(depSetData)
 		require.NoError(t, err)

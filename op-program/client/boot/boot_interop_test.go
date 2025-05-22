@@ -96,8 +96,8 @@ func TestInteropBootstrap_ChainConfigCustom(t *testing.T) {
 	mockOracle := newMockInteropBootstrapOracle(expected, true)
 	mockOracle.chainCfgs = []*params.ChainConfig{config1, config2}
 	mockOracle.depset, _ = depset.NewStaticConfigDependencySet(map[eth.ChainID]*depset.StaticConfigDependency{
-		eth.ChainIDFromBig(config1.ChainID): {ChainIndex: supervisortypes.ChainIndex(config1.ChainID.Uint64()), ActivationTime: 0, HistoryMinTime: 0},
-		eth.ChainIDFromBig(config2.ChainID): {ChainIndex: supervisortypes.ChainIndex(config2.ChainID.Uint64()), ActivationTime: 0, HistoryMinTime: 0},
+		eth.ChainIDFromBig(config1.ChainID): {ChainCode: supervisortypes.ChainCode(config1.ChainID.Uint64()), ActivationTime: 0, HistoryMinTime: 0},
+		eth.ChainIDFromBig(config2.ChainID): {ChainCode: supervisortypes.ChainCode(config2.ChainID.Uint64()), ActivationTime: 0, HistoryMinTime: 0},
 	})
 	actual := BootstrapInterop(mockOracle)
 
@@ -122,8 +122,8 @@ func TestInteropBootstrap_DependencySetCustom(t *testing.T) {
 	mockOracle := newMockInteropBootstrapOracle(expected, true)
 	var err error
 	mockOracle.depset, err = depset.NewStaticConfigDependencySet(map[eth.ChainID]*depset.StaticConfigDependency{
-		eth.ChainIDFromBig(config1.ChainID): {ChainIndex: supervisortypes.ChainIndex(config1.ChainID.Uint64()), ActivationTime: 0, HistoryMinTime: 0},
-		eth.ChainIDFromBig(config2.ChainID): {ChainIndex: supervisortypes.ChainIndex(config2.ChainID.Uint64()), ActivationTime: 0, HistoryMinTime: 0},
+		eth.ChainIDFromBig(config1.ChainID): {ChainCode: supervisortypes.ChainCode(config1.ChainID.Uint64()), ActivationTime: 0, HistoryMinTime: 0},
+		eth.ChainIDFromBig(config2.ChainID): {ChainCode: supervisortypes.ChainCode(config2.ChainID.Uint64()), ActivationTime: 0, HistoryMinTime: 0},
 	})
 	require.NoError(t, err)
 	actual := BootstrapInterop(mockOracle)

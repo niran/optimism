@@ -48,10 +48,10 @@ func TestDependencySet(t *testing.T) {
 
 	t.Run("duplicate index", func(t *testing.T) {
 		_, err := NewStaticConfigDependencySet(map[eth.ChainID]*StaticConfigDependency{
-			eth.ChainIDFromUInt64(900): {ChainIndex: 1},
-			eth.ChainIDFromUInt64(901): {ChainIndex: 1}, // duplicate
+			eth.ChainIDFromUInt64(900): {ChainCode: 1},
+			eth.ChainIDFromUInt64(901): {ChainCode: 1}, // duplicate
 		})
-		require.ErrorIs(t, err, errDuplicateChainIndex)
+		require.ErrorIs(t, err, errDuplicateChainCode)
 	})
 
 }
@@ -67,12 +67,12 @@ func testDependencySetSerialization(
 	depSet, err := NewStaticConfigDependencySet(
 		map[eth.ChainID]*StaticConfigDependency{
 			eth.ChainIDFromUInt64(900): {
-				ChainIndex:     900,
+				ChainCode:      900,
 				ActivationTime: 42,
 				HistoryMinTime: 100,
 			},
 			eth.ChainIDFromUInt64(901): {
-				ChainIndex:     901,
+				ChainCode:      901,
 				ActivationTime: 30,
 				HistoryMinTime: 20,
 			},
@@ -139,11 +139,11 @@ func testDependencySetSerialization(
 
 	t.Run("chain index round trip", func(t *testing.T) {
 		id900 := eth.ChainIDFromUInt64(900)
-		idx, _ := depSet.ChainIndexFromID(id900)
-		idBack, _ := depSet.ChainIDFromIndex(idx)
+		idx, _ := depSet.ChainCodeFromID(id900)
+		idBack, _ := depSet.ChainIDFromCode(idx)
 		require.Equal(t, id900, idBack)
 
-		_, err := depSet.ChainIndexFromID(eth.ChainIDFromUInt64(999))
+		_, err := depSet.ChainCodeFromID(eth.ChainIDFromUInt64(999))
 		require.ErrorContains(t, err, "unknown chain")
 	})
 

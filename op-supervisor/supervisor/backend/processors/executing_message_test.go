@@ -15,10 +15,10 @@ import (
 )
 
 type testDepSet struct {
-	mapping map[eth.ChainID]types.ChainIndex
+	mapping map[eth.ChainID]types.ChainCode
 }
 
-func (t *testDepSet) ChainIndexFromID(id eth.ChainID) (types.ChainIndex, error) {
+func (t *testDepSet) ChainCodeFromID(id eth.ChainID) (types.ChainCode, error) {
 	v, ok := t.mapping[id]
 	if !ok {
 		return 0, types.ErrUnknownChain
@@ -26,7 +26,7 @@ func (t *testDepSet) ChainIndexFromID(id eth.ChainID) (types.ChainIndex, error) 
 	return v, nil
 }
 
-var _ depset.ChainIndexFromID = (*testDepSet)(nil)
+var _ depset.ChainCodeFromID = (*testDepSet)(nil)
 
 func TestDecodeExecutingMessageLog(t *testing.T) {
 	data := `
@@ -49,8 +49,8 @@ func TestDecodeExecutingMessageLog(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(data), &logEvent))
 
 	msg, err := DecodeExecutingMessageLog(&logEvent, &testDepSet{
-		mapping: map[eth.ChainID]types.ChainIndex{
-			eth.ChainIDFromUInt64(900200): types.ChainIndex(123),
+		mapping: map[eth.ChainID]types.ChainCode{
+			eth.ChainIDFromUInt64(900200): types.ChainCode(123),
 		},
 	})
 	require.NoError(t, err)
@@ -73,5 +73,5 @@ func TestDecodeExecutingMessageLog(t *testing.T) {
 	require.Equal(t, uint64(4509), msg.BlockNum)
 	require.Equal(t, uint32(0), msg.LogIdx)
 	require.Equal(t, uint64(1730467171), msg.Timestamp)
-	require.Equal(t, types.ChainIndex(123), msg.Chain)
+	require.Equal(t, types.ChainCode(123), msg.Chain)
 }

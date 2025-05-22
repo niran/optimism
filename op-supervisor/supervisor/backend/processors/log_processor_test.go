@@ -27,7 +27,7 @@ func TestLogProcessor(t *testing.T) {
 		Time:       1111,
 	}
 	depSet := &testDepSet{
-		mapping: map[eth.ChainID]types.ChainIndex{
+		mapping: map[eth.ChainID]types.ChainCode{
 			eth.ChainIDFromUInt64(100): 4,
 		},
 	}
@@ -125,7 +125,7 @@ func TestLogProcessor(t *testing.T) {
 		}
 		store := &stubLogStorage{}
 		processor := NewLogProcessor(eth.ChainID{4}, store, depSet).(*logProcessor)
-		processor.eventDecoder = func(l *ethTypes.Log, translator depset.ChainIndexFromID) (*types.ExecutingMessage, error) {
+		processor.eventDecoder = func(l *ethTypes.Log, translator depset.ChainCodeFromID) (*types.ExecutingMessage, error) {
 			require.Equal(t, rcpts[0].Logs[0], l)
 			return execMsg, nil
 		}

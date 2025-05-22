@@ -22,10 +22,10 @@ type logProcessor struct {
 	chain        eth.ChainID
 	logStore     LogStorage
 	eventDecoder EventDecoderFn
-	depSet       depset.ChainIndexFromID
+	depSet       depset.ChainCodeFromID
 }
 
-func NewLogProcessor(chain eth.ChainID, logStore LogStorage, depSet depset.ChainIndexFromID) LogProcessor {
+func NewLogProcessor(chain eth.ChainID, logStore LogStorage, depSet depset.ChainCodeFromID) LogProcessor {
 	return &logProcessor{
 		chain:        chain,
 		logStore:     logStore,

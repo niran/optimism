@@ -24,11 +24,11 @@ type UnsafeFrontierCheckDeps interface {
 //     local-unsafe block, after the cross-unsafe block.
 func HazardUnsafeFrontierChecks(d UnsafeFrontierCheckDeps, hazards *HazardSet) error {
 	depSet := d.DependencySet()
-	for hazardChainIndex, hazardBlock := range hazards.Entries() {
-		hazardChainID, err := depSet.ChainIDFromIndex(hazardChainIndex)
+	for hazardChainCode, hazardBlock := range hazards.Entries() {
+		hazardChainID, err := depSet.ChainIDFromCode(hazardChainCode)
 		if err != nil {
 			if errors.Is(err, types.ErrUnknownChain) {
-				err = fmt.Errorf("cannot cross-safe verify block %s of unknown chain index %s: %w", hazardBlock, hazardChainIndex, types.ErrConflict)
+				err = fmt.Errorf("cannot cross-safe verify block %s of unknown chain index %s: %w", hazardBlock, hazardChainCode, types.ErrConflict)
 			}
 			return err
 		}

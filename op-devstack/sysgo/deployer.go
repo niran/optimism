@@ -264,7 +264,7 @@ func (wb *worldBuilder) buildDepSet() {
 			continue
 		}
 		depSetContents[id] = &depset.StaticConfigDependency{
-			ChainIndex:     supervisortypes.ChainIndex(chainIndex),
+			ChainCode:      supervisortypes.ChainCode(chainIndex),
 			ActivationTime: *interopTime,
 			HistoryMinTime: *interopTime,
 		}

@@ -40,12 +40,12 @@ func TestBackendLifetime(t *testing.T) {
 	depSet, err := depset.NewStaticConfigDependencySet(
 		map[eth.ChainID]*depset.StaticConfigDependency{
 			chainA: {
-				ChainIndex:     900,
+				ChainCode:      900,
 				ActivationTime: 42,
 				HistoryMinTime: 100,
 			},
 			chainB: {
-				ChainIndex:     901,
+				ChainCode:      901,
 				ActivationTime: 30,
 				HistoryMinTime: 20,
 			},
@@ -183,7 +183,7 @@ func TestBackendCallsMetrics(t *testing.T) {
 	depSet, err := depset.NewStaticConfigDependencySet(
 		map[eth.ChainID]*depset.StaticConfigDependency{
 			chainA: {
-				ChainIndex:     900,
+				ChainCode:      900,
 				ActivationTime: 42,
 				HistoryMinTime: 100,
 			},
@@ -361,7 +361,7 @@ func TestAsyncVerifyAccessWithRPC(t *testing.T) {
 	// Setup a single-chain dependency set
 	chainID := eth.ChainIDFromUInt64(1)
 	depSet, err := depset.NewStaticConfigDependencySet(map[eth.ChainID]*depset.StaticConfigDependency{
-		chainID: {ChainIndex: 1, ActivationTime: 0, HistoryMinTime: 0},
+		chainID: {ChainCode: 1, ActivationTime: 0, HistoryMinTime: 0},
 	})
 	require.NoError(t, err)
 

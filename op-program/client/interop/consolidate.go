@@ -23,7 +23,7 @@ import (
 var ErrInvalidBlockReplacement = errors.New("invalid block replacement error")
 
 // ReceiptsToExecutingMessages returns the executing messages in the receipts indexed by their position in the log.
-func ReceiptsToExecutingMessages(depset depset.ChainIndexFromID, receipts ethtypes.Receipts) (map[uint32]*supervisortypes.ExecutingMessage, uint32, error) {
+func ReceiptsToExecutingMessages(depset depset.ChainCodeFromID, receipts ethtypes.Receipts) (map[uint32]*supervisortypes.ExecutingMessage, uint32, error) {
 	execMsgs := make(map[uint32]*supervisortypes.ExecutingMessage)
 	var curr uint32
 	for _, rcpt := range receipts {

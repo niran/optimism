@@ -59,7 +59,7 @@ func TestValidateRPCConfig(t *testing.T) {
 func validConfig() *Config {
 	depSet, err := depset.NewStaticConfigDependencySet(map[eth.ChainID]*depset.StaticConfigDependency{
 		eth.ChainIDFromUInt64(900): &depset.StaticConfigDependency{
-			ChainIndex:     900,
+			ChainCode:      900,
 			ActivationTime: 0,
 			HistoryMinTime: 0,
 		},

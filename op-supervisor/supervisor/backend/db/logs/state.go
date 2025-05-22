@@ -211,7 +211,7 @@ func (l *logContext) processEntry(entry Entry) error {
 			return err
 		}
 		l.execMsg = &types.ExecutingMessage{
-			Chain:     types.ChainIndex(link.chain),
+			Chain:     types.ChainCode(link.chain),
 			BlockNum:  link.blockNum,
 			LogIdx:    link.logIdx,
 			Timestamp: link.timestamp,

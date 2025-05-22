@@ -22,7 +22,7 @@ func GenerateInteropDepset(ctx context.Context, pEnv *Env, globalIntent *state.I
 	deps := make(map[eth.ChainID]*depset.StaticConfigDependency)
 	for i, chain := range globalIntent.Chains {
 		id := eth.ChainIDFromBytes32(chain.ID)
-		deps[id] = &depset.StaticConfigDependency{ChainIndex: types.ChainIndex(i)}
+		deps[id] = &depset.StaticConfigDependency{ChainCode: types.ChainCode(i)}
 	}
 
 	interopDepSet, err := depset.NewStaticConfigDependencySet(deps)

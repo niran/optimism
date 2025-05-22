@@ -67,13 +67,13 @@ func setupTwoChains(opts ...func(*chainSetupOpts)) (*staticConfigSource, *eth.Su
 	var ds *depset.StaticConfigDependencySet
 	if chainSetupOpts.expiryWindow > 0 {
 		ds, _ = depset.NewStaticConfigDependencySetWithMessageExpiryOverride(map[eth.ChainID]*depset.StaticConfigDependency{
-			eth.ChainIDFromBig(rollupCfg1.L2ChainID): {ChainIndex: chainA, ActivationTime: 0, HistoryMinTime: 0},
-			eth.ChainIDFromBig(rollupCfg2.L2ChainID): {ChainIndex: chainB, ActivationTime: 0, HistoryMinTime: 0},
+			eth.ChainIDFromBig(rollupCfg1.L2ChainID): {ChainCode: chainA, ActivationTime: 0, HistoryMinTime: 0},
+			eth.ChainIDFromBig(rollupCfg2.L2ChainID): {ChainCode: chainB, ActivationTime: 0, HistoryMinTime: 0},
 		}, chainSetupOpts.expiryWindow)
 	} else {
 		ds, _ = depset.NewStaticConfigDependencySet(map[eth.ChainID]*depset.StaticConfigDependency{
-			eth.ChainIDFromBig(rollupCfg1.L2ChainID): {ChainIndex: chainA, ActivationTime: 0, HistoryMinTime: 0},
-			eth.ChainIDFromBig(rollupCfg2.L2ChainID): {ChainIndex: chainB, ActivationTime: 0, HistoryMinTime: 0},
+			eth.ChainIDFromBig(rollupCfg1.L2ChainID): {ChainCode: chainA, ActivationTime: 0, HistoryMinTime: 0},
+			eth.ChainIDFromBig(rollupCfg2.L2ChainID): {ChainCode: chainB, ActivationTime: 0, HistoryMinTime: 0},
 		})
 	}
 	configSource := &staticConfigSource{
@@ -164,19 +164,19 @@ var (
 )
 
 const (
-	chainA supervisortypes.ChainIndex = 0
-	chainB supervisortypes.ChainIndex = 1
+	chainA supervisortypes.ChainCode = 0
+	chainB supervisortypes.ChainCode = 1
 )
 
 func TestDeriveBlockForConsolidateStep(t *testing.T) {
-	createExecMessage := func(initIncludedIn uint64, config *staticConfigSource, initChainIndex supervisortypes.ChainIndex) supervisortypes.Message {
+	createExecMessage := func(initIncludedIn uint64, config *staticConfigSource, initChainCode supervisortypes.ChainCode) supervisortypes.Message {
 		exec := supervisortypes.Message{
 			Identifier: supervisortypes.Identifier{
 				Origin:      initiatingMessageOrigin,
 				BlockNumber: initIncludedIn,
 				LogIndex:    0,
-				Timestamp:   initIncludedIn * config.rollupCfgs[initChainIndex].BlockTime,
-				ChainID:     eth.ChainIDFromBig(config.rollupCfgs[initChainIndex].L2ChainID),
+				Timestamp:   initIncludedIn * config.rollupCfgs[initChainCode].BlockTime,
+				ChainID:     eth.ChainIDFromBig(config.rollupCfgs[initChainCode].L2ChainID),
 			},
 			PayloadHash: initPayloadHash,
 		}
@@ -201,28 +201,28 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 		{
 			name: "HappyPathWithValidMessages-ExecOnChainB",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init := createInitLog()
 					exec := createExecMessage(includeBlockNumbers[chainA], config, chainA)
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{chainA: {init}, chainB: {convertExecutingMessageToLog(t, exec)}}
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{chainA: {init}, chainB: {convertExecutingMessageToLog(t, exec)}}
 				},
 			},
 		},
 		{
 			name: "HappyPathWithValidMessages-ExecOnChainA",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init := createInitLog()
 					execMsg := createExecMessage(includeBlockNumbers[chainB], config, chainB)
 					exec := convertExecutingMessageToLog(t, execMsg)
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{chainA: {exec}, chainB: {init}}
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{chainA: {exec}, chainB: {init}}
 				},
 			},
 		},
 		{
 			name: "HappyPathWithValidMessages-ExecOnChainB-NonZeroLogIndex",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init1 := &gethTypes.Log{
 						Address: initiatingMessageOrigin,
 						Topics:  []common.Hash{initiatingMessageTopic},
@@ -234,7 +234,7 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 					exec := createExecMessage(includeBlockNumbers[chainA], config, chainA)
 					exec.Identifier.Origin = init2.Address
 					exec.Identifier.LogIndex = 1
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{
 						chainA: {init1, init2},
 						chainB: {convertExecutingMessageToLog(t, exec)},
 					}
@@ -244,7 +244,7 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 		{
 			name: "HappyPathWithValidMessages-IntraBlockCycle",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					initA := createInitLog()
 					initB := createInitLog()
 
@@ -252,7 +252,7 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 					execA := convertExecutingMessageToLog(t, execMsgA)
 					execMsgB := createExecMessage(includeBlockNumbers[chainA], config, chainA)
 					execB := convertExecutingMessageToLog(t, execMsgB)
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{
 						chainA: {initA, execA},
 						chainB: {initB, execB},
 					}
@@ -262,21 +262,21 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 		{
 			name: "ReplaceChainB-UnknownChainID",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init := createInitLog()
 					exec := createExecMessage(includeBlockNumbers[chainA], config, chainA)
 					exec.Identifier.ChainID = eth.ChainIDFromUInt64(0xdeadbeef)
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{chainA: {init}, chainB: {convertExecutingMessageToLog(t, exec)}}
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{chainA: {init}, chainB: {convertExecutingMessageToLog(t, exec)}}
 				},
-				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainIndex {
-					return []supervisortypes.ChainIndex{chainB}
+				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainCode {
+					return []supervisortypes.ChainCode{chainB}
 				},
 			},
 		},
 		{
 			name: "ReplaceChainB-InvalidLogIndex",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init1 := &gethTypes.Log{
 						Address: initiatingMessageOrigin,
 						Topics:  []common.Hash{initiatingMessageTopic},
@@ -288,62 +288,62 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 					exec := createExecMessage(includeBlockNumbers[chainA], config, chainA)
 					exec.Identifier.Origin = init2.Address
 					exec.Identifier.LogIndex = 0
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{
 						chainA: {init1, init2},
 						chainB: {convertExecutingMessageToLog(t, exec)},
 					}
 				},
-				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainIndex {
-					return []supervisortypes.ChainIndex{chainB}
+				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainCode {
+					return []supervisortypes.ChainCode{chainB}
 				},
 			},
 		},
 		{
 			name: "ReplaceChainB-InvalidPayloadHash",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init := createInitLog()
 					execMsg := createExecMessage(includeBlockNumbers[chainA], config, chainA)
 					execMsg.PayloadHash = crypto.Keccak256Hash([]byte("invalid hash"))
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{chainA: {init}, chainB: {convertExecutingMessageToLog(t, execMsg)}}
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{chainA: {init}, chainB: {convertExecutingMessageToLog(t, execMsg)}}
 				},
-				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainIndex {
-					return []supervisortypes.ChainIndex{chainB}
+				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainCode {
+					return []supervisortypes.ChainCode{chainB}
 				},
 			},
 		},
 		{
 			name: "ReplaceChainB-InvalidTimestamp",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init := createInitLog()
 					execMsg := createExecMessage(includeBlockNumbers[chainA], config, chainA)
 					execMsg.Identifier.Timestamp = execMsg.Identifier.Timestamp - 1
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{chainA: {init}, chainB: {convertExecutingMessageToLog(t, execMsg)}}
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{chainA: {init}, chainB: {convertExecutingMessageToLog(t, execMsg)}}
 				},
-				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainIndex {
-					return []supervisortypes.ChainIndex{chainB}
+				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainCode {
+					return []supervisortypes.ChainCode{chainB}
 				},
 			},
 		},
 		{
 			name: "ReplaceBothChains",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					invalidExecMsg := createExecMessage(includeBlockNumbers[chainA], config, chainA)
 					invalidExecMsg.PayloadHash = crypto.Keccak256Hash([]byte("invalid hash"))
 					log := convertExecutingMessageToLog(t, invalidExecMsg)
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{chainA: {log}, chainB: {log}}
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{chainA: {log}, chainB: {log}}
 				},
-				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainIndex {
-					return []supervisortypes.ChainIndex{chainA, chainB}
+				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainCode {
+					return []supervisortypes.ChainCode{chainA, chainB}
 				},
 			},
 		},
 		{
 			name: "ReplaceBothChains-CascadingReorg",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					initA := createInitLog()
 					initB := createInitLog()
 
@@ -353,20 +353,20 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 					execMsgB.PayloadHash = crypto.Keccak256Hash([]byte("invalid hash"))
 					execB := convertExecutingMessageToLog(t, execMsgB)
 
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{
 						chainA: {initA, execA},
 						chainB: {initB, execB},
 					}
 				},
-				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainIndex {
-					return []supervisortypes.ChainIndex{chainA, chainB}
+				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainCode {
+					return []supervisortypes.ChainCode{chainA, chainB}
 				},
 			},
 		},
 		{
 			name: "ReplaceChainB-BlockNumberTooBig",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init1 := &gethTypes.Log{
 						Address: initiatingMessageOrigin,
 						Topics:  []common.Hash{initiatingMessageTopic},
@@ -376,20 +376,20 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 						Topics:  []common.Hash{initiatingMessageTopic},
 					}
 					exec := createExecMessage(1_000_000, config, chainA)
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{
 						chainA: {init1, init2},
 						chainB: {convertExecutingMessageToLog(t, exec)},
 					}
 				},
-				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainIndex {
-					return []supervisortypes.ChainIndex{chainB}
+				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainCode {
+					return []supervisortypes.ChainCode{chainB}
 				},
 			},
 		},
 		{
 			name: "ReplaceChainB-LogIndexTooBig",
 			testCase: consolidationTestCase{
-				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log {
+				logBuilderFn: func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log {
 					init1 := &gethTypes.Log{
 						Address: initiatingMessageOrigin,
 						Topics:  []common.Hash{initiatingMessageTopic},
@@ -401,13 +401,13 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 					exec := createExecMessage(includeBlockNumbers[chainA], config, chainA)
 					exec.Identifier.Origin = init2.Address
 					exec.Identifier.LogIndex = 1_000_000
-					return map[supervisortypes.ChainIndex][]*gethTypes.Log{
+					return map[supervisortypes.ChainCode][]*gethTypes.Log{
 						chainA: {init1, init2},
 						chainB: {convertExecutingMessageToLog(t, exec)},
 					}
 				},
-				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainIndex {
-					return []supervisortypes.ChainIndex{chainB}
+				expectBlockReplacements: func(config *staticConfigSource) []supervisortypes.ChainCode {
+					return []supervisortypes.ChainCode{chainB}
 				},
 			},
 		},
@@ -420,10 +420,10 @@ func TestDeriveBlockForConsolidateStep(t *testing.T) {
 	}
 }
 
-// expectBlockReplacementsFn returns the chain indexes containing an optimistic block that must be replaced
-type expectBlockReplacementsFn func(config *staticConfigSource) (chainIndexesToReplace []supervisortypes.ChainIndex)
+// expectBlockReplacementsFn returns the chain codes containing an optimistic block that must be replaced
+type expectBlockReplacementsFn func(config *staticConfigSource) (chainCodesToReplace []supervisortypes.ChainCode)
 
-type logBuilderFn func(includeBlockNumbers map[supervisortypes.ChainIndex]uint64, config *staticConfigSource) map[supervisortypes.ChainIndex][]*gethTypes.Log
+type logBuilderFn func(includeBlockNumbers map[supervisortypes.ChainCode]uint64, config *staticConfigSource) map[supervisortypes.ChainCode][]*gethTypes.Log
 
 type consolidationTestCase struct {
 	expectBlockReplacements expectBlockReplacementsFn
@@ -445,7 +445,7 @@ func runConsolidationTestCase(t *testing.T, testCase consolidationTestCase) {
 	var logA, logB []*gethTypes.Log
 	if testCase.logBuilderFn != nil {
 		logs := testCase.logBuilderFn(
-			map[supervisortypes.ChainIndex]uint64{0: block1A.NumberU64() + 1, 1: block1B.NumberU64() + 1},
+			map[supervisortypes.ChainCode]uint64{0: block1A.NumberU64() + 1, 1: block1B.NumberU64() + 1},
 			configSource,
 		)
 		logA = logs[chainA]
@@ -484,17 +484,17 @@ func runConsolidationTestCase(t *testing.T, testCase consolidationTestCase) {
 		finalTransitionState.PendingProgress[1].OutputRoot,
 	}
 	if testCase.expectBlockReplacements != nil {
-		for _, chainIndexToReplace := range testCase.expectBlockReplacements(configSource) {
+		for _, chainCodeToReplace := range testCase.expectBlockReplacements(configSource) {
 			// stub output root preimage of the replaced block
-			replacedBlockOutput := pendingOutputs[chainIndexToReplace]
+			replacedBlockOutput := pendingOutputs[chainCodeToReplace]
 			replacedBlockOutputRoot := common.Hash(eth.OutputRoot(replacedBlockOutput))
 			l2PreimageOracle.Outputs[replacedBlockOutputRoot] = replacedBlockOutput
 
-			depositsOnlyBlock, depositsOnlyBlockReceipts := createBlock(rng, configSource.rollupCfgs[chainIndexToReplace], 2, nil)
+			depositsOnlyBlock, depositsOnlyBlockReceipts := createBlock(rng, configSource.rollupCfgs[chainCodeToReplace], 2, nil)
 			depositsOnlyOutput := createOutput(depositsOnlyBlock.Hash())
 			depositsOnlyOutputRoot := eth.OutputRoot(depositsOnlyOutput)
-			tasksStub.ExpectBuildDepositOnlyBlock(common.Hash{}, agreedSuperRoot.Chains[chainIndexToReplace].Output, depositsOnlyBlock.Hash(), depositsOnlyOutputRoot)
-			finalRoots[chainIndexToReplace] = depositsOnlyOutputRoot
+			tasksStub.ExpectBuildDepositOnlyBlock(common.Hash{}, agreedSuperRoot.Chains[chainCodeToReplace].Output, depositsOnlyBlock.Hash(), depositsOnlyOutputRoot)
+			finalRoots[chainCodeToReplace] = depositsOnlyOutputRoot
 			// stub the preimages in the replacement block
 			l2PreimageOracle.Blocks[depositsOnlyBlock.Hash()] = depositsOnlyBlock
 			l2PreimageOracle.Outputs[common.Hash(depositsOnlyOutputRoot)] = depositsOnlyOutput

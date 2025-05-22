@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
-type EventDecoderFn func(*ethTypes.Log, depset.ChainIndexFromID) (*types.ExecutingMessage, error)
+type EventDecoderFn func(*ethTypes.Log, depset.ChainCodeFromID) (*types.ExecutingMessage, error)
 
-func DecodeExecutingMessageLog(l *ethTypes.Log, depSet depset.ChainIndexFromID) (*types.ExecutingMessage, error) {
+func DecodeExecutingMessageLog(l *ethTypes.Log, depSet depset.ChainCodeFromID) (*types.ExecutingMessage, error) {
 	if l.Address != params.InteropCrossL2InboxAddress {
 		return nil, nil
 	}
@@ -30,19 +30,19 @@ func DecodeExecutingMessageLog(l *ethTypes.Log, depSet depset.ChainIndexFromID) 
 	}
 	logHash := types.PayloadHashToLogHash(msg.PayloadHash, msg.Identifier.Origin)
 
-	var chainIndex types.ChainIndex
-	index, err := depSet.ChainIndexFromID(eth.ChainID(msg.Identifier.ChainID))
+	var chainCode types.ChainCode
+	index, err := depSet.ChainCodeFromID(eth.ChainID(msg.Identifier.ChainID))
 	if err != nil {
 		if errors.Is(err, types.ErrUnknownChain) {
-			chainIndex = depset.NotFoundChainIndex
+			chainCode = depset.NotFoundChainCode
 		} else {
 			return nil, fmt.Errorf("failed to translate chain ID %s to chain index: %w", msg.Identifier.ChainID, err)
 		}
 	} else {
-		chainIndex = index
+		chainCode = index
 	}
 	return &types.ExecutingMessage{
-		Chain:     chainIndex,
+		Chain:     chainCode,
 		BlockNum:  msg.Identifier.BlockNumber,
 		LogIdx:    msg.Identifier.LogIndex,
 		Timestamp: msg.Identifier.Timestamp,

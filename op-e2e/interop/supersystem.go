@@ -618,9 +618,9 @@ func worldToDepset(world *interopgen.WorldOutput) (*depset.StaticConfigDependenc
 	// Iterate over the L2 chain configs. The L2 nodes don't exist yet.
 	for _, l2Out := range world.L2s {
 		chainID := eth.ChainIDFromBig(l2Out.Genesis.Config.ChainID)
-		chainIndex := supervisortypes.ChainIndex(100 + slices.Index(ids, chainID))
+		chainIndex := supervisortypes.ChainCode(100 + slices.Index(ids, chainID))
 		depSet[chainID] = &depset.StaticConfigDependency{
-			ChainIndex:     chainIndex,
+			ChainCode:      chainIndex,
 			ActivationTime: 0,
 			HistoryMinTime: 0,
 		}

@@ -74,7 +74,7 @@ func generateInteropDepSet(chains []string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse chain ID: %w", err)
 		}
-		deps[id] = &depset.StaticConfigDependency{ChainIndex: types.ChainIndex(i)}
+		deps[id] = &depset.StaticConfigDependency{ChainCode: types.ChainCode(i)}
 	}
 
 	interopDepSet, err := depset.NewStaticConfigDependencySet(deps)
