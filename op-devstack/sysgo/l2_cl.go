@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/node"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
 	p2pcli "github.com/ethereum-optimism/optimism/op-node/p2p/cli"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/interop"
 	nodeSync "github.com/ethereum-optimism/optimism/op-node/rollup/sync"
@@ -139,8 +140,10 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 		l2EL, ok := orch.l2ELs.Get(l2ELID)
 		require.True(ok, "l2 EL node required")
 
-		cluster, ok := orch.ClusterForL2(l2ELID.ChainID)
-		require.True(ok, "l2 must be in known cluster")
+		var depSet derive.DependencySet
+		if cluster, ok := orch.ClusterForL2(l2ELID.ChainID); ok {
+			depSet = cluster.depset
+		}
 
 		jwtPath, jwtSecret := orch.writeDefaultJWT()
 
@@ -210,7 +213,7 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 				SequencerEnabled: isSequencer,
 			},
 			Rollup:        *l2Net.rollupCfg,
-			DependencySet: cluster.depset,
+			DependencySet: depSet,
 			P2PSigner:     p2pSignerSetup, // nil when not sequencer
 			RPC: node.RPCConfig{
 				ListenAddr: "127.0.0.1",

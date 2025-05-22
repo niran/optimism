@@ -58,7 +58,7 @@ type Orchestrator struct {
 
 func (o *Orchestrator) ClusterForL2(chainID eth.ChainID) (*Cluster, bool) {
 	for _, cluster := range o.clusters.Values() {
-		if cluster.depset.HasChain(chainID) {
+		if cluster.depset != nil && cluster.depset.HasChain(chainID) {
 			return cluster, true
 		}
 	}

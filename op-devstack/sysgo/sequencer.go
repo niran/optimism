@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -84,8 +85,10 @@ func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELI
 		l2CL, ok := orch.l2CLs.Get(l2CLID)
 		require.True(ok, "l2 CL node required")
 
-		cluster, ok := orch.ClusterForL2(l2ELID.ChainID)
-		require.True(ok, "l2 must be in known cluster")
+		var depSet *depset.StaticConfigDependencySet
+		if cluster, ok := orch.ClusterForL2(l2ELID.ChainID); ok {
+			depSet = cluster.depset
+		}
 
 		builderID := seqtypes.BuilderID("test-standard-builder")
 		committerID := seqtypes.CommitterID("test-standard-committer")
@@ -112,7 +115,7 @@ func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELI
 						L2CL: endpoint.MustRPC{
 							Value: endpoint.HttpURL(l2CL.userRPC),
 						},
-						DependencySet: cluster.depset,
+						DependencySet: depSet,
 					},
 				},
 			},
