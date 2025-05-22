@@ -2,8 +2,11 @@ package bindings
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum-optimism/optimism/op-service/apis"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
@@ -53,6 +56,7 @@ type BaseCallFactory struct {
 	BaseCall
 	BaseCallView
 	BaseCallTest
+	BaseCodec
 }
 
 // Options to populate the factory
@@ -76,8 +80,9 @@ func WithTest(t BaseTest) CallFactoryOption {
 	}
 }
 
-func NewBaseCallFactory(opts ...CallFactoryOption) *BaseCallFactory {
+func NewBaseCallFactory(bind *bind.MetaData, opts ...CallFactoryOption) *BaseCallFactory {
 	b := &BaseCallFactory{}
+	b.GetABI(bind)
 	b.ApplyFactoryOptions(opts...)
 	return b
 }
@@ -86,4 +91,16 @@ func (b *BaseCallFactory) ApplyFactoryOptions(opts ...CallFactoryOption) {
 	for _, opt := range opts {
 		opt(b)
 	}
+}
+
+type BaseCodec struct {
+	ABI *abi.ABI
+}
+
+func (bc *BaseCodec) GetABI(bind *bind.MetaData) {
+	abi, err := bind.GetAbi()
+	if err != nil {
+		panic(errors.New("invalid ABI: " + err.Error()))
+	}
+	bc.ABI = abi
 }

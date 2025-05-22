@@ -44,5 +44,5 @@ func Write[O any](user *dsl.EOA, call txintent.CallView[O], opts ...txplan.Optio
 	return o
 }
 
-var _ TestCallView[eth.ETH] = (*bindings.BalanceOfCall)(nil)
-var _ TestCallView[bool] = (*bindings.TransferCall)(nil)
+var _ TestCallView[eth.ETH] = (*bindings.Call_balanceOf[eth.ETH])(nil)
+var _ TestCallView[bool] = (*bindings.Call_transfer[bool])(nil)
