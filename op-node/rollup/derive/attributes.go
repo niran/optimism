@@ -225,9 +225,9 @@ func (ba *FetchingAttributesBuilder) deployCrossL2InboxTxs(nextL2Time uint64) ([
 
 	// Select the right activation transaction based on the current hard fork, currently there's only initial interop
 	// If later hard forks update the CrossL2Inbox, update them here.
-	tx, err := InteropActivateCrossL2InboxTransaction()
+	txs, err := InteropActivateCrossL2InboxTransactions()
 	if err != nil {
 		return nil, NewCriticalError(fmt.Errorf("failed to build interop activate cross l2 inbox tx: %w", err))
 	}
-	return []hexutil.Bytes{tx}, nil
+	return txs, nil
 }

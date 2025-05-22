@@ -27,28 +27,12 @@ var (
 )
 
 func InteropNetworkUpgradeTransactions() ([]hexutil.Bytes, error) {
-	upgradeTxns := make([]hexutil.Bytes, 0, 4) // 2 + 2 updates
+	upgradeTxns := make([]hexutil.Bytes, 0, 2)
 
-	// 1. Deploy CrossL2Inbox
-	deployCrossL2InboxTx, err := types.NewTx(&types.DepositTx{
-		SourceHash:          deployCrossL2InboxSource.SourceHash(),
-		From:                crossL2InboxDeployerAddress,
-		To:                  nil,
-		Mint:                big.NewInt(0),
-		Value:               big.NewInt(0),
-		Gas:                 420_000,
-		IsSystemTransaction: false,
-		Data:                crossL2InboxDeploymentBytecode,
-	}).MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	upgradeTxns = append(upgradeTxns, deployCrossL2InboxTx)
+	// Note that the CrossL2Inbox is not deployed here.
+	// It is only deployed when the chain is first in a dependency set with at least two active chains.
 
-	// Note that the CrossL2Inbox proxy is not updated here.
-	// It is only updated when the chain is first in a dependency set with at least two active chains.
-
-	// 2. Deploy L2ToL2CrossDomainMessenger
+	// 1. Deploy L2ToL2CrossDomainMessenger
 	deployL2ToL2MessengerTx, err := types.NewTx(&types.DepositTx{
 		SourceHash:          deployL2ToL2MessengerSource.SourceHash(),
 		From:                l2ToL2MessengerDeployerAddress,
@@ -64,7 +48,7 @@ func InteropNetworkUpgradeTransactions() ([]hexutil.Bytes, error) {
 	}
 	upgradeTxns = append(upgradeTxns, deployL2ToL2MessengerTx)
 
-	// 3. Update L2ToL2CrossDomainMessenger Proxy
+	// 2. Update L2ToL2CrossDomainMessenger Proxy
 	updateL2ToL2MessengerProxyTx, err := types.NewTx(&types.DepositTx{
 		SourceHash:          updateL2ToL2MessengerProxySource.SourceHash(),
 		From:                common.Address{},
@@ -83,8 +67,23 @@ func InteropNetworkUpgradeTransactions() ([]hexutil.Bytes, error) {
 	return upgradeTxns, nil
 }
 
-func InteropActivateCrossL2InboxTransaction() (hexutil.Bytes, error) {
-	// Update CrossL2Inbox Proxy
+func InteropActivateCrossL2InboxTransactions() ([]hexutil.Bytes, error) {
+	// 1. Deploy CrossL2Inbox
+	deployCrossL2InboxTx, err := types.NewTx(&types.DepositTx{
+		SourceHash:          deployCrossL2InboxSource.SourceHash(),
+		From:                crossL2InboxDeployerAddress,
+		To:                  nil,
+		Mint:                big.NewInt(0),
+		Value:               big.NewInt(0),
+		Gas:                 420_000,
+		IsSystemTransaction: false,
+		Data:                crossL2InboxDeploymentBytecode,
+	}).MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Update CrossL2Inbox Proxy
 	updateCrossL2InboxProxyTx, err := types.NewTx(&types.DepositTx{
 		SourceHash:          updateCrossL2InboxProxySource.SourceHash(),
 		From:                common.Address{},
@@ -99,5 +98,5 @@ func InteropActivateCrossL2InboxTransaction() (hexutil.Bytes, error) {
 	if err != nil {
 		return nil, err
 	}
-	return updateCrossL2InboxProxyTx, nil
+	return []hexutil.Bytes{deployCrossL2InboxTx, updateCrossL2InboxProxyTx}, nil
 }
