@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/endpoint"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum-optimism/optimism/op-test-sequencer/sequencer/backend/work"
 	"github.com/ethereum-optimism/optimism/op-test-sequencer/sequencer/seqtypes"
 )
@@ -22,6 +23,9 @@ type Config struct {
 	L2EL endpoint.MustRPC `yaml:"l2EL"`
 	// L2 consensus-layer RPC endpoint
 	L2CL endpoint.MustRPC `yaml:"l2CL"`
+
+	// TODO(#16041): Fetch the dependency set from op-node (will need a new RPC endpoint)
+	DependencySet *depset.StaticConfigDependencySet `yaml:"dependencySet"`
 }
 
 func (c *Config) Start(ctx context.Context, id seqtypes.BuilderID, opts *work.ServiceOpts) (work.Builder, error) {
@@ -70,8 +74,7 @@ func (c *Config) Start(ctx context.Context, id seqtypes.BuilderID, opts *work.Se
 	if err != nil {
 		return nil, err
 	}
-	// TODO(#16041): Fetch the dependency set from op-node (will need a new RPC endpoint)
-	fb := derive.NewFetchingAttributesBuilder(cfg, nil, l1Cl, l2Cl)
+	fb := derive.NewFetchingAttributesBuilder(cfg, c.DependencySet, l1Cl, l2Cl)
 
 	fb.TestSkipL1OriginCheck()
 

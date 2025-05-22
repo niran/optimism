@@ -84,6 +84,9 @@ func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELI
 		l2CL, ok := orch.l2CLs.Get(l2CLID)
 		require.True(ok, "l2 CL node required")
 
+		cluster, ok := orch.ClusterForL2(l2ELID.ChainID)
+		require.True(ok, "l2 must be in known cluster")
+
 		builderID := seqtypes.BuilderID("test-standard-builder")
 		committerID := seqtypes.CommitterID("test-standard-committer")
 		signerID := seqtypes.SignerID("test-local-signer")
@@ -109,6 +112,7 @@ func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELI
 						L2CL: endpoint.MustRPC{
 							Value: endpoint.HttpURL(l2CL.userRPC),
 						},
+						DependencySet: cluster.depset,
 					},
 				},
 			},
