@@ -218,7 +218,8 @@ func (ba *FetchingAttributesBuilder) deployCrossL2InboxTxs(nextL2Time uint64) ([
 		return nil, NewTemporaryError(fmt.Errorf("failed to check if CrossL2Inbox already active: %w", err))
 	}
 	// This is the interop activation block but the chain was in the dependency set even before now
-	if !alreadyDeployed && !ba.rollupCfg.IsInteropActivationBlock(nextL2Time) {
+	// so ensure the proxy is initialized correctly
+	if alreadyDeployed && !ba.rollupCfg.IsInteropActivationBlock(nextL2Time) {
 		return nil, nil
 	}
 

@@ -117,7 +117,8 @@ func TestInteropHappyTx(gt *testing.T) {
 		var err error
 		execReceipt, err = execTx.PlannedTx.Included.Eval(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(execReceipt.Logs))
+		require.Equal(t, types.ReceiptStatusSuccessful, execReceipt.Status)
+		require.Len(t, execReceipt.Logs, 1)
 
 		l.Info("executing message included", "chain", sys.L2ChainB.ChainID(), "block_number", execReceipt.BlockNumber, "block_hash", execReceipt.BlockHash, "now", time.Now().Unix())
 	}
