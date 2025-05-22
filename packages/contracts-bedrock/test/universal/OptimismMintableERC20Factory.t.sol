@@ -19,6 +19,26 @@ import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMin
 contract OptimismMintableERC20Factory_TestInit is CommonTest {
     event StandardL2TokenCreated(address indexed remoteToken, address indexed localToken);
     event OptimismMintableERC20Created(address indexed localToken, address indexed remoteToken, address deployer);
+
+    /// @notice Precalculates the address of the token contract.
+    function _calculateTokenAddress(
+        address _remote,
+        string memory _name,
+        string memory _symbol,
+        uint8 _decimals
+    )
+        internal
+        view
+        returns (address)
+    {
+        bytes memory constructorArgs = abi.encode(address(l2StandardBridge), _remote, _name, _symbol, _decimals);
+        bytes memory bytecode = abi.encodePacked(type(OptimismMintableERC20).creationCode, constructorArgs);
+        bytes32 salt = keccak256(abi.encode(_remote, _name, _symbol, _decimals));
+        bytes32 hash = keccak256(
+            abi.encodePacked(bytes1(0xff), address(l2OptimismMintableERC20Factory), salt, keccak256(bytecode))
+        );
+        return address(uint160(uint256(hash)));
+    }
 }
 
 /// @title OptimismMintableERC20Factory_Constructor_Test
@@ -46,26 +66,6 @@ contract OptimismMintableERC20Factory_Initialize_Test is OptimismMintableERC20Fa
 /// @notice Tests the `createStandardL2Token` function of the `OptimismMintableERC20Factory`
 ///         contract.
 contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMintableERC20Factory_TestInit {
-    /// @notice Precalculates the address of the token contract.
-    function _calculateTokenAddress(
-        address _remote,
-        string memory _name,
-        string memory _symbol,
-        uint8 _decimals
-    )
-        internal
-        view
-        returns (address)
-    {
-        bytes memory constructorArgs = abi.encode(address(l2StandardBridge), _remote, _name, _symbol, _decimals);
-        bytes memory bytecode = abi.encodePacked(type(OptimismMintableERC20).creationCode, constructorArgs);
-        bytes32 salt = keccak256(abi.encode(_remote, _name, _symbol, _decimals));
-        bytes32 hash = keccak256(
-            abi.encodePacked(bytes1(0xff), address(l2OptimismMintableERC20Factory), salt, keccak256(bytecode))
-        );
-        return address(uint160(uint256(hash)));
-    }
-
     /// @notice Test that calling `createStandardL2Token` with valid parameters succeeds.
     function test_createStandardL2Token_succeeds(
         address _caller,
