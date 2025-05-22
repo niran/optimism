@@ -390,14 +390,12 @@ func ApplyPipeline(
 	}
 
 	// Generate the interop dependency set if interop is enabled
-	if intent.InteropTimeOffset != nil {
-		pline = append(pline, pipelineStage{
-			"generate-interop-depset",
-			func() error {
-				return pipeline.GenerateInteropDepset(ctx, pEnv, intent, st)
-			},
-		})
-	}
+	pline = append(pline, pipelineStage{
+		"generate-interop-depset",
+		func() error {
+			return pipeline.GenerateInteropDepset(ctx, pEnv, intent, st)
+		},
+	})
 
 	// Generate the prestate for all chains
 	pline = append(pline, pipelineStage{

@@ -1,7 +1,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -105,13 +104,6 @@ func CombineDeployConfig(intent *Intent, chainIntent *ChainIntent, state *State,
 			ProofMaturityDelaySeconds:       604800,
 			DisputeGameFinalityDelaySeconds: 302400,
 		},
-	}
-
-	if intent.InteropTimeOffset != nil {
-		if upgradeSchedule.L2GenesisIsthmusTimeOffset == nil {
-			return genesis.DeployConfig{}, errors.New("expecting isthmus fork to be enabled for interop deployments")
-		}
-		cfg.L2InitializationConfig.UpgradeScheduleDeployConfig.L2GenesisInteropTimeOffset = intent.InteropTimeOffset
 	}
 
 	if chainState.StartBlock == nil {

@@ -214,7 +214,7 @@ func WithPrefundedL2(chainID eth.ChainID) DeployerOption {
 func WithInteropAtGenesis() DeployerOption {
 	return func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {
 		for _, l2Cfg := range builder.L2s() {
-			l2Cfg.WithForkAtOffset(rollup.Interop, new(uint64))
+			l2Cfg.WithForkAtGenesis(rollup.Interop)
 		}
 	}
 }
@@ -320,9 +320,6 @@ func (wb *worldBuilder) Build() {
 		}
 	}
 	wb.logger.Info("Dependency set setting", "interopTime", minInteropTimeOffset)
-
-	// If any chains are activating interop at genesis, then set useInterop to true
-	intent.InteropTimeOffset = minInteropTimeOffset
 
 	pipelineOpts := deployer.ApplyPipelineOpts{
 		DeploymentTarget:   deployer.DeploymentTargetGenesis,

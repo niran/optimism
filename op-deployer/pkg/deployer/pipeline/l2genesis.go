@@ -92,7 +92,7 @@ func GenerateL2Genesis(pEnv *Env, intent *state.Intent, bundle ArtifactsBundle, 
 		GovernanceTokenOwner:                     overrides.GovernanceTokenOwner,
 		Fork:                                     big.NewInt(schedule.SolidityForkNumber(1)),
 		// Only include interop predeploys if it is activating at genesis
-		UseInterop:       intent.InteropTimeOffset != nil && *intent.InteropTimeOffset == 0,
+		UseInterop:       schedule.L2GenesisInteropTimeOffset != nil && *schedule.L2GenesisInteropTimeOffset == 0,
 		EnableGovernance: overrides.EnableGovernance,
 		FundDevAccounts:  overrides.FundDevAccounts,
 	}); err != nil {
@@ -115,12 +115,6 @@ func GenerateL2Genesis(pEnv *Env, intent *state.Intent, bundle ArtifactsBundle, 
 
 func calculateL2GenesisOverrides(intent *state.Intent, thisIntent *state.ChainIntent) (l2GenesisOverrides, *genesis.UpgradeScheduleDeployConfig, error) {
 	schedule := standard.DefaultHardforkScheduleForTag(intent.L1ContractsLocator.Tag)
-	if intent.InteropTimeOffset != nil {
-		if schedule.L2GenesisIsthmusTimeOffset == nil {
-			return l2GenesisOverrides{}, nil, fmt.Errorf("expecting isthmus fork to be enabled for interop deployments")
-		}
-		schedule.L2GenesisInteropTimeOffset = intent.InteropTimeOffset
-	}
 
 	overrides := defaultOverrides()
 	// Special case for FundDevAccounts since it's both an intent value and an override.

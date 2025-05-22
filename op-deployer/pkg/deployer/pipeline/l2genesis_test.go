@@ -138,7 +138,9 @@ func TestCalculateL2GenesisOverrides(t *testing.T) {
 			name: "interop mode",
 			intent: &state.Intent{
 				L1ContractsLocator: &artifacts.Locator{},
-				InteropTimeOffset:  op_service.U64UtilPtr(0),
+				GlobalDeployOverrides: map[string]any{
+					"l2GenesisInteropTimeOffset": "0x0",
+				},
 			},
 			chainIntent:       &state.ChainIntent{},
 			expectError:       false,
