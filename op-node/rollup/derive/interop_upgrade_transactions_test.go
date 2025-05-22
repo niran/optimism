@@ -38,18 +38,10 @@ func TestInteropSourcesMatchSpec(t *testing.T) {
 func TestInteropNetworkTransactions(t *testing.T) {
 	upgradeTxns, err := InteropNetworkUpgradeTransactions()
 	require.NoError(t, err)
-	require.Len(t, upgradeTxns, 3)
-
-	// 1. Deploy CrossL2Inbox
-	sender1, tx1 := toDepositTxn(t, upgradeTxns[0])
-	require.Equal(t, crossL2InboxDeployerAddress, sender1, "sender mismatch tx 1")
-	require.Equal(t, deployCrossL2InboxSource.SourceHash(), tx1.SourceHash(), "source hash mismatch tx 1")
-	require.Nil(t, tx1.To(), "to mismatch tx 1")
-	require.Equal(t, uint64(420000), tx1.Gas(), "gas mismatch tx 1")
-	require.Equal(t, crossL2InboxDeploymentBytecode, tx1.Data(), "data mismatch tx 1")
+	require.Len(t, upgradeTxns, 2)
 
 	// 2. Deploy L2ToL2CrossDomainMessenger
-	sender3, tx3 := toDepositTxn(t, upgradeTxns[1])
+	sender3, tx3 := toDepositTxn(t, upgradeTxns[0])
 	require.Equal(t, l2ToL2MessengerDeployerAddress, sender3, "sender mismatch tx 3")
 	require.Equal(t, deployL2ToL2MessengerSource.SourceHash(), tx3.SourceHash(), "source hash mismatch tx 3")
 	require.Nil(t, tx3.To(), "to mismatch tx 3")
@@ -57,7 +49,7 @@ func TestInteropNetworkTransactions(t *testing.T) {
 	require.Equal(t, l2ToL2MessengerDeploymentBytecode, tx3.Data(), "data mismatch tx 3")
 
 	// 3. Update L2ToL2CrossDomainMessenger Proxy
-	sender4, tx4 := toDepositTxn(t, upgradeTxns[2])
+	sender4, tx4 := toDepositTxn(t, upgradeTxns[1])
 	require.Equal(t, common.Address{}, sender4, "sender mismatch tx 4")
 	require.Equal(t, updateL2ToL2MessengerProxySource.SourceHash(), tx4.SourceHash(), "source hash mismatch tx 4")
 	require.NotNil(t, tx4.To(), "to mismatch tx 4")
@@ -68,10 +60,20 @@ func TestInteropNetworkTransactions(t *testing.T) {
 }
 
 func TestInteropActivateCrossL2InboxTransaction(t *testing.T) {
-	upgradeTxn, err := InteropActivateCrossL2InboxTransaction()
+	upgradeTxns, err := InteropActivateCrossL2InboxTransactions()
 	require.NoError(t, err)
-	// Update CrossL2Inbox Proxy
-	sender2, tx2 := toDepositTxn(t, upgradeTxn)
+	require.Len(t, upgradeTxns, 2)
+
+	// 1. Deploy CrossL2Inbox
+	sender1, tx1 := toDepositTxn(t, upgradeTxns[0])
+	require.Equal(t, crossL2InboxDeployerAddress, sender1, "sender mismatch tx 1")
+	require.Equal(t, deployCrossL2InboxSource.SourceHash(), tx1.SourceHash(), "source hash mismatch tx 1")
+	require.Nil(t, tx1.To(), "to mismatch tx 1")
+	require.Equal(t, uint64(420000), tx1.Gas(), "gas mismatch tx 1")
+	require.Equal(t, crossL2InboxDeploymentBytecode, tx1.Data(), "data mismatch tx 1")
+
+	// 2. Update CrossL2Inbox Proxy
+	sender2, tx2 := toDepositTxn(t, upgradeTxns[1])
 	require.Equal(t, common.Address{}, sender2, "sender mismatch tx 2")
 	require.Equal(t, updateCrossL2InboxProxySource.SourceHash(), tx2.SourceHash(), "source hash mismatch tx 2")
 	require.NotNil(t, tx2.To(), "to mismatch tx 2")

@@ -138,9 +138,9 @@ func VerifyInteropContractsDeployedCorrectly(t helpers.Testing, chain *dsl.Chain
 
 	expectedUpgradeTransactions, err := derive.InteropNetworkUpgradeTransactions()
 	require.NoError(t, err)
-	activateTx, err := derive.InteropActivateCrossL2InboxTransaction()
+	activateTxs, err := derive.InteropActivateCrossL2InboxTransactions()
 	require.NoError(t, err)
-	expectedUpgradeTransactions = append(expectedUpgradeTransactions, activateTx)
+	expectedUpgradeTransactions = append(expectedUpgradeTransactions, activateTxs...)
 
 	require.Equal(t, upgradeTransactionBytes, expectedUpgradeTransactions)
 
