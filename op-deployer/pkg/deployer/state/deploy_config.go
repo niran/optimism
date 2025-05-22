@@ -106,7 +106,6 @@ func CombineDeployConfig(intent *Intent, chainIntent *ChainIntent, state *State,
 		},
 	}
 
-
 	if chainState.StartBlock == nil {
 		// These are dummy variables - see below for rationale.
 		num := rpc.LatestBlockNumber
