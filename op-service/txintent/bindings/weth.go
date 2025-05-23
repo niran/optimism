@@ -45,14 +45,15 @@ func (f *WETHCallFactory) Transfer(dest common.Address, amount eth.ETH) txintent
 type WETH struct {
 	WETHCallFactory
 
-	BalanceOf func(addr common.Address) txintent.CallView[eth.ETH]
-	Transfer  func(dest common.Address, amount eth.ETH) txintent.CallView[bool]
+	BalanceOf func(addr common.Address) txintent.CallView[eth.ETH]              `sol:"balanceOf"`
+	Transfer  func(dest common.Address, amount eth.ETH) txintent.CallView[bool] `sol:"transfer"`
 
-	BalanceOf2 func(addr common.Address) Call
-	Transfer2  func(dest common.Address, amount eth.ETH) Call
+	BalanceOf2 func(addr common.Address) Call                 `sol:"balanceOf"`
+	Transfer2  func(dest common.Address, amount eth.ETH) Call `sol:"transfer"`
 
-	BalanceOf3 func(addr common.Address) TypedCall[eth.ETH]
-	Transfer3  func(dest common.Address, amount eth.ETH) TypedCall[bool]
+	// TODO: solidity methods which starts with lowercase must be also exportable. Think about convention
+	BalanceOf3 func(addr common.Address) TypedCall[eth.ETH]              `sol:"balanceOf"`
+	Transfer3  func(dest common.Address, amount eth.ETH) TypedCall[bool] `sol:"transfer"`
 }
 
 func extractGenericArg(t reflect.Type) string {
@@ -75,11 +76,12 @@ var typeRegistry = map[string]reflect.Type{
 	// add more as needed
 }
 
+// elective
 func lookupType(typeStr string) reflect.Type {
 	return typeRegistry[typeStr]
 }
 
-func encoder(args ...any) ([]byte, error) {
+func encoder(name string, args ...any) ([]byte, error) {
 	// fillme fixme: do not care about types
 	// use geth ABI.pack
 	addr, ok := args[0].(common.Address)
@@ -89,6 +91,7 @@ func encoder(args ...any) ([]byte, error) {
 
 	ret := addr.Bytes()
 	ret = append(ret, []byte{0x41, 0x42, 0x43}...)
+	ret = append(ret, []byte(name)...)
 	return ret, nil
 }
 
@@ -101,9 +104,29 @@ func decoder(data []byte) (any, error) {
 	return string(data), nil
 }
 
+// TODO: embed in basecallfactory
+func (w *WETH) Check() {
+	// panic when when lambda, they must have `sol` tag
+	t := reflect.TypeOf(*w)
+	for i := range t.NumField() {
+		field := t.Field(i)
+		fieldType := field.Type
+
+		if fieldType.Kind() != reflect.Func {
+			continue
+		}
+		if len(field.Tag.Get("sol")) == 0 {
+			panic("all function arguments must have sol tags")
+		}
+		// TODO: also check field name convention, comparing with sol tag
+	}
+}
 func NewWETH(f *WETHCallFactory) *WETH {
 	// infer here
 	weth := WETH{WETHCallFactory: *f}
+
+	// TOOD: implement better checker
+	weth.Check()
 
 	v := reflect.ValueOf(&weth).Elem()
 
@@ -167,7 +190,11 @@ func NewWETH(f *WETHCallFactory) *WETH {
 					for i, a := range argsOuter {
 						callArgs[i] = a.Interface()
 					}
-					v0, v1 := encoder(callArgs...)
+					methodName := field.Tag.Get("sol") // TODO: make tag as constant
+					if len(methodName) == 0 {
+						panic("invalid method name")
+					}
+					v0, v1 := encoder(methodName, callArgs...)
 
 					// guard
 					var val0 reflect.Value
@@ -211,7 +238,8 @@ func NewWETH(f *WETHCallFactory) *WETH {
 			})
 
 			// test
-			if field.Name == "BalanceOf2" {
+			// TODO: remove hardcode
+			if field.Name == "BalanceOf2" || field.Name == "Transfer2" {
 				// func(...args) -> Call
 				λ := reflect.MakeFunc(fieldType, func(args []reflect.Value) []reflect.Value {
 					innerResults := encoderLambdaLambda.Call(args)
@@ -230,7 +258,8 @@ func NewWETH(f *WETHCallFactory) *WETH {
 				// panic when type mismatch
 				v.FieldByName(field.Name).Set(λ)
 			}
-			if field.Name == "BalanceOf3" {
+			// TODO: remove hardcode
+			if field.Name == "BalanceOf3" || field.Name == "Transfer3" {
 				// func(...args) -> TypedCall[ReturnValue]
 				λ := reflect.MakeFunc(fieldType, func(args []reflect.Value) []reflect.Value {
 					innerResults := encoderLambdaLambda.Call(args)
@@ -264,6 +293,7 @@ func NewWETH(f *WETHCallFactory) *WETH {
 	fmt.Println(ret2)
 
 	// TODO: check field lambdas are not nil and properly initialized
+	panic("wow")
 
 	return &weth
 }
