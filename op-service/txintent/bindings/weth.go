@@ -47,6 +47,9 @@ type WETH struct {
 
 	BalanceOf func(addr common.Address) txintent.CallView[eth.ETH]
 	Transfer  func(dest common.Address, amount eth.ETH) txintent.CallView[bool]
+
+	BalanceOf2 func(addr common.Address) Call
+	Transfer2  func(dest common.Address, amount eth.ETH) Call
 }
 
 func extractGenericArg(t reflect.Type) string {
@@ -65,6 +68,7 @@ var typeRegistry = map[string]reflect.Type{
 	"int":            reflect.TypeOf(0),
 	"common.Address": reflect.TypeOf(common.Address{}),
 	"github.com/ethereum-optimism/optimism/op-service/eth.ETH": reflect.TypeOf(eth.ETH{}),
+	"bindings.Call": reflect.TypeOf(Call{}),
 	// add more as needed
 }
 
@@ -85,15 +89,20 @@ func encoder(args ...any) ([]byte, error) {
 	return ret, nil
 }
 
-func decoder[ReturnType any](data []byte) (ReturnType, error) {
+func decoder(data []byte) (any, error) {
 	// fillme fixme: use geth ABI.unpack
 	// use geth ABI.unpack
-	return *new(ReturnType), nil
+	// no type yet
+
+	// example: fixme
+	return string(data), nil
 }
 
 func NewWETH(f *WETHCallFactory) *WETH {
 	// infer here
 	weth := WETH{WETHCallFactory: *f}
+
+	v := reflect.ValueOf(&weth).Elem()
 
 	t := reflect.TypeOf(weth)
 
@@ -115,6 +124,9 @@ func NewWETH(f *WETHCallFactory) *WETH {
 				t := fieldType.Out(j)
 				fmt.Printf("    Return %d: %s\n", j, t)
 				genericArg := extractGenericArg(t)
+				if genericArg == "" { // non generic typed
+					genericArg = t.String()
+				}
 				fmt.Printf("    Return %d: %s\n", j, genericArg)
 				v := reflect.New(lookupType(genericArg)).Elem()
 				fmt.Printf("    Return %d: %s\n", j, v.Type())
@@ -124,13 +136,20 @@ func NewWETH(f *WETHCallFactory) *WETH {
 
 			// outer: func(...args) -> <inner: (func() -> (bytes[], error))>
 			// inner: func() -> (bytes[], error)
-			funcInputWrapper := reflect.FuncOf(inputTypes, []reflect.Type{reflect.TypeOf(func() ([]byte, error) { return nil, nil })}, false)
 			funcInput := reflect.FuncOf([]reflect.Type{}, []reflect.Type{reflect.TypeOf([]byte{}), reflect.TypeOf((*error)(nil)).Elem()}, false)
+			funcInputWrapper := reflect.FuncOf(inputTypes, []reflect.Type{funcInput}, false)
 
 			fmt.Println("funcInput", funcInput)
 			fmt.Println("funcInputWrapper", funcInputWrapper)
-			outputTypes = append(outputTypes, reflect.TypeOf((*error)(nil)).Elem())
-			funcOutput := reflect.FuncOf([]reflect.Type{reflect.TypeOf([]byte{})}, outputTypes, false)
+
+			outputType := outputTypes[0]
+			_ = outputType
+
+			outputAnyTypes := []reflect.Type{reflect.TypeOf((*any)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()}
+
+			// outer:
+			// inner: func([]byte) -> (any, error)
+			funcOutput := reflect.FuncOf([]reflect.Type{reflect.TypeOf([]byte{})}, outputAnyTypes, false)
 			fmt.Println("funcOutput", funcOutput)
 
 			// λ
@@ -144,8 +163,13 @@ func NewWETH(f *WETHCallFactory) *WETH {
 					}
 					v0, v1 := encoder(callArgs...)
 
-					val0 := reflect.ValueOf(v0)
-
+					// guard
+					var val0 reflect.Value
+					if v0 == nil {
+						val0 = reflect.Zero(reflect.TypeOf([]byte{}))
+					} else {
+						val0 = reflect.ValueOf(v0)
+					}
 					var val1 reflect.Value
 					if v1 == nil {
 						val1 = reflect.Zero(reflect.TypeOf((*error)(nil)).Elem())
@@ -161,39 +185,44 @@ func NewWETH(f *WETHCallFactory) *WETH {
 
 			decoderLambda := reflect.MakeFunc(funcOutput, func(args []reflect.Value) []reflect.Value {
 				data := args[0].Interface().([]byte)
-				v0, v1 := decoder[any](data)
-				return []reflect.Value{reflect.ValueOf(v0), reflect.ValueOf(v1)}
+				v0, v1 := decoder(data)
+
+				// guard
+				var val0 reflect.Value
+				if v0 == nil {
+					val0 = reflect.Zero(reflect.TypeOf((*any)(nil)).Elem())
+				} else {
+					val0 = reflect.ValueOf(v0)
+				}
+				var val1 reflect.Value
+				if v1 == nil {
+					val1 = reflect.Zero(reflect.TypeOf((*error)(nil)).Elem())
+				} else {
+					val1 = reflect.ValueOf(v1)
+				}
+
+				return []reflect.Value{val0, val1}
 			})
 
-			_ = encoderLambdaLambda
-			_ = decoderLambda
-
 			// test
-			if field.Name == "BalanceOf" {
-				// below works but need to know outer λ type
-				// // exampleAddr := common.HexToAddress("0x1234")
-				// // outerλ := encoderLambdaLambda.Interface().((func(common.Address) func() ([]byte, error)))
-				// // innerλ := outerλ(exampleAddr)
-				// // data, _ := innerλ()
-				// // panic(string(data))
+			if field.Name == "BalanceOf2" {
+				// func(...args) -> Call
+				λ := reflect.MakeFunc(fieldType, func(args []reflect.Value) []reflect.Value {
+					innerResults := encoderLambdaLambda.Call(args)
+					if len(innerResults) != 1 {
+						panic("expected one return value")
+					}
+					innerλ := innerResults[0].Interface().(func() ([]byte, error))
+					decoderλ := decoderLambda.Interface().(func([]byte) (any, error))
+					realcall := Call{
+						EncodeInputLambda:  innerλ,
+						DecodeOutputLambda: decoderλ,
+					}
+					return []reflect.Value{reflect.ValueOf(realcall)}
+				})
 
-				args := make([]reflect.Value, len(inputTypes))
-
-				exampleAddr := common.HexToAddress("0x45464748")
-				args[0] = reflect.ValueOf(exampleAddr) // we need this
-
-				innerResults := encoderLambdaLambda.Call(args)
-				if len(innerResults) != 1 {
-					panic("expected one return value")
-				}
-				innerλ := innerResults[0].Interface().(func() ([]byte, error))
-				data, _ := innerλ()
-
-				fmt.Println(string(data))
-				fmt.Println("EFGHABC")
-				if strings.HasPrefix(string(data), "EFGHABC") {
-					panic(string(data))
-				}
+				// panic when type mismatch
+				v.FieldByName(field.Name).Set(λ)
 			}
 		}
 	}
@@ -201,8 +230,45 @@ func NewWETH(f *WETHCallFactory) *WETH {
 	weth.BalanceOf = f.BalanceOf
 	weth.Transfer = f.Transfer
 
+	a := weth.BalanceOf2(common.HexToAddress("0x30313233"))
+	ret, _ := a.EncodeInput()
+	fmt.Println(string(ret))
+	ret2, _ := a.DecodeOutput([]byte{0x41, 0x42, 0x41})
+	fmt.Println(ret2)
+
+	// TODO: check field lambdas are not nil and properly initialized
+
+	//panic("wow")
+
 	return &weth
 }
+
+type Call struct {
+	BaseCallFactory
+
+	EncodeInputLambda  func() ([]byte, error)
+	DecodeOutputLambda func(data []byte) (dest any, err error)
+}
+
+func (c *Call) EncodeInput() ([]byte, error) {
+	return c.EncodeInputLambda()
+}
+
+func (c *Call) DecodeOutput(data []byte) (any, error) {
+	return c.DecodeOutputLambda(data)
+}
+
+var _ txintent.CallView[any] = (*Call)(nil)
+
+type TypedCall[ReturnType any] struct {
+	Call
+}
+
+func typeextract[ReturnType any](tc TypedCall[ReturnType]) {
+
+}
+
+var _ txintent.CallView[any] = (*TypedCall[any])(nil)
 
 type Call_balanceOf[ReturnType eth.ETH] struct {
 	WETHCallFactory
