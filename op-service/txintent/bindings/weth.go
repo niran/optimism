@@ -50,6 +50,9 @@ type WETH struct {
 
 	BalanceOf2 func(addr common.Address) Call
 	Transfer2  func(dest common.Address, amount eth.ETH) Call
+
+	BalanceOf3 func(addr common.Address) TypedCall[eth.ETH]
+	Transfer3  func(dest common.Address, amount eth.ETH) TypedCall[bool]
 }
 
 func extractGenericArg(t reflect.Type) string {
@@ -120,8 +123,10 @@ func NewWETH(f *WETHCallFactory) *WETH {
 				inputTypes = append(inputTypes, fieldType.In(j))
 			}
 			outputTypes := []reflect.Type{}
+			var originalOutputType reflect.Type
 			for j := 0; j < fieldType.NumOut(); j++ {
 				t := fieldType.Out(j)
+				originalOutputType = t
 				fmt.Printf("    Return %d: %s\n", j, t)
 				genericArg := extractGenericArg(t)
 				if genericArg == "" { // non generic typed
@@ -133,6 +138,7 @@ func NewWETH(f *WETHCallFactory) *WETH {
 				// outputTypes = append(outputTypes, t)
 				outputTypes = append(outputTypes, v.Type())
 			}
+			_ = originalOutputType
 
 			// outer: func(...args) -> <inner: (func() -> (bytes[], error))>
 			// inner: func() -> (bytes[], error)
@@ -224,21 +230,40 @@ func NewWETH(f *WETHCallFactory) *WETH {
 				// panic when type mismatch
 				v.FieldByName(field.Name).Set(λ)
 			}
+			if field.Name == "BalanceOf3" {
+				// func(...args) -> TypedCall[ReturnValue]
+				λ := reflect.MakeFunc(fieldType, func(args []reflect.Value) []reflect.Value {
+					innerResults := encoderLambdaLambda.Call(args)
+					if len(innerResults) != 1 {
+						panic("expected one return value")
+					}
+					innerλ := innerResults[0].Interface().(func() ([]byte, error))
+					decoderλ := decoderLambda.Interface().(func([]byte) (any, error))
+
+					wrap := reflect.New(originalOutputType).Elem()
+
+					wrap.FieldByName("EncodeInputLambda").Set(reflect.ValueOf(innerλ))
+					wrap.FieldByName("DecodeOutputLambda").Set(reflect.ValueOf(decoderλ))
+
+					return []reflect.Value{wrap}
+				})
+				// panic when type mismatch
+				v.FieldByName(field.Name).Set(λ)
+
+			}
 		}
 	}
 
 	weth.BalanceOf = f.BalanceOf
 	weth.Transfer = f.Transfer
 
-	a := weth.BalanceOf2(common.HexToAddress("0x30313233"))
+	a := weth.BalanceOf3(common.HexToAddress("0x30313233"))
 	ret, _ := a.EncodeInput()
 	fmt.Println(string(ret))
 	ret2, _ := a.DecodeOutput([]byte{0x41, 0x42, 0x41})
 	fmt.Println(ret2)
 
 	// TODO: check field lambdas are not nil and properly initialized
-
-	//panic("wow")
 
 	return &weth
 }
@@ -262,10 +287,6 @@ var _ txintent.CallView[any] = (*Call)(nil)
 
 type TypedCall[ReturnType any] struct {
 	Call
-}
-
-func typeextract[ReturnType any](tc TypedCall[ReturnType]) {
-
 }
 
 var _ txintent.CallView[any] = (*TypedCall[any])(nil)
