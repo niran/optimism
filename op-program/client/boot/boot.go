@@ -1,6 +1,7 @@
 package boot
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"math"
@@ -8,6 +9,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-program/chainconfig"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -24,6 +26,9 @@ type BootInfo struct {
 
 	L2ChainConfig *params.ChainConfig
 	RollupConfig  *rollup.Config
+
+	// Optional - only set when regenerating blocks in native mode post-interop
+	DependencySet depset.DependencySet
 }
 
 type BootstrapClient struct {
@@ -34,7 +39,7 @@ func NewBootstrapClient(r oracleClient) *BootstrapClient {
 	return &BootstrapClient{r: r}
 }
 
-func (br *BootstrapClient) BootInfo() *BootInfo {
+func (br *BootstrapClient) BootInfo(loadDependencySet bool) *BootInfo {
 	l1Head := common.BytesToHash(br.r.Get(L1HeadLocalIndex))
 	l2OutputRoot := common.BytesToHash(br.r.Get(L2OutputRootLocalIndex))
 	l2Claim := common.BytesToHash(br.r.Get(L2ClaimLocalIndex))
@@ -43,6 +48,7 @@ func (br *BootstrapClient) BootInfo() *BootInfo {
 
 	var l2ChainConfig *params.ChainConfig
 	var rollupConfig *rollup.Config
+	var depSet depset.DependencySet
 	if l2ChainID == CustomChainIDIndicator {
 		l2ChainConfig = new(params.ChainConfig)
 		err := json.Unmarshal(br.r.Get(L2ChainConfigLocalIndex), &l2ChainConfig)
@@ -54,6 +60,12 @@ func (br *BootstrapClient) BootInfo() *BootInfo {
 		if err != nil {
 			panic("failed to bootstrap rollup config")
 		}
+		if loadDependencySet {
+			depSet, err = depset.ParseJSONDependencySet(bytes.NewReader(br.r.Get(DependencySetLocalIndex)))
+			if err != nil {
+				panic("failed to bootstrap dependency set")
+			}
+		}
 	} else {
 		var err error
 		rollupConfig, err = chainconfig.RollupConfigByChainID(l2ChainID)
@@ -63,6 +75,12 @@ func (br *BootstrapClient) BootInfo() *BootInfo {
 		l2ChainConfig, err = chainconfig.ChainConfigByChainID(l2ChainID)
 		if err != nil {
 			panic(err)
+		}
+		if loadDependencySet {
+			depSet, err = chainconfig.DependencySetByChainID(l2ChainID)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 
@@ -74,5 +92,6 @@ func (br *BootstrapClient) BootInfo() *BootInfo {
 		L2ChainID:          l2ChainID,
 		L2ChainConfig:      l2ChainConfig,
 		RollupConfig:       rollupConfig,
+		DependencySet:      depSet,
 	}
 }

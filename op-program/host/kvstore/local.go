@@ -3,7 +3,6 @@ package kvstore
 import (
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 
 	"github.com/ethereum-optimism/optimism/op-program/client/boot"
 	"github.com/ethereum-optimism/optimism/op-program/host/config"
@@ -59,9 +58,10 @@ func (s *LocalPreimageSource) Get(key common.Hash) ([]byte, error) {
 		}
 		return json.Marshal(s.config.Rollups[0])
 	case dependencySetKey:
-		if !s.config.InteropEnabled {
-			return nil, errors.New("host is not configured to serve dependencySet local keys")
-		}
+		// TODO(#16041): I really don't think we should disable this check.
+		//if !s.config.InteropEnabled {
+		//	return nil, errors.New("host is not configured to serve dependencySet local keys")
+		//}
 		return json.Marshal(s.config.DependencySet)
 	default:
 		return nil, ErrNotFound

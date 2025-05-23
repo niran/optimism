@@ -25,11 +25,12 @@ type Prefetcher interface {
 }
 type PrefetcherCreator func(ctx context.Context, logger log.Logger, kv kvstore.KV, cfg *config.Config) (Prefetcher, error)
 type programCfg struct {
-	prefetcher       PrefetcherCreator
-	skipValidation   bool
-	db               l2.KeyValueStore
-	storeBlockData   bool
-	forceHintChainID bool
+	prefetcher        PrefetcherCreator
+	skipValidation    bool
+	db                l2.KeyValueStore
+	storeBlockData    bool
+	forceHintChainID  bool
+	loadDependencySet bool
 }
 
 type ProgramOpt func(c *programCfg)
@@ -68,6 +69,12 @@ func WithStoreBlockData(store bool) ProgramOpt {
 func WithForceHintChainID(force bool) ProgramOpt {
 	return func(c *programCfg) {
 		c.forceHintChainID = force
+	}
+}
+
+func WithDependencySet() ProgramOpt {
+	return func(c *programCfg) {
+		c.loadDependencySet = true
 	}
 }
 
@@ -142,14 +149,14 @@ func FaultProofProgram(ctx context.Context, logger log.Logger, cfg *config.Confi
 		logger.Debug("Client program completed successfully")
 		return nil
 	} else {
-		var clientCfg cl.Config
-		if programConfig.skipValidation {
-			clientCfg.SkipValidation = true
+		clientCfg := cl.Config{
+			InteropEnabled:    cfg.InteropEnabled,
+			DB:                programConfig.db,
+			StoreBlockData:    programConfig.storeBlockData,
+			ForceHintChainID:  programConfig.forceHintChainID,
+			LoadDependencySet: programConfig.loadDependencySet,
+			SkipValidation:    programConfig.skipValidation,
 		}
-		clientCfg.InteropEnabled = cfg.InteropEnabled
-		clientCfg.DB = programConfig.db
-		clientCfg.StoreBlockData = programConfig.storeBlockData
-		clientCfg.ForceHintChainID = programConfig.forceHintChainID
 		return cl.RunProgram(logger, pClientRW, hClientRW, clientCfg)
 	}
 }

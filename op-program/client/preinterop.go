@@ -22,7 +22,7 @@ func RunPreInteropProgram(
 	result, err := tasks.RunDerivation(
 		logger,
 		bootInfo.RollupConfig,
-		nil, // No dependency set pre-interop
+		bootInfo.DependencySet, // nil pre-interop but set if we're regenerating a post-interop block
 		bootInfo.L2ChainConfig,
 		bootInfo.L1Head,
 		bootInfo.L2OutputRoot,

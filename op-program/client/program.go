@@ -21,11 +21,12 @@ import (
 var errInvalidConfig = errors.New("invalid config")
 
 type Config struct {
-	SkipValidation   bool
-	InteropEnabled   bool
-	ForceHintChainID bool
-	DB               l2.KeyValueStore
-	StoreBlockData   bool
+	SkipValidation    bool
+	InteropEnabled    bool
+	ForceHintChainID  bool
+	DB                l2.KeyValueStore
+	StoreBlockData    bool
+	LoadDependencySet bool
 }
 
 // Main executes the client program in a detached context and exits the current process.
@@ -73,7 +74,7 @@ func RunProgram(logger log.Logger, preimageOracle io.ReadWriter, preimageHinter 
 	if cfg.DB == nil {
 		return fmt.Errorf("%w: db config is required", errInvalidConfig)
 	}
-	bootInfo := boot.NewBootstrapClient(pClient).BootInfo()
+	bootInfo := boot.NewBootstrapClient(pClient).BootInfo(cfg.LoadDependencySet)
 	derivationOptions := tasks.DerivationOptions{StoreBlockData: cfg.StoreBlockData, SkipValidation: cfg.SkipValidation}
 	return RunPreInteropProgram(logger, bootInfo, l1PreimageOracle, l2PreimageOracle, cfg.DB, derivationOptions)
 }

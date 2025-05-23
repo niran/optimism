@@ -171,6 +171,7 @@ func (p *programExecutor) RunProgram(
 		hostcommon.WithStoreBlockData(true),
 		// Our prefetcher expects chain IDs but pre-interop does not normally include them in hint data
 		hostcommon.WithForceHintChainID(true),
+		hostcommon.WithDependencySet(),
 	)
 }
 
