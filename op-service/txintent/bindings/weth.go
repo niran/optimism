@@ -100,6 +100,9 @@ func decoder(data []byte) (any, error) {
 	// use geth ABI.unpack
 	// no type yet
 
+	// TODO: at this point, we need the return type's type to correctly decode.
+	// First prioritttyy
+
 	// example: fixme
 	return string(data), nil
 }
@@ -121,6 +124,7 @@ func (w *WETH) Check() {
 		// TODO: also check field name convention, comparing with sol tag
 	}
 }
+
 func NewWETH(f *WETHCallFactory) *WETH {
 	// infer here
 	weth := WETH{WETHCallFactory: *f}
