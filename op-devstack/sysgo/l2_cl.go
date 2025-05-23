@@ -142,7 +142,7 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 
 		var depSet derive.DependencySet
 		if cluster, ok := orch.ClusterForL2(l2ELID.ChainID); ok {
-			depSet = cluster.depset
+			depSet = cluster.DepSet()
 		}
 
 		jwtPath, jwtSecret := orch.writeDefaultJWT()

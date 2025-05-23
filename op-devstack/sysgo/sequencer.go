@@ -87,7 +87,7 @@ func WithTestSequencer(testSequencerID stack.TestSequencerID, l2CLID stack.L2CLN
 
 		var depSet *depset.StaticConfigDependencySet
 		if cluster, ok := orch.ClusterForL2(l2ELID.ChainID); ok {
-			depSet = cluster.depset
+			depSet = cluster.DepSet()
 		}
 
 		builderID := seqtypes.BuilderID("test-standard-builder")

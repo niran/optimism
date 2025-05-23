@@ -26,7 +26,7 @@ func TestBootstrapClient(t *testing.T) {
 		RollupConfig:       rollupCfg,
 	}
 	mockOracle := newMockPreinteropBootstrapOracle(bootInfo, false)
-	readBootInfo := NewBootstrapClient(mockOracle).BootInfo()
+	readBootInfo := NewBootstrapClient(mockOracle).BootInfo(false)
 	require.EqualValues(t, bootInfo, readBootInfo)
 }
 
@@ -41,7 +41,7 @@ func TestBootstrapClient_CustomChain(t *testing.T) {
 		RollupConfig:       chaincfg.OPSepolia(),
 	}
 	mockOracle := newMockPreinteropBootstrapOracle(bootInfo, true)
-	readBootInfo := NewBootstrapClient(mockOracle).BootInfo()
+	readBootInfo := NewBootstrapClient(mockOracle).BootInfo(false)
 	require.EqualValues(t, bootInfo, readBootInfo)
 }
 
@@ -55,7 +55,7 @@ func TestBootstrapClient_UnknownChainPanics(t *testing.T) {
 	}
 	mockOracle := newMockPreinteropBootstrapOracle(bootInfo, false)
 	client := NewBootstrapClient(mockOracle)
-	require.Panics(t, func() { client.BootInfo() })
+	require.Panics(t, func() { client.BootInfo(false) })
 }
 
 func newMockPreinteropBootstrapOracle(info *BootInfo, custom bool) *mockPreinteropBootstrapOracle {
