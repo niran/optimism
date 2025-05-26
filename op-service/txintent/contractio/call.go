@@ -66,7 +66,7 @@ func Plan(call txintent.Call) (txplan.Option, error) {
 	return tx, nil
 }
 
-func Write3[O any](call *bindings.TypedCall[O], ctx context.Context, opts ...txplan.Option) (*types.Receipt, error) {
+func Write3(call *bindings.TypedCall[any], ctx context.Context, opts ...txplan.Option) (*types.Receipt, error) {
 	plan, err := Plan3(call)
 	if err != nil {
 		return nil, err
