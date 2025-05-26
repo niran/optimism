@@ -1,11 +1,13 @@
 package bindings
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"reflect"
 	"strings"
 
+	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
@@ -52,8 +54,12 @@ type WETH struct {
 	Transfer2  func(dest common.Address, amount eth.ETH) Call `sol:"transfer"`
 
 	// TODO: solidity methods which starts with lowercase must be also exportable. Think about convention
-	BalanceOf3 func(addr common.Address) TypedCall[eth.ETH]              `sol:"balanceOf"`
-	Transfer3  func(dest common.Address, amount eth.ETH) TypedCall[bool] `sol:"transfer"`
+	BalanceOf3 func(addr common.Address) TypedCall[*big.Int]              `sol:"balanceOf"`
+	Transfer3  func(dest common.Address, amount *big.Int) TypedCall[bool] `sol:"transfer"`
+
+	// not using op-service types yet
+	BalanceOf4 func(addr common.Address) TypedCall[eth.ETH]              `sol:"balanceOf"`
+	Transfer4  func(dest common.Address, amount eth.ETH) TypedCall[bool] `sol:"transfer"`
 }
 
 func extractGenericArg(t reflect.Type) string {
@@ -66,6 +72,7 @@ func extractGenericArg(t reflect.Type) string {
 	return s[start+1 : end] // returns "bool"
 }
 
+// elective
 var typeRegistry = map[string]reflect.Type{
 	"bool":           reflect.TypeOf(true),
 	"string":         reflect.TypeOf(""),
@@ -73,6 +80,7 @@ var typeRegistry = map[string]reflect.Type{
 	"common.Address": reflect.TypeOf(common.Address{}),
 	"github.com/ethereum-optimism/optimism/op-service/eth.ETH": reflect.TypeOf(eth.ETH{}),
 	"bindings.Call": reflect.TypeOf(Call{}),
+	"*math/big.Int": reflect.TypeOf(*big.NewInt(0)),
 	// add more as needed
 }
 
@@ -84,15 +92,51 @@ func lookupType(typeStr string) reflect.Type {
 func encoder(name string, args ...any) ([]byte, error) {
 	// fillme fixme: do not care about types
 	// use geth ABI.pack
-	addr, ok := args[0].(common.Address)
-	if !ok {
-		panic("this is only for test. fix me okay?")
+
+	// something like makeArgs
+	inputs, outputs := []abi.Argument{}, []abi.Argument{}
+	for i, arg := range args {
+		abiTyp, err := script.GoTypeToABIType(reflect.TypeOf(arg))
+		if err != nil {
+			panic("go type to abi type")
+		}
+		input := abi.Argument{
+			Name: fmt.Sprintf("arg_%d", i),
+			Type: abiTyp,
+		}
+		inputs = append(inputs, input)
 	}
 
-	ret := addr.Bytes()
-	ret = append(ret, []byte{0x41, 0x42, 0x43}...)
-	ret = append(ret, []byte(name)...)
-	return ret, nil
+	// no need return types to build calldata
+	// internally initializes sig and ID
+	// use dummy vars but calldata does not care
+	method := abi.NewMethod(name, name, abi.Function, "payable", false, false, inputs, outputs)
+	arguments, err := method.Inputs.Pack(args...)
+	if err != nil {
+		panic(err)
+	}
+
+	// fmt.Println(len(args))
+	// fmt.Println(len(inputs))
+	// fmt.Println(name)
+	// fmt.Println(len(arguments))
+	// fmt.Println(hex.EncodeToString(arguments))
+
+	result := append(method.ID, arguments...)
+
+	// fmt.Println(hex.EncodeToString(result))
+
+	return result, err
+
+	// addr, ok := args[0].(common.Address)
+	// if !ok {
+	// 	panic("this is only for test. fix me okay?")
+	// }
+
+	// ret := addr.Bytes()
+	// ret = append(ret, []byte{0x41, 0x42, 0x43}...)
+	// ret = append(ret, []byte(name)...)
+	// return ret, nil
 }
 
 func decoder(data []byte) (any, error) {
@@ -141,6 +185,9 @@ func NewWETH(f *WETHCallFactory) *WETH {
 		fieldType := field.Type
 
 		if fieldType.Kind() == reflect.Func {
+
+			methodName := field.Tag.Get("sol")
+
 			fmt.Printf("Field %q is a function with %d input(s) and %d output(s):\n",
 				field.Name, fieldType.NumIn(), fieldType.NumOut())
 
@@ -255,6 +302,7 @@ func NewWETH(f *WETHCallFactory) *WETH {
 					innerλ := innerResults[0].Interface().(func() ([]byte, error))
 					decoderλ := decoderLambda.Interface().(func([]byte) (any, error))
 					realcall := Call{
+						MethodName:         methodName,
 						EncodeInputLambda:  innerλ,
 						DecodeOutputLambda: decoderλ,
 					}
@@ -277,6 +325,7 @@ func NewWETH(f *WETHCallFactory) *WETH {
 
 					wrap := reflect.New(originalOutputType).Elem()
 
+					wrap.FieldByName("MethodName").Set(reflect.ValueOf(methodName))
 					wrap.FieldByName("EncodeInputLambda").Set(reflect.ValueOf(innerλ))
 					wrap.FieldByName("DecodeOutputLambda").Set(reflect.ValueOf(decoderλ))
 
@@ -294,9 +343,10 @@ func NewWETH(f *WETHCallFactory) *WETH {
 
 	a := weth.BalanceOf3(common.HexToAddress("0x30313233"))
 	ret, _ := a.EncodeInput()
-	fmt.Println(string(ret))
+	fmt.Printf("calldata: %s\n", hex.EncodeToString(ret))
 	ret2, _ := a.DecodeOutput([]byte{0x41, 0x42, 0x41})
 	fmt.Println(ret2)
+	fmt.Println(a.MethodName)
 
 	// TODO: check field lambdas are not nil and properly initialized
 	panic("wow")
@@ -306,6 +356,8 @@ func NewWETH(f *WETHCallFactory) *WETH {
 
 type Call struct {
 	BaseCallFactory
+
+	MethodName string
 
 	EncodeInputLambda  func() ([]byte, error)
 	DecodeOutputLambda func(data []byte) (dest any, err error)
