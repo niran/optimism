@@ -101,7 +101,7 @@ func Read3[O any](view *bindings.TypedCall[O], ctx context.Context, opts ...txpl
 	if err != nil {
 		return *new(O), err
 	}
-	return decoded.(O), nil
+	return decoded, nil
 }
 
 func Plan3[O any](call *bindings.TypedCall[O]) (txplan.Option, error) {

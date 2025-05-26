@@ -101,7 +101,7 @@ func decoder(data []byte) (any, error) {
 	// no type yet
 
 	// TODO: at this point, we need the return type's type to correctly decode.
-	// First prioritttyy
+	// we do not need a lambda for decoder
 
 	// example: fixme
 	return string(data), nil
@@ -165,7 +165,7 @@ func NewWETH(f *WETHCallFactory) *WETH {
 				// outputTypes = append(outputTypes, t)
 				outputTypes = append(outputTypes, v.Type())
 			}
-			_ = originalOutputType
+			fmt.Println("originalOutputType", originalOutputType)
 
 			// outer: func(...args) -> <inner: (func() -> (bytes[], error))>
 			// inner: func() -> (bytes[], error)
@@ -240,6 +240,8 @@ func NewWETH(f *WETHCallFactory) *WETH {
 
 				return []reflect.Value{val0, val1}
 			})
+
+			// decodeLambda := decodeUnwrap()
 
 			// test
 			// TODO: remove hardcode
@@ -321,6 +323,18 @@ var _ txintent.CallView[any] = (*Call)(nil)
 
 type TypedCall[ReturnType any] struct {
 	Call
+}
+
+func (c *TypedCall[ReturnType]) EncodeInput() ([]byte, error) {
+	return c.EncodeInputLambda()
+}
+
+func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
+	// we have the type here: as Return
+	// we do not need a decodeinput lambda here; no lazy evaluation
+	_, _ = c.DecodeOutputLambda(data)
+
+	return *new(ReturnType), nil
 }
 
 var _ txintent.CallView[any] = (*TypedCall[any])(nil)
