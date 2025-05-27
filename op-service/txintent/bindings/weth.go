@@ -1,7 +1,6 @@
 package bindings
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -302,6 +301,7 @@ func NewWETH(f *WETHCallFactory) *WETH {
 					innerλ := innerResults[0].Interface().(func() ([]byte, error))
 					decoderλ := decoderLambda.Interface().(func([]byte) (any, error))
 					realcall := Call{
+						BaseCallFactory:    &f.BaseCallFactory,
 						MethodName:         methodName,
 						EncodeInputLambda:  innerλ,
 						DecodeOutputLambda: decoderλ,
@@ -328,6 +328,7 @@ func NewWETH(f *WETHCallFactory) *WETH {
 					wrap.FieldByName("MethodName").Set(reflect.ValueOf(methodName))
 					wrap.FieldByName("EncodeInputLambda").Set(reflect.ValueOf(innerλ))
 					wrap.FieldByName("DecodeOutputLambda").Set(reflect.ValueOf(decoderλ))
+					wrap.FieldByName("BaseCallFactory").Set(reflect.ValueOf(&f.BaseCallFactory))
 
 					return []reflect.Value{wrap}
 				})
@@ -341,21 +342,20 @@ func NewWETH(f *WETHCallFactory) *WETH {
 	weth.BalanceOf = f.BalanceOf
 	weth.Transfer = f.Transfer
 
-	a := weth.BalanceOf3(common.HexToAddress("0x30313233"))
-	ret, _ := a.EncodeInput()
-	fmt.Printf("calldata: %s\n", hex.EncodeToString(ret))
-	ret2, _ := a.DecodeOutput([]byte{0x41, 0x42, 0x41})
-	fmt.Println(ret2)
-	fmt.Println(a.MethodName)
+	// a := weth.BalanceOf3(common.HexToAddress("0x30313233"))
+	// ret, _ := a.EncodeInput()
+	// fmt.Printf("calldata: %s\n", hex.EncodeToString(ret))
+	// ret2, _ := a.DecodeOutput([]byte{0x41, 0x42, 0x41})
+	// fmt.Println(ret2)
+	// fmt.Println(a.MethodName)
 
 	// TODO: check field lambdas are not nil and properly initialized
-	panic("wow")
 
 	return &weth
 }
 
 type Call struct {
-	BaseCallFactory
+	*BaseCallFactory
 
 	MethodName string
 
