@@ -384,9 +384,20 @@ func (c *TypedCall[ReturnType]) EncodeInput() ([]byte, error) {
 func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
 	// we have the type here: as Return
 	// we do not need a decodeinput lambda here; no lazy evaluation
-	_, _ = c.DecodeOutputLambda(data)
+	// _, _ = c.DecodeOutputLambda(data)
 
-	return *new(ReturnType), nil
+	abiType, err := script.GoTypeToABIType(reflect.TypeOf(*new(ReturnType)))
+	if err != nil {
+		// TODO: proper error
+		panic(err)
+	}
+	outputs := abi.Arguments{abi.Argument{Type: abiType}}
+	out, err := outputs.Unpack(data)
+	if err != nil {
+		panic(err)
+	}
+	out0 := abi.ConvertType(out[0], new(ReturnType)).(*ReturnType)
+	return *out0, err
 }
 
 var _ txintent.CallView[any] = (*TypedCall[any])(nil)
