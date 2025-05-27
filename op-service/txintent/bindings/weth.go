@@ -150,30 +150,10 @@ func decoder(data []byte) (any, error) {
 	return string(data), nil
 }
 
-// TODO: embed in basecallfactory
-func (w *WETH) Check() {
-	// panic when when lambda, they must have `sol` tag
-	t := reflect.TypeOf(*w)
-	for i := range t.NumField() {
-		field := t.Field(i)
-		fieldType := field.Type
-
-		if fieldType.Kind() != reflect.Func {
-			continue
-		}
-		if len(field.Tag.Get("sol")) == 0 {
-			panic("all function arguments must have sol tags")
-		}
-		// TODO: also check field name convention, comparing with sol tag
-	}
-}
-
 func NewWETH(f *WETHCallFactory) *WETH {
 	// infer here
 	weth := WETH{WETHCallFactory: *f}
-
-	// TOOD: implement better checker
-	weth.Check()
+	CheckImpl(weth)
 
 	v := reflect.ValueOf(&weth).Elem()
 

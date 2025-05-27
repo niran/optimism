@@ -3,6 +3,7 @@ package bindings
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -59,6 +60,26 @@ type BaseCallFactory struct {
 	BaseCodec
 }
 
+// TODO: implement better checker
+func CheckImpl(parent any) {
+	t := reflect.TypeOf(parent)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	for i := range t.NumField() {
+		field := t.Field(i)
+		fieldType := field.Type
+
+		if fieldType.Kind() != reflect.Func {
+			continue
+		}
+		// panic when when lambda, they must have `sol` tag
+		if len(field.Tag.Get("sol")) == 0 {
+			panic("all function arguments must have sol tags")
+		}
+	}
+}
+
 // Options to populate the factory
 type CallFactoryOption func(*BaseCallFactory)
 
@@ -93,6 +114,7 @@ func (b *BaseCallFactory) ApplyFactoryOptions(opts ...CallFactoryOption) {
 	}
 }
 
+// need to be eventually removed
 type BaseCodec struct {
 	ABI *abi.ABI
 }
