@@ -1,6 +1,7 @@
 package bindings
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -380,39 +381,44 @@ func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
 	// we do not need a decodeinput lambda here; no lazy evaluation
 	// _, _ = c.DecodeOutputLambda(data)
 
-	// handle op service types
-	var retout ReturnType
-	typ := reflect.TypeOf(retout)
-	switch typ {
-	case reflect.TypeOf(eth.ETH{}):
-		typ = reflect.TypeOf(big.NewInt(0))
-	default:
+	var zero ReturnType
+	retTyp := reflect.TypeOf(zero)
+
+	// Special handling for eth.ETH
+	var abiTargetType reflect.Type
+	if retTyp == reflect.TypeOf(eth.ETH{}) {
+		abiTargetType = reflect.TypeOf(big.NewInt(0))
+	} else {
+		abiTargetType = retTyp
 	}
 
-	abiType, err := script.GoTypeToABIType(typ)
+	abiType, err := script.GoTypeToABIType(abiTargetType)
 	if err != nil {
-		// TODO: proper error
-		panic(err)
-	}
-	outputs := abi.Arguments{abi.Argument{Type: abiType}}
-	out, err := outputs.Unpack(data)
-	if err != nil {
-		panic(err)
+		return zero, fmt.Errorf("failed to convert Go type to ABI type: %w", err)
 	}
 
-	var out0 *ReturnType
-	switch reflect.TypeOf(retout) {
+	outputs := abi.Arguments{{Type: abiType}}
+	decoded, err := outputs.Unpack(data)
+	if err != nil {
+		return zero, fmt.Errorf("ABI unpack error: %w", err)
+	}
+
+	// TODO: handle multiple returns
+	val := decoded[0]
+
+	// Special handling for eth.ETH
+	switch retTyp {
 	case reflect.TypeOf(eth.ETH{}):
-		out0_bef := abi.ConvertType(out[0], new(big.Int)).(*big.Int)
+		bigVal := abi.ConvertType(val, new(big.Int)).(*big.Int)
 		var concrete eth.ETH
-		if (*uint256.Int)(&concrete).SetFromBig(out0_bef) {
-			panic("result conversion failure: does not fit in uint256")
+		if (*uint256.Int)(&concrete).SetFromBig(bigVal) {
+			return zero, errors.New("result conversion failure: does not fit in uint256")
 		}
-		out0 = any(&concrete).(*ReturnType)
+		return any(concrete).(ReturnType), nil
 	default:
-		out0 = abi.ConvertType(out[0], new(ReturnType)).(*ReturnType)
+		ptr := abi.ConvertType(val, new(ReturnType)).(*ReturnType)
+		return *ptr, nil
 	}
-	return *out0, err
 }
 
 var _ txintent.CallView[any] = (*TypedCall[any])(nil)
