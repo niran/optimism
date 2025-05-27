@@ -53,8 +53,8 @@ type WETH struct {
 	Transfer2  func(dest common.Address, amount eth.ETH) Call `sol:"transfer"`
 
 	// TODO: solidity methods which starts with lowercase must be also exportable. Think about convention
-	BalanceOf3 func(addr common.Address) TypedCall[*big.Int]              `sol:"balanceOf"`
-	Transfer3  func(dest common.Address, amount *big.Int) TypedCall[bool] `sol:"transfer"`
+	BalanceOf3 func(addr common.Address) TypedCall[eth.ETH]              `sol:"balanceOf"`
+	Transfer3  func(dest common.Address, amount eth.ETH) TypedCall[bool] `sol:"transfer"`
 
 	// not using op-service types yet
 	BalanceOf4 func(addr common.Address) TypedCall[eth.ETH]              `sol:"balanceOf"`
@@ -94,8 +94,20 @@ func encoder(name string, args ...any) ([]byte, error) {
 
 	// something like makeArgs
 	inputs, outputs := []abi.Argument{}, []abi.Argument{}
+	args_translated := []any{}
 	for i, arg := range args {
-		abiTyp, err := script.GoTypeToABIType(reflect.TypeOf(arg))
+		var typ reflect.Type
+		// handle op service types
+		switch v := arg.(type) {
+		case eth.ETH:
+			argsTyped := v.ToBig()
+			typ = reflect.TypeOf(argsTyped)
+			args_translated = append(args_translated, argsTyped)
+		default:
+			typ = reflect.TypeOf(arg)
+			args_translated = append(args_translated, arg)
+		}
+		abiTyp, err := script.GoTypeToABIType(typ)
 		if err != nil {
 			panic("go type to abi type")
 		}
@@ -110,7 +122,7 @@ func encoder(name string, args ...any) ([]byte, error) {
 	// internally initializes sig and ID
 	// use dummy vars but calldata does not care
 	method := abi.NewMethod(name, name, abi.Function, "payable", false, false, inputs, outputs)
-	arguments, err := method.Inputs.Pack(args...)
+	arguments, err := method.Inputs.Pack(args_translated...)
 	if err != nil {
 		panic(err)
 	}
@@ -145,6 +157,8 @@ func decoder(data []byte) (any, error) {
 
 	// TODO: at this point, we need the return type's type to correctly decode.
 	// we do not need a lambda for decoder
+
+	// NOT used in version 3
 
 	// example: fixme
 	return string(data), nil
@@ -366,7 +380,16 @@ func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
 	// we do not need a decodeinput lambda here; no lazy evaluation
 	// _, _ = c.DecodeOutputLambda(data)
 
-	abiType, err := script.GoTypeToABIType(reflect.TypeOf(*new(ReturnType)))
+	// handle op service types
+	var retout ReturnType
+	typ := reflect.TypeOf(retout)
+	switch typ {
+	case reflect.TypeOf(eth.ETH{}):
+		typ = reflect.TypeOf(big.NewInt(0))
+	default:
+	}
+
+	abiType, err := script.GoTypeToABIType(typ)
 	if err != nil {
 		// TODO: proper error
 		panic(err)
@@ -376,7 +399,19 @@ func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
 	if err != nil {
 		panic(err)
 	}
-	out0 := abi.ConvertType(out[0], new(ReturnType)).(*ReturnType)
+
+	var out0 *ReturnType
+	switch reflect.TypeOf(retout) {
+	case reflect.TypeOf(eth.ETH{}):
+		out0_bef := abi.ConvertType(out[0], new(big.Int)).(*big.Int)
+		var concrete eth.ETH
+		if (*uint256.Int)(&concrete).SetFromBig(out0_bef) {
+			panic("result conversion failure: does not fit in uint256")
+		}
+		out0 = any(&concrete).(*ReturnType)
+	default:
+		out0 = abi.ConvertType(out[0], new(ReturnType)).(*ReturnType)
+	}
 	return *out0, err
 }
 
