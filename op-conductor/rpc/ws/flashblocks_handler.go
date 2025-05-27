@@ -13,20 +13,12 @@ import (
 )
 
 const (
-	// maxClientFailures is the number of consecutive failures before dropping a client
-	maxClientFailures = 5
 	// reconnectDelay is the delay between reconnection attempts
 	reconnectDelay = 5 * time.Second
-	// clientSendBufferSize is the buffer size for client send channels
-	clientSendBufferSize = 32
 	// pingInterval is how often to send pings to keep connections alive
 	pingInterval = 30 * time.Second
 	// pongTimeout is how long to wait for a pong response
 	pongTimeout = 10 * time.Second
-	// readTimeout for leader nodes (expecting regular activity)
-	leaderReadTimeout = 60 * time.Second
-	// readTimeout for non-leader nodes (can be longer)
-	nonLeaderReadTimeout = 120 * time.Second
 	// writeTimeout for all message writes
 	writeTimeout = 5 * time.Second
 )
@@ -64,9 +56,9 @@ type Handler struct {
 // NewHandler creates a new flashblocks handler
 func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) bool) (FlashblockHandler, error) {
 	// Validate configuration
-	if cfg.RollupBoostWsURL == "" {
-		log.Error("rollup boost WebSocket URL not configured")
-		return nil, errors.New("rollup boost WebSocket URL not configured")
+	if cfg.RollupBoostWsURL == "" || cfg.WebsocketServerPort <= 0 {
+		log.Error("rollup boost WebSocket URL or websocket server port not configured")
+		return nil, errors.New("rollup boost WebSocket URL or websocket server port not configured")
 	}
 
 	// Initialize the handler
@@ -77,7 +69,7 @@ func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) boo
 	}
 
 	// Try to establish initial connection to rollup boost WebSocket
-	const maxConnectionAttempts = 5
+	maxConnectionAttempts := 5
 	var conn *websocket.Conn
 	var err error
 
@@ -174,8 +166,7 @@ func (h *Handler) BroadcastMessage(message []byte) {
 // startWebSocketServer initializes and starts a WebSocket server
 func (h *Handler) startWebSocketServer(_ context.Context) error {
 	if h.cfg.WebsocketServerPort <= 0 {
-		h.log.Info("WebSocket server disabled, no port configured")
-		return nil
+		return fmt.Errorf("WebSocket server port not configured or invalid: %d", h.cfg.WebsocketServerPort)
 	}
 
 	// Create HTTP server with WebSocket endpoint
@@ -210,12 +201,12 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			// Try to connect if not connected
+			// Try to connect if not connected indefinitely
 			if h.rollupBoostConn == nil {
 				h.log.Info("reconnecting to rollup boost WebSocket", "url", h.cfg.RollupBoostWsURL)
 
 				// Connect with timeout
-				dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+				dialCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 				conn, _, err := websocket.Dial(dialCtx, h.cfg.RollupBoostWsURL, nil)
 				cancel()
 

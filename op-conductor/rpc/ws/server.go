@@ -11,11 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const (
-	// Client-related constants
-	broadcastBufferSize = 256
-)
-
 // Hub maintains the set of active clients and broadcasts messages to them
 type Hub struct {
 	// Registered clients
@@ -42,7 +37,7 @@ type Hub struct {
 // newHub creates a new hub
 func newHub() *Hub {
 	return &Hub{
-		broadcast:  make(chan []byte, broadcastBufferSize),
+		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
@@ -78,6 +73,7 @@ func (h *Hub) run() {
 			}
 			h.clientsMu.Unlock()
 		case message := <-h.broadcast:
+			maxClientFailures := 5
 			h.clientsMu.Lock()
 			for client := range h.clients {
 				select {
@@ -127,7 +123,7 @@ func newClient(conn *websocket.Conn, ctx context.Context, hub *Hub, logger log.L
 	ctx, cancel := context.WithCancel(ctx)
 	return &Client{
 		conn:   conn,
-		send:   make(chan []byte, clientSendBufferSize),
+		send:   make(chan []byte, 256),
 		ctx:    ctx,
 		cancel: cancel,
 		hub:    hub,
@@ -170,45 +166,36 @@ func (h *Handler) readPump(client *Client) {
 		// Check if context is done
 		select {
 		case <-client.ctx.Done():
+			// If the context is done, exit the read pump
 			return
 		default:
+			// If the context is not done, continue
 		}
 
 		// Check if we're the leader
 		isLeader := h.isLeaderFn(client.ctx)
 
-		// Determine read timeout based on leader status
-		var readTimeout time.Duration
-		if isLeader {
-			readTimeout = leaderReadTimeout
-		} else {
-			readTimeout = nonLeaderReadTimeout
-		}
-
-		// Read with timeout
-		readCtx, cancel := context.WithTimeout(client.ctx, readTimeout)
+		// Read with timeout (same for both leader and non-leader)
+		readCtx, cancel := context.WithTimeout(client.ctx, 60*time.Second)
 		messageType, _, err := client.conn.Read(readCtx)
 		cancel()
 
 		if err != nil {
 			if isLeader {
-				// If we're the leader and there's an error, log and break
-				h.log.Warn("Error reading from WebSocket client as leader",
-					"err", err)
+				// Leader: exit on any error for strict availability
+				h.log.Warn("Error reading from WebSocket client as leader", "err", err)
 				return
 			} else if errors.Is(err, context.DeadlineExceeded) {
-				// If it's a timeout and we're not the leader, just log and continue
-				h.log.Debug("Read timeout as non-leader, continuing",
-					"remote")
+				// Non-leader: continue on timeout, but exit on real errors
+				h.log.Debug("Read timeout as non-leader, continuing")
 				continue
 			} else if websocket.CloseStatus(err) != -1 {
-				// Normal close
+				// Normal close for both
 				h.log.Info("Client closed connection", "code", websocket.CloseStatus(err))
 				return
 			} else {
-				// For other errors, log and break
-				h.log.Warn("Error reading from WebSocket client",
-					"err", err)
+				// Non-leader: exit on actual connection errors
+				h.log.Warn("Error reading from WebSocket client", "err", err)
 				return
 			}
 		}
