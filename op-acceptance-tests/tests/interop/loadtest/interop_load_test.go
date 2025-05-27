@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
@@ -62,6 +64,65 @@ func TestLoad(gt *testing.T) {
 		defer wg.Done()
 		SpamInteropTxs(t, numInitTxs, L2B, L2A, sys.Supervisor)
 	}()
+}
+
+type EOA struct {
+	inner *dsl.EOA
+	nonce atomic.Uint64
+}
+
+func NewEOA(eoa *eoa.EOA) *EOA {
+	return &EOA{
+		inner: eoa,
+	}
+}
+
+func (eoa *EOA) PlanOnRejection() txplan.Option {
+	nonce := eoa.nonce.Load()
+	return txplan.Combine(eoa.inner.Plan(), txplan.WithStaticNonce(nonce))
+}
+
+func (eoa *EOA) PlanOnInclusion() txplan.Option {
+	nonce := eoa.nonce.Add(1) - 1
+	return txplan.Combine(eoa.inner.Plan(), txplan.WithStaticNonce(nonce)) // TODO retry submission and inclusion?
+}
+
+type EOAPool struct {
+	queueMu sync.Mutex
+	queue   []*EOA
+}
+
+func NewEOAPool(funder *dsl.Funder, wallet *dsl.HDWallet, size int) *EOAPool {
+	if size < 1 {
+		panic("expected positive size")
+	}
+	eoas := make([]*EOA, size)
+	var wg sync.WaitGroup
+	for i := range size {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			eoas[i] = NewEOA(funder.NewFundedEOA(eth.OneEther))
+		}()
+	}
+}
+
+func (p *EOAPool) Borrow() *EOA {
+	p.queueMu.Lock()
+	defer p.queueMu.Unlock()
+	if len(p.queue) == 0 {
+		return nil // Pool exhausted.
+	}
+	eoa := p.queue[0]
+	p.queue[0] = nil
+	p.queue = p.queue[1:]
+	return eoa
+}
+
+func (p *EOAPool) Return(eoa *EOA) {
+	p.queueMu.Lock()
+	defer p.queueMu.Unlock()
+	p.queue = append(p.queue, eoa)
 }
 
 func fundEOAs(num uint64, funder *dsl.Funder) []*dsl.EOA {
