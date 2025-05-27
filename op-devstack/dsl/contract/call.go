@@ -44,5 +44,31 @@ func Write[O any](user *dsl.EOA, call txintent.CallView[O], opts ...txplan.Optio
 	return o
 }
 
+type TestCallView3[O any] interface {
+	Test() bindings.BaseTest
+}
+
+func checkTestable3[O any](call bindings.TypedCall[O]) {
+	callTest, ok := any(call).(TestCallView3[O])
+	if !ok || callTest.Test() == nil {
+		panic(fmt.Sprintf("call of type %T does not support testing", call))
+	}
+}
+
+func Read3[O any](call bindings.TypedCall[O], opts ...txplan.Option) O {
+	checkTestable3(call)
+	o, err := contractio.Read3(call, call.Test().Ctx(), opts...)
+	call.Test().Require().NoError(err)
+	return o
+}
+
+func Write3[O any](user *dsl.EOA, call bindings.TypedCall[O], opts ...txplan.Option) *types.Receipt {
+	checkTestable3(call)
+	finalOpts := txplan.Combine(user.Plan(), txplan.Combine(opts...))
+	o, err := contractio.Write3(call, call.Test().Ctx(), finalOpts)
+	call.Test().Require().NoError(err)
+	return o
+}
+
 var _ TestCallView[eth.ETH] = (*bindings.Call_balanceOf[eth.ETH])(nil)
 var _ TestCallView[bool] = (*bindings.Call_transfer[bool])(nil)

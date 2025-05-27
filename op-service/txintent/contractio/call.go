@@ -66,7 +66,7 @@ func Plan(call txintent.Call) (txplan.Option, error) {
 	return tx, nil
 }
 
-func Write3(call *bindings.TypedCall[any], ctx context.Context, opts ...txplan.Option) (*types.Receipt, error) {
+func Write3[O any](call bindings.TypedCall[O], ctx context.Context, opts ...txplan.Option) (*types.Receipt, error) {
 	plan, err := Plan3(call)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func Write3(call *bindings.TypedCall[any], ctx context.Context, opts ...txplan.O
 	return receipt, nil
 }
 
-func Read3[O any](view *bindings.TypedCall[O], ctx context.Context, opts ...txplan.Option) (O, error) {
+func Read3[O any](view bindings.TypedCall[O], ctx context.Context, opts ...txplan.Option) (O, error) {
 	plan, err := Plan3(view)
 	if err != nil {
 		return *new(O), err
@@ -104,7 +104,7 @@ func Read3[O any](view *bindings.TypedCall[O], ctx context.Context, opts ...txpl
 	return decoded, nil
 }
 
-func Plan3[O any](call *bindings.TypedCall[O]) (txplan.Option, error) {
+func Plan3[O any](call bindings.TypedCall[O]) (txplan.Option, error) {
 	target, err := call.To()
 	if err != nil {
 		return nil, err
