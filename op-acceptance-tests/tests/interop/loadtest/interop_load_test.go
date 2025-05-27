@@ -71,7 +71,7 @@ type EOA struct {
 	nonce atomic.Uint64
 }
 
-func NewEOA(eoa *eoa.EOA) *EOA {
+func NewEOA(eoa *dsl.EOA) *EOA {
 	return &EOA{
 		inner: eoa,
 	}
@@ -92,18 +92,21 @@ type EOAPool struct {
 	queue   []*EOA
 }
 
-func NewEOAPool(funder *dsl.Funder, wallet *dsl.HDWallet, size int) *EOAPool {
+func NewEOAPool(funder *dsl.Funder, size int) *EOAPool {
 	if size < 1 {
 		panic("expected positive size")
 	}
-	eoas := make([]*EOA, size)
+	queue := make([]*EOA, size)
 	var wg sync.WaitGroup
 	for i := range size {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			eoas[i] = NewEOA(funder.NewFundedEOA(eth.OneEther))
+			queue[i] = NewEOA(funder.NewFundedEOA(eth.OneEther))
 		}()
+	}
+	return &EOAPool{
+		queue: queue,
 	}
 }
 
