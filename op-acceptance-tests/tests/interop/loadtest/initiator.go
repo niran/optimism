@@ -16,7 +16,7 @@ import (
 var rng = rand.New(rand.NewSource(1234))
 
 type Initiator interface {
-	Initiate(devtest.T, txplan.Option) []types.Message
+	Initiate(devtest.T, *SyncEOA) []types.Message
 }
 
 type ManyMsgsInitiator struct {
@@ -33,7 +33,7 @@ func NewManyMsgsInitiator(el *dsl.L2ELNode, eventLogger common.Address) *ManyMsg
 	}
 }
 
-func (in *ManyMsgsInitiator) Initiate(t devtest.T, opt txplan.Option) []types.Message {
+func (in *ManyMsgsInitiator) Initiate(t devtest.T, eoa *SyncEOA) []types.Message {
 	const numMsgs = 275 // About the max number of msgs we can create before hitting tx size limits.
 	initCalls := make([]txintent.Call, 0, numMsgs)
 	for range numMsgs {
@@ -42,7 +42,7 @@ func (in *ManyMsgsInitiator) Initiate(t devtest.T, opt txplan.Option) []types.Me
 	return buildAndSendInitTx(t, in.el, &txintent.MultiTrigger{
 		Emitter: constants.MultiCall3,
 		Calls:   initCalls,
-	}, opt)
+	}, eoa.PlanOnInclusion())
 }
 
 type LargeMsgInitiator struct {
@@ -59,13 +59,13 @@ func NewLargeMsgInitiator(el *dsl.L2ELNode, eventLogger common.Address) *LargeMs
 	}
 }
 
-func (lin *LargeMsgInitiator) Initiate(t devtest.T, opt txplan.Option) []types.Message {
+func (lin *LargeMsgInitiator) Initiate(t devtest.T, eoa *SyncEOA) []types.Message {
 	// TODO(#16039): can we create an even larger event without the event logger?
-	return buildAndSendInitTx(t, lin.el, interop.RandomInitTrigger(rng, lin.eventLogger, 4, 75_000), opt)
+	return buildAndSendInitTx(t, lin.el, interop.RandomInitTrigger(rng, lin.eventLogger, 4, 75_000), eoa.PlanOnInclusion())
 }
 
 func buildAndSendInitTx(t devtest.T, el *dsl.L2ELNode, initCall txintent.Call, opts ...txplan.Option) []types.Message {
-	initMsgsTx := txintent.NewIntent[txintent.Call, *txintent.InteropOutput](txplan.Combine(opts...), retryForever(el.Escape().EthClient()))
+	initMsgsTx := txintent.NewIntent[txintent.Call, *txintent.InteropOutput](txplan.Combine(opts...), retryInclusionForever(el.Escape().EthClient()))
 	initMsgsTx.Content.Set(initCall)
 	_, err := initMsgsTx.PlannedTx.Success.Eval(t.Ctx())
 	t.Require().NoError(err)

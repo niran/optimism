@@ -27,7 +27,7 @@ import (
 )
 
 // funderMnemonicIndex the funding account is not one of the 30 standard account, but still derived from a user-key.
-const funderMnemonicIndex = 10_000
+const funderMnemonicIndex = 1_000_000_000
 
 type DeployerOption func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder)
 

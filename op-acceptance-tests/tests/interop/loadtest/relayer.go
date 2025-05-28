@@ -18,7 +18,7 @@ import (
 )
 
 type Relayer interface {
-	Relay(devtest.T, []types.Message, txplan.Option)
+	Relay(devtest.T, []types.Message, *SyncEOA)
 }
 
 type ValidRelayer struct {
@@ -36,8 +36,8 @@ func NewValidRelayer(el *dsl.L2ELNode, supervisor *dsl.Supervisor) *ValidRelayer
 	}
 }
 
-func (e *ValidRelayer) Relay(t devtest.T, msgs []types.Message, opt txplan.Option) {
-	tx := buildRelayTx(e.el, msgs, opt, retryForever(e.el.Escape().EthClient()))
+func (e *ValidRelayer) Relay(t devtest.T, msgs []types.Message, eoa *SyncEOA) {
+	tx := buildRelayTx(e.el, msgs, eoa.PlanOnInclusion(), retryInclusionForever(e.el.Escape().EthClient()))
 	receipt, err := tx.Included.Eval(t.Ctx())
 	t.Require().NoError(err)
 	_, err = tx.Success.Eval(t.Ctx())
@@ -78,14 +78,14 @@ func NewDelayedRelayer(e *ValidRelayer, wg *sync.WaitGroup, delay time.Duration)
 	}
 }
 
-func (de *DelayedRelayer) Relay(t devtest.T, msgs []types.Message, opt txplan.Option) {
+func (de *DelayedRelayer) Relay(t devtest.T, msgs []types.Message, eoa *SyncEOA) {
 	de.wg.Add(1)
 	go func() {
 		defer de.wg.Done()
 		select {
 		case <-t.Ctx().Done():
 		case <-time.After(de.delay):
-			de.e.Relay(t, msgs, opt)
+			de.e.Relay(t, msgs, eoa)
 		}
 	}()
 }
@@ -106,13 +106,13 @@ func NewInvalidRelayer(el *dsl.L2ELNode, makeInvalid ToInvalidMsgFn) *InvalidRel
 	}
 }
 
-func (ie *InvalidRelayer) Relay(t devtest.T, validMsgs []types.Message, opt txplan.Option) {
+func (ie *InvalidRelayer) Relay(t devtest.T, validMsgs []types.Message, eoa *SyncEOA) {
 	msgs := make([]types.Message, len(validMsgs))
 	copy(msgs, validMsgs)
 	// Replace the last message with the invalid message.
 	// Merely appending can cause us to hit tx size limits if the original slice has a lot of messages.
 	msgs = append(msgs[:len(msgs)-1], ie.makeInvalid(msgs[len(msgs)-1]))
-	tx := buildRelayTx(ie.el, msgs, opt)
+	tx := buildRelayTx(ie.el, msgs, eoa.PlanOnRejection())
 	_, err := tx.Submitted.Eval(t.Ctx())
 	t.Require().ErrorContains(err, core.ErrTxFilteredOut.Error())
 }

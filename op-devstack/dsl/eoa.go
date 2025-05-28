@@ -138,6 +138,15 @@ func (u *EOA) DeployEventLogger() common.Address {
 	return eventLoggerAddress
 }
 
+func (u *EOA) DeployFaucet() common.Address {
+	txDeployFaucet := txplan.NewPlannedTx(u.Plan(), txplan.WithData(common.FromHex(bindings.FaucetBin)))
+	receipt, err := txDeployFaucet.Included.Eval(u.ctx)
+	u.require.NoError(err)
+	_, err = txDeployFaucet.Success.Eval(u.ctx)
+	u.require.NoError(err)
+	return receipt.ContractAddress
+}
+
 func (u *EOA) SendInitMessage(trigger *txintent.InitTrigger) (*txintent.IntentTx[*txintent.InitTrigger, *txintent.InteropOutput], *types.Receipt) {
 	tx := txintent.NewIntent[*txintent.InitTrigger, *txintent.InteropOutput](u.Plan())
 	tx.Content.Set(trigger)
