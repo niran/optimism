@@ -532,6 +532,8 @@ contract L2ToL2CrossDomainMessenger_RelayMessage_Test is L2ToL2CrossDomainMessen
                 && _target != foundryVMAddress
         );
 
+        assumeNotForgeAddress(_target);
+
         // ensure the target has 0 balance to avoid an overflow
         vm.deal(_target, 0);
 
