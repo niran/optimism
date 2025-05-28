@@ -2,15 +2,13 @@
 pragma solidity ^0.8.0;
 
 /// @title Faucet
-/// @notice Faucet is a util contract to airdrop Wei, primarily for efficiently funding many accounts in integration tests.
+/// @notice Faucet is a util contract to airdrop Wei, primarily for efficiently funding many accounts in integration
+/// tests.
 contract Faucet {
     /// @notice Sends Wei to recipients.
     /// @param _recipients List of recipients.
     /// @param _amount     Amount of Wei to send to each recipient.
-    function fund(
-        address[] memory _recipients,
-        uint256 _amount
-    ) external payable {
+    function fund(address[] memory _recipients, uint256 _amount) external payable {
         uint256 totalAmount = _recipients.length * _amount;
         require(msg.value >= totalAmount, "Not enough ETH sent");
 

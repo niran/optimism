@@ -78,14 +78,6 @@ func TestLoad(gt *testing.T) {
 	}()
 }
 
-func fundEOAs(num uint64, funder *dsl.Funder) []*dsl.EOA {
-	eoas := make([]*dsl.EOA, 0, num)
-	for range num {
-		eoas = append(eoas, funder.NewFundedEOA(eth.OneEther))
-	}
-	return eoas
-}
-
 func (source *L2) SpamInteropTxs(t devtest.T, numInitTxs int, dest *L2, supervisor *dsl.Supervisor) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
