@@ -38,6 +38,7 @@ var (
 	BillionEther  = Ether(1000_000_000)
 	MillionEther  = Ether(1000_000)
 	ThousandEther = Ether(1000)
+	HundredEther  = Ether(100)
 	OneEther      = Ether(1)
 	OneGWei       = GWei(1)
 	OneWei        = WeiU64(1)

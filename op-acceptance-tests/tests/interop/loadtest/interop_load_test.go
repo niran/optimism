@@ -1,25 +1,76 @@
 package loadtest
 
 import (
+	"math/big"
 	"os"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/bindings"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	opbindings "github.com/ethereum-optimism/optimism/op-service/txintent/bindings"
+	"github.com/ethereum-optimism/optimism/op-service/txintent/contractio"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
+	"github.com/ethereum/go-ethereum/common"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 const numInitTxsEnvVar = "NAT_LOADTEST_INITTXS"
 
 func TestMain(m *testing.M) {
 	presets.DoMain(m, presets.WithSimpleInterop())
+}
+
+const num = 1_650
+
+func TestDeployAirdrop(gt *testing.T) {
+	t := devtest.SerialT(gt)
+	sys := presets.NewSimpleInterop(t)
+
+	master := sys.FunderA.NewFundedEOA(eth.MillionEther.Mul(2))
+
+	tx := txplan.NewPlannedTx(master.Plan(), txplan.WithData(common.FromHex(bindings.FaucetBin)))
+	receipt, err := tx.Included.Eval(t.Ctx())
+	t.Require().NoError(err)
+	_, err = tx.Success.Eval(t.Ctx())
+	t.Require().NoError(err)
+	faucetAddress := receipt.ContractAddress
+
+	faucet := opbindings.NewFaucet(opbindings.NewFaucetFactory(
+		opbindings.WithClient(sys.L2ELA.Escape().EthClient()),
+		opbindings.WithTest(t),
+		opbindings.WithTo(faucetAddress),
+	))
+
+	eoas := make([]*dsl.EOA, 0, num)
+	addrs := make([]common.Address, 0, num)
+	for range num {
+		eoa := sys.Wallet.NewEOA(sys.L2ELA)
+		eoas = append(eoas, eoa)
+		addrs = append(addrs, eoa.Address())
+	}
+
+	receipt, err = contractio.Write(faucet.Fund(addrs, eth.OneEther.ToBig()), t.Ctx(), master.Plan(), txplan.WithValue(eth.MillionEther.ToBig()))
+	t.Require().NoError(err)
+	t.Require().Equal(ethtypes.ReceiptStatusSuccessful, receipt.Status)
+
+	for _, eoa := range eoas {
+		t.Require().Equal(eth.OneEther, eoa.GetBalance())
+	}
+
+	t.Logf("master balance: %s", master.GetBalance().EtherString())
+
+	// Ensure there is no eth left in the contract.
+	balance, err := sys.L2ELA.Escape().EthClient().BalanceAt(t.Ctx(), faucetAddress, nil)
+	t.Require().NoError(err)
+	t.Logf("contract balance: %s", eth.WeiBig(balance).EtherString())
+	t.Require().Zero(balance.Cmp(new(big.Int)))
 }
 
 type L2 struct {
@@ -64,68 +115,6 @@ func TestLoad(gt *testing.T) {
 		defer wg.Done()
 		SpamInteropTxs(t, numInitTxs, L2B, L2A, sys.Supervisor)
 	}()
-}
-
-type EOA struct {
-	inner *dsl.EOA
-	nonce atomic.Uint64
-}
-
-func NewEOA(eoa *dsl.EOA) *EOA {
-	return &EOA{
-		inner: eoa,
-	}
-}
-
-func (eoa *EOA) PlanOnRejection() txplan.Option {
-	nonce := eoa.nonce.Load()
-	return txplan.Combine(eoa.inner.Plan(), txplan.WithStaticNonce(nonce))
-}
-
-func (eoa *EOA) PlanOnInclusion() txplan.Option {
-	nonce := eoa.nonce.Add(1) - 1
-	return txplan.Combine(eoa.inner.Plan(), txplan.WithStaticNonce(nonce)) // TODO retry submission and inclusion?
-}
-
-type EOAPool struct {
-	queueMu sync.Mutex
-	queue   []*EOA
-}
-
-func NewEOAPool(funder *dsl.Funder, size int) *EOAPool {
-	if size < 1 {
-		panic("expected positive size")
-	}
-	queue := make([]*EOA, size)
-	var wg sync.WaitGroup
-	for i := range size {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			queue[i] = NewEOA(funder.NewFundedEOA(eth.OneEther))
-		}()
-	}
-	return &EOAPool{
-		queue: queue,
-	}
-}
-
-func (p *EOAPool) Borrow() *EOA {
-	p.queueMu.Lock()
-	defer p.queueMu.Unlock()
-	if len(p.queue) == 0 {
-		return nil // Pool exhausted.
-	}
-	eoa := p.queue[0]
-	p.queue[0] = nil
-	p.queue = p.queue[1:]
-	return eoa
-}
-
-func (p *EOAPool) Return(eoa *EOA) {
-	p.queueMu.Lock()
-	defer p.queueMu.Unlock()
-	p.queue = append(p.queue, eoa)
 }
 
 func fundEOAs(num uint64, funder *dsl.Funder) []*dsl.EOA {
