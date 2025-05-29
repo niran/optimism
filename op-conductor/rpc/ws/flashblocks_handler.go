@@ -9,6 +9,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/ethereum-optimism/optimism/op-conductor/metrics"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -16,7 +17,7 @@ const (
 	// reconnectDelay is the delay between reconnection attempts
 	reconnectDelay = 5 * time.Second
 	// pingInterval is how often to send pings to keep connections alive
-	pingInterval = 30 * time.Second
+	pingInterval = 15 * time.Second
 	// pongTimeout is how long to wait for a pong response
 	pongTimeout = 10 * time.Second
 	// writeTimeout for all message writes
@@ -46,6 +47,7 @@ type Handler struct {
 	cfg             Config
 	log             log.Logger
 	isLeaderFn      func(context.Context) bool
+	metrics         metrics.Metricer
 	rollupBoostConn *websocket.Conn
 	rollupBoostCtx  context.Context
 	rollupCancel    context.CancelFunc
@@ -54,7 +56,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new flashblocks handler
-func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) bool) (FlashblockHandler, error) {
+func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) bool, m metrics.Metricer) (FlashblockHandler, error) {
 	// Validate configuration
 	if cfg.RollupBoostWsURL == "" || cfg.WebsocketServerPort <= 0 {
 		log.Error("rollup boost WebSocket URL or websocket server port not configured")
@@ -66,6 +68,7 @@ func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) boo
 		cfg:        cfg,
 		log:        log,
 		isLeaderFn: isLeaderFn,
+		metrics:    m,
 	}
 
 	// Try to establish initial connection to rollup boost WebSocket
@@ -107,10 +110,6 @@ func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) boo
 
 // Start initializes and starts the flashblocks handler
 func (h *Handler) Start(ctx context.Context) error {
-	// Create and start the hub
-	h.hub = newHub()
-	go h.hub.run()
-
 	// Start the WebSocket server
 	if err := h.startWebSocketServer(ctx); err != nil {
 		return err
@@ -158,16 +157,17 @@ func (h *Handler) Stop() {
 
 // BroadcastMessage sends a message to all connected WebSocket clients
 func (h *Handler) BroadcastMessage(message []byte) {
-	if h.hub != nil {
-		h.hub.broadcast <- message
-	}
+	h.hub.broadcast <- message
 }
 
-// startWebSocketServer initializes and starts a WebSocket server
+// Your startWebSocketServer should look like this:
 func (h *Handler) startWebSocketServer(_ context.Context) error {
 	if h.cfg.WebsocketServerPort <= 0 {
 		return fmt.Errorf("WebSocket server port not configured or invalid: %d", h.cfg.WebsocketServerPort)
 	}
+
+	h.hub = newHub()
+	go h.hub.run()
 
 	// Create HTTP server with WebSocket endpoint
 	mux := http.NewServeMux()
@@ -213,6 +213,8 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 				if err != nil {
 					h.log.Warn("failed to connect to rollup boost WebSocket, will retry",
 						"err", err, "retryIn", reconnectDelay)
+					// add a metric for the number of times we've tried to connect
+					h.metrics.RecordRollupBoostConnectionAttempts(false)
 					time.Sleep(reconnectDelay)
 					continue
 				}
@@ -246,7 +248,7 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 func (h *Handler) handleRollupBoostMessage(ctx context.Context, message []byte) {
 	// Only forward messages if we're the leader - check dynamically each time
 	if !h.isLeaderFn(ctx) {
-		h.log.Debug("not forwarding rollup boost message, not the leader")
+		h.log.Trace("not forwarding rollup boost message, not the leader")
 		return
 	}
 

@@ -73,18 +73,15 @@ func (h *Hub) run() {
 			}
 			h.clientsMu.Unlock()
 		case message := <-h.broadcast:
-			maxClientFailures := 5
 			h.clientsMu.Lock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
-					client.failureCount = 0
+					// Message sent successfully
 				default:
-					client.failureCount++
-					if client.failureCount >= maxClientFailures {
-						delete(h.clients, client)
-						client.Close()
-					}
+					// Channel is full, client is likely slow/dead
+					// The ping mechanism will detect and clean up dead clients
+					h.log.Debug("Failed to send message to client, channel full")
 				}
 			}
 			h.clientsMu.Unlock()
@@ -94,19 +91,19 @@ func (h *Hub) run() {
 
 // Client represents a connected WebSocket client
 type Client struct {
-	conn         *websocket.Conn
-	send         chan []byte
-	failureCount int
-	ctx          context.Context
-	cancel       context.CancelFunc
-	mu           sync.Mutex // protects closed flag
-	closed       bool
-	hub          *Hub
-	log          log.Logger
+	conn   *websocket.Conn
+	send   chan []byte
+	ctx    context.Context
+	cancel context.CancelFunc
+	mu     sync.Mutex // protects closed flag
+	closed bool
+	hub    *Hub
+	log    log.Logger
 }
 
 // Close closes the client's WebSocket connection and send channel
 func (c *Client) Close() {
+	// this mutex is used to prevent race conditions on the closed flag
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -154,62 +151,52 @@ func (h *Handler) serveWs(w http.ResponseWriter, r *http.Request) {
 	h.readPump(client)
 }
 
-// readPump pumps messages from the WebSocket connection to the hub
+// readPump for followers where you don't expect regular data messages
 func (h *Handler) readPump(client *Client) {
+	h.log.Info("SERVER: readPump starting")
 	defer func() {
+		h.log.Info("SERVER: readPump exiting")
 		// Unregister the client when the read pump exits
 		h.hub.unregister <- client
 		h.log.Info("WebSocket read pump exited, client unregistered")
 	}()
 
 	for {
-		// Check if context is done
 		select {
 		case <-client.ctx.Done():
-			// If the context is done, exit the read pump
 			return
 		default:
-			// If the context is not done, continue
-		}
+			// Always read to process control frames (ping/pong/close)
+			readCtx, cancel := context.WithTimeout(client.ctx, 30*time.Second)
+			messageType, message, err := client.conn.Read(readCtx)
+			cancel()
 
-		// Check if we're the leader
-		isLeader := h.isLeaderFn(client.ctx)
-
-		// Read with timeout (same for both leader and non-leader)
-		readCtx, cancel := context.WithTimeout(client.ctx, 60*time.Second)
-		messageType, _, err := client.conn.Read(readCtx)
-		cancel()
-
-		if err != nil {
-			if isLeader {
-				// Leader: exit on any error for strict availability
-				h.log.Warn("Error reading from WebSocket client as leader", "err", err)
-				return
-			} else if errors.Is(err, context.DeadlineExceeded) {
-				// Non-leader: continue on timeout, but exit on real errors
-				h.log.Debug("Read timeout as non-leader, continuing")
-				continue
-			} else if websocket.CloseStatus(err) != -1 {
-				// Normal close for both
-				h.log.Info("Client closed connection", "code", websocket.CloseStatus(err))
-				return
-			} else {
-				// Non-leader: exit on actual connection errors
-				h.log.Warn("Error reading from WebSocket client", "err", err)
+			if err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					// Timeout is expected when no messages - continue reading
+					continue
+				}
+				if websocket.CloseStatus(err) != -1 {
+					h.log.Debug("Client closed connection", "code", websocket.CloseStatus(err))
+					return
+				}
+				h.log.Debug("Error reading from WebSocket client", "err", err)
 				return
 			}
-		}
 
-		// Process message if needed (we usually don't expect application messages)
-		if messageType == websocket.MessageText || messageType == websocket.MessageBinary {
-			h.log.Debug("Received message from client", "type", messageType)
+			// Handle any data messages from clients if needed
+			if messageType == websocket.MessageText || messageType == websocket.MessageBinary {
+				h.log.Debug("Received message from client", "message", string(message))
+			}
 		}
 	}
 }
 
 // writePump pumps messages from the hub to the WebSocket connection
 func (h *Handler) writePump(client *Client) {
+	h.log.Info("SERVER: writePump starting")
 	defer func() {
+		h.log.Info("SERVER: writePump exiting")
 		client.Close()
 	}()
 
@@ -239,20 +226,14 @@ func (h *Handler) writePump(client *Client) {
 				return
 			}
 
-			// Reset failure count on successful write
-			client.failureCount = 0
-
 		case <-pingTicker.C:
-			// Only send ping if we're not the leader
-			if !h.isLeaderFn(client.ctx) {
-				pingCtx, cancel := context.WithTimeout(client.ctx, pongTimeout)
-				err := client.conn.Ping(pingCtx)
-				cancel()
+			pingCtx, cancel := context.WithTimeout(client.ctx, pongTimeout)
+			err := client.conn.Ping(pingCtx)
+			cancel()
 
-				if err != nil {
-					h.log.Warn("Ping error", "err", err)
-					return
-				}
+			if err != nil {
+				h.log.Warn("Ping error", "err", err)
+				return
 			}
 		}
 	}

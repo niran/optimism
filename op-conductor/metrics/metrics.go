@@ -19,6 +19,7 @@ type Metricer interface {
 	RecordStopSequencer(success bool)
 	RecordHealthCheck(success bool, err error)
 	RecordLoopExecutionTime(duration float64)
+	RecordRollupBoostConnectionAttempts(success bool)
 	opmetrics.RPCMetricer
 }
 
@@ -35,11 +36,12 @@ type Metrics struct {
 	info prometheus.GaugeVec
 	up   prometheus.Gauge
 
-	healthChecks    *prometheus.CounterVec
-	leaderTransfers *prometheus.CounterVec
-	sequencerStarts *prometheus.CounterVec
-	sequencerStops  *prometheus.CounterVec
-	stateChanges    *prometheus.CounterVec
+	healthChecks                  *prometheus.CounterVec
+	leaderTransfers               *prometheus.CounterVec
+	sequencerStarts               *prometheus.CounterVec
+	sequencerStops                *prometheus.CounterVec
+	stateChanges                  *prometheus.CounterVec
+	rollupBoostConnectionAttempts *prometheus.CounterVec
 
 	loopExecutionTime prometheus.Histogram
 }
@@ -108,6 +110,11 @@ func NewMetrics() *Metrics {
 			Help:      "Time (in seconds) to execute conductor loop iteration",
 			Buckets:   []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
 		}),
+		rollupBoostConnectionAttempts: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: Namespace,
+			Name:      "rollup_boost_connection_attempts_count",
+			Help:      "Number of rollup boost connection attempts",
+		}, []string{"success"}),
 	}
 }
 
@@ -158,4 +165,9 @@ func (m *Metrics) RecordStopSequencer(success bool) {
 // RecordLoopExecutionTime records the time it took to execute the conductor loop.
 func (m *Metrics) RecordLoopExecutionTime(duration float64) {
 	m.loopExecutionTime.Observe(duration)
+}
+
+// RecordRollupBoostConnectionAttempts increments the rollupBoostConnectionAttempts counter.
+func (m *Metrics) RecordRollupBoostConnectionAttempts(success bool) {
+	m.rollupBoostConnectionAttempts.WithLabelValues(strconv.FormatBool(success)).Inc()
 }
