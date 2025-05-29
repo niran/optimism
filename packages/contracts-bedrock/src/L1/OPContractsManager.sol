@@ -1039,7 +1039,7 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
         );
 
         // While not a proxy, we deploy the PermissionedDisputeGame here as well because it's bespoke per chain.
-        if (_input.disputeGameType == GameTypes.SUPER_PERMISSIONED_CANNON) {
+        if (_input.disputeGameType.raw() == GameTypes.SUPER_PERMISSIONED_CANNON.raw()) {
             output.permissionedDisputeGame = IPermissionedDisputeGame(
                 Blueprint.deployFrom(
                     blueprint.superPermissionedDisputeGame1,
