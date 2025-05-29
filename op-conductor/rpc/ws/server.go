@@ -153,9 +153,7 @@ func (h *Handler) serveWs(w http.ResponseWriter, r *http.Request) {
 
 // readPump for followers where you don't expect regular data messages
 func (h *Handler) readPump(client *Client) {
-	h.log.Info("SERVER: readPump starting")
 	defer func() {
-		h.log.Info("SERVER: readPump exiting")
 		// Unregister the client when the read pump exits
 		h.hub.unregister <- client
 		h.log.Info("WebSocket read pump exited, client unregistered")
@@ -194,9 +192,7 @@ func (h *Handler) readPump(client *Client) {
 
 // writePump pumps messages from the hub to the WebSocket connection
 func (h *Handler) writePump(client *Client) {
-	h.log.Info("SERVER: writePump starting")
 	defer func() {
-		h.log.Info("SERVER: writePump exiting")
 		client.Close()
 	}()
 
