@@ -35,9 +35,8 @@ func (p *Prefetcher) fetchBlockNumberProofs(ctx context.Context, hint l2.BlockAn
 
 	// Fetch proof of block-8191 and any blocks needed in the history serve window
 	currentBlockNum := blockInfo.NumberU64()
-	currentHistoryStorageIdx := currentBlockNum % params.HistoryServeWindow
 
-	lastHistoryStorageIdx := (currentHistoryStorageIdx + 1) % params.HistoryServeWindow
+	lastHistoryStorageIdx := (currentBlockNum + 1) % params.HistoryServeWindow
 	lastHistoryStorageBlockNum := currentBlockNum - (params.HistoryServeWindow - 1)
 
 	keysToFetchPerBlockHash := make(map[common.Hash][]common.Hash)
@@ -74,7 +73,6 @@ func (p *Prefetcher) fetchBlockNumberProofs(ctx context.Context, hint l2.BlockAn
 			lastHistoryStorageIdx = (lastHistoryStorageIdx + 1) % params.HistoryServeWindow
 			lastHistoryStorageBlockNum = nextBlockInfo.NumberU64() - (params.HistoryServeWindow - 1)
 			currentBlockNum = nextBlockInfo.NumberU64()
-			currentHistoryStorageIdx = currentBlockNum % params.HistoryServeWindow
 			continue
 		}
 
