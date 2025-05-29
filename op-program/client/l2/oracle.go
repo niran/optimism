@@ -46,7 +46,7 @@ type Oracle interface {
 
 	ReceiptsByBlockHash(blockHash common.Hash, chainID eth.ChainID) (*types.Block, types.Receipts)
 
-	BlockAncestorsByNumbers(parentBlockHash common.Hash, blockNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult
+	BlockAncestorsByNumbers(parentBlockHash eth.BlockID, blockNumbers []uint64, chainID eth.ChainID) map[uint64]common.Hash
 
 	// Optional interface to provide proactive hints.
 	Hinter() l2Types.OracleHinter
@@ -210,8 +210,8 @@ func (p *PreimageOracle) ReceiptsByBlockHash(blockHash common.Hash, chainID eth.
 	return block, receipts
 }
 
-func (p *PreimageOracle) BlockAncestorsByNumbers(fromBlockHash common.Hash, ancestorNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult {
-	hint := BlockAncestorHint{FromBlockHash: fromBlockHash, BlockNumbers: ancestorNumbers, ChainID: chainID}
+func (p *PreimageOracle) BlockAncestorsByNumbers(fromBlock eth.BlockID, ancestorNumbers []uint64, chainID eth.ChainID) map[uint64]common.Hash {
+	hint := BlockAncestorHint{FromBlockHash: fromBlock.Hash, BlockNumbers: ancestorNumbers, ChainID: chainID}
 	hintHash := hint.Hash()
 
 	p.hint.Hint(hint)
@@ -219,7 +219,22 @@ func (p *PreimageOracle) BlockAncestorsByNumbers(fromBlockHash common.Hash, ance
 
 	var ancestorProofs map[common.Hash]eth.AccountResult
 	if err := json.Unmarshal(ancestorHashJson, &ancestorProofs); err != nil {
-		panic(fmt.Errorf("failed to unmarshal ancestor proofs for block %s: %w", fromBlockHash, err))
+		panic(fmt.Errorf("failed to unmarshal ancestor proofs for block %s: %w", fromBlock.Hash, err))
 	}
-	return ancestorProofs
+
+	fetchStateRoot := func(blockHash common.Hash) common.Hash {
+		block := p.BlockByHash(blockHash, chainID)
+		return block.Root()
+	}
+
+	provenBlocks, err := eth.CheckProofChain(
+		ancestorProofs,
+		fromBlock,
+		fetchStateRoot,
+	)
+	if err != nil {
+		panic(fmt.Errorf("failed to verify historical block proofs: %w", err))
+	}
+
+	return provenBlocks
 }

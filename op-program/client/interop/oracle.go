@@ -111,7 +111,7 @@ func (o *ConsolidateOracle) TransitionStateByRoot(root common.Hash) *interopType
 	return o.ts
 }
 
-func (o *ConsolidateOracle) BlockAncestorsByNumbers(parentBlockHash common.Hash, blockNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult {
+func (o *ConsolidateOracle) BlockAncestorsByNumbers(parentBlockHash eth.BlockID, blockNumbers []uint64, chainID eth.ChainID) map[uint64]common.Hash {
 	return o.o.BlockAncestorsByNumbers(parentBlockHash, blockNumbers, chainID)
 }
 

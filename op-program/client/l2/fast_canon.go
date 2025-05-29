@@ -1,8 +1,6 @@
 package l2
 
 import (
-	"math/big"
-
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -52,65 +50,12 @@ func (o *FastCanonicalBlockHeaderOracle) fetchHistoricalBlockProofs() {
 		blockNums = append(blockNums, n)
 	}
 
-	accountProofs := o.oracle.BlockAncestorsByNumbers(o.head.Hash(), blockNums, chainID)
-	stateRoots := make(map[common.Hash]common.Hash, len(accountProofs))
-	for blockHash := range accountProofs {
-		block := o.oracle.BlockByHash(blockHash, chainID)
-		stateRoots[blockHash] = block.Root()
-	}
+	provenBlocks := o.oracle.BlockAncestorsByNumbers(eth.BlockID{
+		Hash:   o.head.Hash(),
+		Number: o.head.Number.Uint64(),
+	}, blockNums, chainID)
 
-	// verify all the account proofs are valid
-	for blockHash, result := range accountProofs {
-		if result.Verify(stateRoots[blockHash]) != nil {
-			panic("failed to verify historical block proof")
-		}
-	}
-
-	currBlockHash := o.head.Hash()
-	currBlockNum := o.head.Number.Uint64()
-
-	o.canonicalBlockHashes[currBlockNum] = currBlockHash
-
-	// verify the merkle proofs indicate the correct block hashes, and store the historical blocks
-	for {
-		firstAccountProof := accountProofs[currBlockHash]
-		currentBlockStorageIdx := currBlockNum % params.HistoryServeWindow
-		earliestBlockStorageIdx := (currentBlockStorageIdx + 1) % params.HistoryServeWindow
-		earliestBlockNum := currBlockNum - (params.HistoryServeWindow - 1)
-
-		storageKeys := make(map[common.Hash]common.Hash)
-		for _, proof := range firstAccountProof.StorageProof {
-			key := common.BytesToHash(common.LeftPadBytes(proof.Key[:], 32))
-			// big endian
-			storageKeys[key] = common.Hash(proof.Value.ToInt().Bytes())
-		}
-
-		for historyIdxKey, historyBlockHash := range storageKeys {
-			historyIdx := historyIdxKey.Big().Uint64()
-			blockNum := ((historyIdx + params.HistoryServeWindow) - earliestBlockStorageIdx) + earliestBlockNum
-			blockHash := common.BigToHash(historyBlockHash.Big())
-
-			if blockHash == (common.Hash{}) {
-				panic("missing historical block hash in storage keys")
-			}
-
-			o.canonicalBlockHashes[blockNum] = blockHash
-		}
-
-		// next block is the storage slot of the earliest block in the history serve window
-		nextBlockHash, ok := storageKeys[common.BigToHash(big.NewInt(int64(earliestBlockStorageIdx)))]
-		if !ok {
-			break
-		}
-		if nextBlockHash == (common.Hash{}) {
-			// If we don't have a next block hash, we cannot serve historical blocks
-			return
-		}
-
-		currBlockNum = earliestBlockNum
-		currBlockHash = nextBlockHash
-	}
-
+	o.canonicalBlockHashes = provenBlocks
 }
 
 func (o *FastCanonicalBlockHeaderOracle) GetHeaderByNumber(n uint64) *types.Header {

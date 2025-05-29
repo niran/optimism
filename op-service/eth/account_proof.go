@@ -2,12 +2,15 @@ package eth
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb/memorydb"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 )
@@ -98,4 +101,76 @@ type ProofParams struct {
 	BlockHash common.Hash
 	Address   common.Address
 	Storage   []common.Hash
+}
+
+var (
+	ErrInvalidProof              = errors.New("failed to verify historical block proof")
+	ErrInvalidStorageHistoryHash = errors.New(
+		"invalid storage history hash, expected to be a valid historical block hash",
+	)
+)
+
+// CheckProofChain verifies a chain of account proofs and returns a map of block numbers to their hashes
+// using EIP-2935 block hash history contracts to jump 8190 blocks back in history.
+func CheckProofChain(accountProofs map[common.Hash]AccountResult, chainHead BlockID, fetchStateRoot func(common.Hash) common.Hash) (map[uint64]common.Hash, error) {
+	provenBlockHashes := make(map[uint64]common.Hash)
+
+	// verify all the account proofs are valid
+	for blockHash, result := range accountProofs {
+		if result.Verify(fetchStateRoot(blockHash)) != nil {
+			return nil, ErrInvalidProof
+		}
+	}
+
+	currBlockHash := chainHead.Hash
+	currBlockNum := chainHead.Number
+
+	provenBlockHashes[currBlockNum] = currBlockHash
+
+	// starting with the first block, we will iterate backwards through the history serve window
+	for {
+		currAccountProof := accountProofs[currBlockHash]
+		currBlockStorageIdx := currBlockNum % params.HistoryServeWindow
+		earliestBlockStorageIdx := (currBlockStorageIdx + 1) % params.HistoryServeWindow
+		earliestBlockNum := currBlockNum - (params.HistoryServeWindow - 1)
+
+		storageKeys := make(map[common.Hash]common.Hash)
+		for _, proof := range currAccountProof.StorageProof {
+			key := common.BytesToHash(common.LeftPadBytes(proof.Key[:], 32))
+			// big endian
+			storageKeys[key] = common.Hash(proof.Value.ToInt().Bytes())
+		}
+
+		for historyIdxKey, historyBlockHash := range storageKeys {
+			historyIdx := historyIdxKey.Big().Uint64()
+			blockNum := ((historyIdx + params.HistoryServeWindow) - earliestBlockStorageIdx) + earliestBlockNum
+			blockHash := common.BigToHash(historyBlockHash.Big())
+
+			if blockHash == (common.Hash{}) {
+				return nil, fmt.Errorf(
+					"block %d: %w",
+					blockNum,
+					ErrInvalidStorageHistoryHash,
+				)
+			}
+
+			provenBlockHashes[blockNum] = blockHash
+		}
+
+		// next block is the storage slot of the earliest block in the history serve window
+		nextBlockHash, ok := storageKeys[common.BigToHash(big.NewInt(int64(earliestBlockStorageIdx)))]
+		if !ok {
+			break
+		}
+		if nextBlockHash == (common.Hash{}) {
+			// If we don't have a next block hash, we cannot serve historical blocks
+			return nil, fmt.Errorf("block %d: %w",
+				earliestBlockNum, ErrInvalidStorageHistoryHash)
+		}
+
+		currBlockNum = earliestBlockNum
+		currBlockHash = nextBlockHash
+	}
+
+	return provenBlockHashes, nil
 }

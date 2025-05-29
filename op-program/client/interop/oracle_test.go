@@ -236,9 +236,9 @@ func (o *OracleMock) CodeByHash(codeHash common.Hash, chainID eth.ChainID) []byt
 	return args.Get(0).([]byte)
 }
 
-func (o *OracleMock) BlockAncestorsByNumbers(parentBlockHash common.Hash, blockNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult {
+func (o *OracleMock) BlockAncestorsByNumbers(parentBlockHash eth.BlockID, blockNumbers []uint64, chainID eth.ChainID) map[uint64]common.Hash {
 	args := o.Called(parentBlockHash, blockNumbers, chainID)
-	if res, ok := args.Get(0).(map[common.Hash]eth.AccountResult); ok {
+	if res, ok := args.Get(0).(map[uint64]common.Hash); ok {
 		return res
 	}
 	return nil
