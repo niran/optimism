@@ -880,6 +880,16 @@ func (m *l2Client) PayloadExecutionWitness(ctx context.Context, parentHash commo
 	return nil, hostcommon.ErrExperimentalPrefetchFailed
 }
 
+func (m *l2Client) InfoByNumber(ctx context.Context, blockNum uint64) (eth.BlockInfo, error) {
+	out := m.Mock.MethodCalled("InfoByNumber", blockNum)
+	return out[0].(eth.BlockInfo), *out[1].(*error)
+}
+
+func (m *l2Client) BatchGetProofs(ctx context.Context, proofs []eth.ProofParams) (map[common.Hash]eth.AccountResult, error) {
+	out := m.Mock.MethodCalled("BatchGetProofs", proofs)
+	return out[0].(map[common.Hash]eth.AccountResult), *out[1].(*error)
+}
+
 func (m *l2Client) OutputByRoot(ctx context.Context, blockHash common.Hash) (eth.Output, error) {
 	out := m.Mock.MethodCalled("OutputByRoot", blockHash)
 	return out[0].(eth.Output), *out[1].(*error)

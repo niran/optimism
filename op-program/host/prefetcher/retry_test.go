@@ -391,6 +391,25 @@ func (m *MockL2Source) PayloadExecutionWitness(ctx context.Context, parentHash c
 	out := m.Mock.MethodCalled("PayloadExecutionWitness", parentHash, payloadAttributes)
 	return out[0].(*eth.ExecutionWitness), *out[1].(*error)
 }
+
+func (m *MockL2Source) BatchGetProofs(ctx context.Context, proofsToFetch []eth.ProofParams) (map[common.Hash]eth.AccountResult, error) {
+	out := m.Mock.MethodCalled("BatchGetProofs", proofsToFetch)
+	if out.Get(0) == nil {
+		return nil, *out[1].(*error)
+	}
+	proofs := out.Get(0).(map[common.Hash]eth.AccountResult)
+	return proofs, *out[1].(*error)
+}
+
+func (m *MockL2Source) InfoByNumber(ctx context.Context, blockNumber uint64) (eth.BlockInfo, error) {
+	out := m.Mock.MethodCalled("InfoByNumber", blockNumber)
+	if out.Get(0) == nil {
+		return nil, *out[1].(*error)
+	}
+	info := out.Get(0).(eth.BlockInfo)
+	return info, *out[1].(*error)
+}
+
 func (m *MockL2Source) GetProof(ctx context.Context, address common.Address, storage []common.Hash, blockTag string) (*eth.AccountResult, error) {
 	out := m.Mock.MethodCalled("GetProof", address, storage, blockTag)
 	return out[0].(*eth.AccountResult), *out[1].(*error)

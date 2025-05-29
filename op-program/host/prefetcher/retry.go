@@ -121,6 +121,16 @@ func (s *RetryingL2Source) InfoAndTxsByHash(ctx context.Context, blockHash commo
 	})
 }
 
+func (s *RetryingL2Source) InfoByNumber(ctx context.Context, blockNum uint64) (eth.BlockInfo, error) {
+	return retry.Do(ctx, maxAttempts, s.strategy, func() (eth.BlockInfo, error) {
+		i, err := s.source.InfoByNumber(ctx, blockNum)
+		if err != nil {
+			s.logger.Warn("Failed to retrieve l2 info by number", "number", blockNum, "err", err)
+		}
+		return i, err
+	})
+}
+
 func (s *RetryingL2Source) NodeByHash(ctx context.Context, hash common.Hash) ([]byte, error) {
 	return retry.Do(ctx, maxAttempts, s.strategy, func() ([]byte, error) {
 		n, err := s.source.NodeByHash(ctx, hash)
@@ -181,6 +191,14 @@ func (s *RetryingL2Source) GetProof(ctx context.Context, address common.Address,
 func (s *RetryingL2Source) PayloadExecutionWitness(ctx context.Context, parentHash common.Hash, payloadAttributes eth.PayloadAttributes) (*eth.ExecutionWitness, error) {
 	// these aren't retried because they are currently experimental and can be slow
 	return s.source.PayloadExecutionWitness(ctx, parentHash, payloadAttributes)
+}
+
+func (s *RetryingL2Source) BatchGetProofs(ctx context.Context, proofsToFetch []eth.ProofParams) (map[common.Hash]eth.AccountResult, error) {
+	proofs, err := s.source.BatchGetProofs(ctx, proofsToFetch)
+	if err != nil {
+		s.logger.Warn("Failed to batch get proofs", "err", err)
+	}
+	return proofs, err
 }
 
 func NewRetryingL2Source(logger log.Logger, source hosttypes.L2Source) *RetryingL2Source {

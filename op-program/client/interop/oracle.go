@@ -111,6 +111,10 @@ func (o *ConsolidateOracle) TransitionStateByRoot(root common.Hash) *interopType
 	return o.ts
 }
 
+func (o *ConsolidateOracle) BlockAncestorsByNumbers(parentBlockHash common.Hash, blockNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult {
+	return o.o.BlockAncestorsByNumbers(parentBlockHash, blockNumbers, chainID)
+}
+
 func (o *ConsolidateOracle) headerByBlockHash(blockHash common.Hash) *types.Header {
 	blockHashKey := preimage.Keccak256Key(blockHash).PreimageKey()
 	headerRlp, err := o.db.Get(blockHashKey[:])

@@ -107,3 +107,8 @@ func (o *CachingOracle) TransitionStateByRoot(root common.Hash) *interopTypes.Tr
 	// Don't bother caching as this is only requested once as part of the bootstrap process
 	return o.oracle.TransitionStateByRoot(root)
 }
+
+func (o *CachingOracle) BlockAncestorsByNumbers(parentBlockHash common.Hash, blockNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult {
+	// Always request from the oracle even on cache hit. as we want the effects of the host oracle hinting
+	return o.oracle.BlockAncestorsByNumbers(parentBlockHash, blockNumbers, chainID)
+}

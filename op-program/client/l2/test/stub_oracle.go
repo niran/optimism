@@ -102,6 +102,10 @@ func (o StubBlockOracle) ReceiptsByBlockHash(blockHash common.Hash, chainID eth.
 	return o.BlockByHash(blockHash, chainID), receipts
 }
 
+func (o StubBlockOracle) BlockAncestorsByNumbers(parentBlockHash common.Hash, blockNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult {
+	panic("not implemented")
+}
+
 // KvStateOracle loads data from a source ethdb.KeyValueStore
 type KvStateOracle struct {
 	T      *testing.T

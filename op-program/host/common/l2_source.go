@@ -117,6 +117,14 @@ func (l *L2Source) InfoAndTxsByHash(ctx context.Context, blockHash common.Hash) 
 	return l.canonicalEthClient.InfoAndTxsByHash(ctx, blockHash)
 }
 
+// InfoByNumber implements prefetcher.L2Source.
+func (l *L2Source) InfoByNumber(ctx context.Context, blockNum uint64) (eth.BlockInfo, error) {
+	if l.ExperimentalEnabled() {
+		return l.experimentalClient.InfoByNumber(ctx, blockNum)
+	}
+	return l.canonicalEthClient.InfoByNumber(ctx, blockNum)
+}
+
 // OutputByRoot implements prefetcher.L2Source.
 func (l *L2Source) OutputByRoot(ctx context.Context, blockRoot common.Hash) (eth.Output, error) {
 	if l.ExperimentalEnabled() {
@@ -147,6 +155,37 @@ func (l *L2Source) PayloadExecutionWitness(ctx context.Context, parentHash commo
 		return nil, ErrExperimentalPrefetchFailed
 	}
 	return witness, nil
+}
+
+func (l *L2Source) BatchGetProofs(ctx context.Context, proofsToFetch []eth.ProofParams) (map[common.Hash]eth.AccountResult, error) {
+	var proofs []*eth.AccountResult
+	var err error
+	if l.ExperimentalEnabled() {
+		proofs, err = l.experimentalClient.BatchGetProofs(ctx, proofsToFetch)
+
+	} else {
+		proofs, err = l.canonicalEthClient.BatchGetProofs(ctx, proofsToFetch)
+	}
+
+	if err != nil {
+		l.logger.Error("Failed to fetch batch proofs", "err", err)
+		return nil, ErrExperimentalPrefetchFailed
+	}
+
+	if len(proofs) != len(proofsToFetch) {
+		l.logger.Error("Batch proofs length mismatch", "expected", len(proofsToFetch), "got", len(proofs))
+		return nil, errors.New("batch proofs length mismatch")
+	}
+
+	proofMap := make(map[common.Hash]eth.AccountResult, len(proofs))
+	for i, proof := range proofs {
+		proofParams := proofsToFetch[i]
+		if proof == nil {
+			continue
+		}
+		proofMap[proofParams.BlockHash] = *proof
+	}
+	return proofMap, nil
 }
 
 // GetProof implements prefetcher.L2Source.

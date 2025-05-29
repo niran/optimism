@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/processors"
 	supervisortypes "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -263,7 +262,15 @@ func newConsolidateCheckDeps(
 			return nil, fmt.Errorf("no chain config available for chain ID %v: %w", chain.ChainID, err)
 		}
 		fallback := l2.NewCanonicalBlockHeaderOracle(head.Header(), blockByHash)
-		canonBlocks[chain.ChainID] = l2.NewFastCanonicalBlockHeaderOracle(head.Header(), blockByHash, l2ChainConfig, oracle, rawdb.NewMemoryDatabase(), fallback)
+
+		blockNumberSet := make(map[uint64]struct{})
+		for _, logs := range consolidateState.execMessageCache {
+			for _, execMsg := range logs.execMsgs {
+				blockNumberSet[execMsg.BlockNum] = struct{}{}
+			}
+		}
+
+		canonBlocks[chain.ChainID] = l2.NewFastCanonicalBlockHeaderOracle(head.Header(), blockByHash, l2ChainConfig, oracle, fallback, blockNumberSet)
 	}
 
 	return &consolidateCheckDeps{

@@ -236,6 +236,14 @@ func (o *OracleMock) CodeByHash(codeHash common.Hash, chainID eth.ChainID) []byt
 	return args.Get(0).([]byte)
 }
 
+func (o *OracleMock) BlockAncestorsByNumbers(parentBlockHash common.Hash, blockNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult {
+	args := o.Called(parentBlockHash, blockNumbers, chainID)
+	if res, ok := args.Get(0).(map[common.Hash]eth.AccountResult); ok {
+		return res
+	}
+	return nil
+}
+
 func (o *OracleMock) Hinter() l2Types.OracleHinter {
 	args := o.Called()
 	return args.Get(0).(l2Types.OracleHinter)

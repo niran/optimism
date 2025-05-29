@@ -93,3 +93,9 @@ func (res *AccountResult) Verify(stateRoot common.Hash) error {
 	}
 	return err
 }
+
+type ProofParams struct {
+	BlockHash common.Hash
+	Address   common.Address
+	Storage   []common.Hash
+}

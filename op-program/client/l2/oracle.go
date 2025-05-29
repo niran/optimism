@@ -1,6 +1,7 @@
 package l2
 
 import (
+	"encoding/json"
 	"fmt"
 
 	interopTypes "github.com/ethereum-optimism/optimism/op-program/client/interop/types"
@@ -44,6 +45,8 @@ type Oracle interface {
 	TransitionStateByRoot(root common.Hash) *interopTypes.TransitionState
 
 	ReceiptsByBlockHash(blockHash common.Hash, chainID eth.ChainID) (*types.Block, types.Receipts)
+
+	BlockAncestorsByNumbers(parentBlockHash common.Hash, blockNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult
 
 	// Optional interface to provide proactive hints.
 	Hinter() l2Types.OracleHinter
@@ -205,4 +208,18 @@ func (p *PreimageOracle) ReceiptsByBlockHash(blockHash common.Hash, chainID eth.
 		panic(fmt.Errorf("failed to decode receipts for block %v: %w", block.Hash(), err))
 	}
 	return block, receipts
+}
+
+func (p *PreimageOracle) BlockAncestorsByNumbers(fromBlockHash common.Hash, ancestorNumbers []uint64, chainID eth.ChainID) map[common.Hash]eth.AccountResult {
+	hint := BlockAncestorHint{FromBlockHash: fromBlockHash, BlockNumbers: ancestorNumbers, ChainID: chainID}
+	hintHash := hint.Hash()
+
+	p.hint.Hint(hint)
+	ancestorHashJson := p.oracle.Get(preimage.Keccak256Key(hintHash))
+
+	var ancestorProofs map[common.Hash]eth.AccountResult
+	if err := json.Unmarshal(ancestorHashJson, &ancestorProofs); err != nil {
+		panic(fmt.Errorf("failed to unmarshal ancestor proofs for block %s: %w", fromBlockHash, err))
+	}
+	return ancestorProofs
 }

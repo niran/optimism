@@ -517,6 +517,28 @@ func (p *Prefetcher) prefetch(ctx context.Context, hint string) error {
 		}
 		hash := crypto.Keccak256Hash(p.agreedPrestate)
 		return p.kvStore.Put(preimage.Keccak256Key(hash).PreimageKey(), p.agreedPrestate)
+	case l2.HintL2BlockAncestors:
+		hintBytesLen := len(hintBytes)
+		if hintBytesLen < 32+8 || (hintBytesLen-32-8)%8 != 0 {
+			return fmt.Errorf("invalid L2 block ancestors hint: %x", hintBytes)
+		}
+
+		hintBytesWithoutChainIDAndHash := hintBytes[:32+8]
+
+		numBlocks := (hintBytesLen - len(hintBytesWithoutChainIDAndHash)) / 8
+
+		blockNums := make([]uint64, numBlocks)
+		for i := 0; i < numBlocks; i++ {
+			blockNums[i] = binary.BigEndian.Uint64(hintBytesWithoutChainIDAndHash[32+i*8 : 32+(i+1)*8])
+		}
+
+		hint := l2.BlockAncestorHint{
+			FromBlockHash: common.Hash(hintBytesWithoutChainIDAndHash[:32]),
+			BlockNumbers:  blockNums,
+			ChainID:       eth.ChainIDFromUInt64(binary.BigEndian.Uint64(hintBytesWithoutChainIDAndHash[32:])),
+		}
+
+		return p.fetchBlockNumberProofs(ctx, hint)
 	case l2.HintL2StateNode, l2.HintL2Code:
 		// handle state access hints separately to allow for bulk fetching
 		return p.prefetchState(ctx, hint)

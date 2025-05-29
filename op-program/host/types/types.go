@@ -21,6 +21,8 @@ var SupportedDataFormats = []DataFormat{DataFormatFile, DataFormatDirectory, Dat
 
 type L2Source interface {
 	InfoAndTxsByHash(ctx context.Context, blockHash common.Hash) (eth.BlockInfo, types.Transactions, error)
+	InfoByNumber(ctx context.Context, blockNumber uint64) (eth.BlockInfo, error)
+	BatchGetProofs(ctx context.Context, proofsToFetch []eth.ProofParams) (map[common.Hash]eth.AccountResult, error)
 	NodeByHash(ctx context.Context, hash common.Hash) ([]byte, error)
 	CodeByHash(ctx context.Context, hash common.Hash) ([]byte, error)
 	FetchReceipts(ctx context.Context, blockHash common.Hash) (eth.BlockInfo, types.Receipts, error)

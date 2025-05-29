@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	preimage "github.com/ethereum-optimism/optimism/op-preimage"
 )
@@ -25,6 +26,7 @@ const (
 	HintAgreedPrestate   = "agreed-pre-state"
 	HintL2AccountProof   = "l2-account-proof"
 	HintL2PayloadWitness = "l2-payload-witness"
+	HintL2BlockAncestors = "l2-block-ancestors"
 )
 
 type LegacyBlockHeaderHint common.Hash
@@ -184,4 +186,32 @@ func (l PayloadWitnessHint) Hint() string {
 	}
 
 	return HintL2PayloadWitness + " " + hexutil.Encode(marshaled)
+}
+
+type BlockAncestorHint struct {
+	FromBlockHash common.Hash
+	BlockNumbers  []uint64
+	ChainID       eth.ChainID
+}
+
+var _ preimage.Hint = BlockAncestorHint{}
+
+func (l BlockAncestorHint) Hash() common.Hash {
+	hintBytes := make([]byte, 32+8+8*len(l.BlockNumbers))
+	copy(hintBytes[:32], l.FromBlockHash.Bytes())
+	binary.BigEndian.PutUint64(hintBytes[32:], eth.EvilChainIDToUInt64(l.ChainID))
+	for i, blockNumber := range l.BlockNumbers {
+		binary.BigEndian.PutUint64(hintBytes[32+i*8:40+i*8], blockNumber)
+	}
+	return crypto.Keccak256Hash(hintBytes)
+}
+
+func (l BlockAncestorHint) Hint() string {
+	hintBytes := make([]byte, 32+8+8*len(l.BlockNumbers))
+	copy(hintBytes[:32], l.FromBlockHash.Bytes())
+	binary.BigEndian.PutUint64(hintBytes[32:], eth.EvilChainIDToUInt64(l.ChainID))
+	for i, blockNumber := range l.BlockNumbers {
+		binary.BigEndian.PutUint64(hintBytes[32+i*8:40+i*8], blockNumber)
+	}
+	return HintL2BlockAncestors + " " + hexutil.Encode(hintBytes)
 }
