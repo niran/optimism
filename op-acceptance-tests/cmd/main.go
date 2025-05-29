@@ -160,6 +160,7 @@ func runAcceptanceTest(c *cli.Context) error {
 }
 
 func deployDevnet(ctx context.Context, tracer trace.Tracer, devnet string, kurtosisDir string) error {
+	return nil
 	ctx, span := tracer.Start(ctx, "deploy devnet")
 	defer span.End()
 

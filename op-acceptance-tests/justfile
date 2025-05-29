@@ -36,6 +36,7 @@ acceptance-test devnet="simple" gate="holocene":
 
         # Print which binary is being used
         BINARY_PATH=$(mise which op-acceptor)
+        BINARY_PATH=../../infra/op-acceptor/bin/op-acceptor
         echo "Using mise-managed binary: $BINARY_PATH"
         go run cmd/main.go \
             --devnet "{{devnet}}-devnet" \

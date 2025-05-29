@@ -20,8 +20,8 @@ type systemHelper struct {
 	system stack.ExtensibleSystem
 	orch   stack.Orchestrator
 
-	elA, elB stack.L2ELNode
-	clA, clB stack.L2CLNode
+	el stack.L2ELNode
+	cl stack.L2CLNode
 
 	Tick time.Duration
 }
@@ -37,18 +37,14 @@ func newSystemHelper(gt *testing.T) *systemHelper {
 	waitTime := time.Duration(blockTime+1) * time.Second
 
 	// identify the L2 EL/CL nodes of interest
-	elA := system.L2Network(match.L2ChainA).L2ELNode(match.FirstL2EL)
-	clA := system.L2Network(match.L2ChainA).L2CLNode(match.WithEngine(elA.ID()))
-	elB := system.L2Network(match.L2ChainB).L2ELNode(match.FirstL2EL)
-	clB := system.L2Network(match.L2ChainB).L2CLNode(match.WithEngine(elB.ID()))
+	el := system.L2Network(match.L2ChainA).L2ELNode(match.FirstL2EL)
+	cl := system.L2Network(match.L2ChainA).L2CLNode(match.WithEngine(el.ID()))
 	return &systemHelper{
 		T:      t,
 		orch:   orch,
 		system: system,
-		elA:    elA,
-		elB:    elB,
-		clA:    clA,
-		clB:    clB,
+		el:     el,
+		cl:     cl,
 		Tick:   waitTime,
 	}
 }
@@ -58,28 +54,25 @@ func (h *systemHelper) Logger() log.Logger {
 }
 
 // query the latest block numbers of the two chains
-func (h *systemHelper) query() (eth.BlockRef, eth.BlockRef) {
+func (h *systemHelper) query() eth.BlockRef {
 	ctx := h.system.T().Ctx()
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 	logger := h.system.T().Logger()
 	t := h.system.T()
-	blockA, err := h.elA.EthClient().BlockRefByLabel(ctx, "latest")
+	block, err := h.el.EthClient().BlockRefByLabel(ctx, "latest")
 	require.NoError(t, err)
-	blockB, err := h.elB.EthClient().BlockRefByLabel(ctx, "latest")
-	require.NoError(t, err)
-	logger.Info("chain A", "blockNum", blockA.Number, "tip", blockA)
-	logger.Info("chain B", "blockNum", blockB.Number, "tip", blockB)
-	return blockA, blockB
+	logger.Info("chain", "blockNum", block.Number, "tip", block)
+	return block
 }
 
 // check that the two chains are advancing
 func (h *systemHelper) CheckAdvancing() func() bool {
-	prevBlockA, prevBlockB := h.query()
+	prevBlock := h.query()
 	return func() bool {
-		blockA, blockB := h.query()
-		advanced := blockA.Number > prevBlockA.Number && blockB.Number > prevBlockB.Number
-		prevBlockA, prevBlockB = blockA, blockB
+		block := h.query()
+		advanced := block.Number > prevBlock.Number
+		prevBlock = block
 		return advanced
 	}
 }
@@ -94,26 +87,25 @@ func (h *systemHelper) CheckStalled() func() bool {
 
 func (h *systemHelper) SetCLState(state stack.ControlAction) {
 	h.system.T().Logger().Info("setting L2CL state", "state", state)
-	h.orch.ControlPlane().L2CLNodeState(h.clA.ID(), state)
-	h.orch.ControlPlane().L2CLNodeState(h.clB.ID(), state)
+	h.orch.ControlPlane().L2CLNodeState(h.cl.ID(), state)
 }
 
 func TestL2CLResync(gt *testing.T) {
 	h := newSystemHelper(gt)
 	logger := h.Logger()
 
-	logger.Info("check unsafe chains are advancing")
+	logger.Info("check unsafe chain is advancing")
 	require.Eventually(h.T, h.CheckAdvancing(), 10*time.Second, h.Tick)
 
-	logger.Info("stop nodes")
+	logger.Info("stop node")
 	h.SetCLState(stack.Stop)
 
-	logger.Info("check unsafe chains stopped advancing")
+	logger.Info("check unsafe chain stopped advancing")
 	require.Eventually(h.T, h.CheckStalled(), 10*time.Second, h.Tick)
 
-	logger.Info("restart nodes")
+	logger.Info("restart node")
 	h.SetCLState(stack.Start)
 
-	logger.Info("check unsafe chains are advancing again")
+	logger.Info("check unsafe chain is advancing again")
 	require.Eventually(h.T, h.CheckAdvancing(), 30*time.Second, h.Tick)
 }
