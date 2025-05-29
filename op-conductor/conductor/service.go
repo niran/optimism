@@ -305,7 +305,7 @@ func (c *OpConductor) initFlashblocksHandler(ctx context.Context) error {
 		WebsocketServerPort: c.cfg.WebsocketServerPort,
 	}, c.log, func(ctx context.Context) bool {
 		return c.Leader(ctx)
-	})
+	}, c.metrics)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to create flashblocks handler")

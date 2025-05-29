@@ -16,3 +16,4 @@ func (*NoopMetricsImpl) RecordStartSequencer(success bool)                      
 func (*NoopMetricsImpl) RecordStopSequencer(success bool)                         {}
 func (*NoopMetricsImpl) RecordHealthCheck(success bool, err error)                {}
 func (*NoopMetricsImpl) RecordLoopExecutionTime(duration float64)                 {}
+func (*NoopMetricsImpl) RecordRollupBoostConnectionAttempts(success bool)         {}
