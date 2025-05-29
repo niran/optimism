@@ -59,27 +59,61 @@ func (c *Constant) Adjust(Metrics) {}
 
 // AIMD scheduler (additive-increase, multiplicative-decrease).
 type AIMD struct {
-	rps               atomic.Uint64
-	maxRPS            uint64
-	addRPS            uint64  // additive delta
-	multRPS           float64 // multiplicative factor (<1.0)
+	// rps can be thought of to mean "requests per slot", although the unit and quantity are flexible.
+	rps    atomic.Uint64
+	maxRPS uint64
+
+	increaseDelta  uint64  // additive delta
+	decreaseFactor float64 // multiplicative factor
+
 	failRateThreshold float64 // when to start decreasing (e.g., 0.05 of all requests are failures)
-	slot              time.Duration
-	ready             chan struct{}
+
+	slotTime time.Duration
+	ready    chan struct{}
 }
 
 var _ Schedule = (*AIMD)(nil)
 
-func NewAIMD(baseRPS, maxRPS, addRPS uint64, multRPS float64, failRate float64, slot time.Duration) *AIMD {
-	c := &AIMD{
-		maxRPS:  maxRPS,
-		addRPS:  addRPS,
-		multRPS: multRPS,
-		ready:   make(chan struct{}),
-		slot:    slot,
+func NewAIMD(baseRPS uint64, slotTime time.Duration, opts ...AIMDOption) *AIMD {
+	aimd := &AIMD{
+		maxRPS:            10 * baseRPS,
+		increaseDelta:     max(baseRPS/10, 1),
+		decreaseFactor:    0.5,
+		failRateThreshold: 0.05,
+		ready:             make(chan struct{}),
+		slotTime:          slotTime,
 	}
-	c.rps.Store(baseRPS)
-	return c
+	aimd.rps.Store(baseRPS)
+	for _, opt := range opts {
+		opt(aimd)
+	}
+	return aimd
+}
+
+type AIMDOption func(*AIMD)
+
+func WithMaxRPS(maxRPS uint64) AIMDOption {
+	return func(aimd *AIMD) {
+		aimd.maxRPS = maxRPS
+	}
+}
+
+func WithIncreaseDelta(delta uint64) AIMDOption {
+	return func(aimd *AIMD) {
+		aimd.increaseDelta = delta
+	}
+}
+
+func WithDecreaseFactor(factor float64) AIMDOption {
+	return func(aimd *AIMD) {
+		aimd.decreaseFactor = factor
+	}
+}
+
+func WithFailRateThreshold(threshold float64) AIMDOption {
+	return func(aimd *AIMD) {
+		aimd.failRateThreshold = threshold
+	}
 }
 
 func (c *AIMD) Start(ctx context.Context) {
@@ -88,7 +122,7 @@ func (c *AIMD) Start(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(c.slot / time.Duration(c.rps.Load())):
+		case <-time.After(c.slotTime / time.Duration(c.rps.Load())):
 			select {
 			case c.ready <- struct{}{}:
 			default: // Skip if readers are not ready.
@@ -100,10 +134,10 @@ func (c *AIMD) Start(ctx context.Context) {
 func (c *AIMD) Adjust(m Metrics) {
 	failRate := float64(m.Failed) / float64(m.Submitted+1)
 	if failRate > c.failRateThreshold {
-		newRPS := max(uint64(float64(c.rps.Load())*c.multRPS), 1)
+		newRPS := max(uint64(float64(c.rps.Load())*c.decreaseFactor), 1)
 		c.rps.Store(newRPS)
 	} else {
-		newRPS := min(c.rps.Load()+c.addRPS, c.maxRPS)
+		newRPS := min(c.rps.Load()+c.increaseDelta, c.maxRPS)
 		c.rps.Store(newRPS)
 	}
 }

@@ -1,10 +1,10 @@
-package loadtest2
+package runner
 
 import (
 	"context"
 	"sync"
 
-	"github.com/ethereum-optimism/optimism/op-acceptance-tests/tests/interop/loadtest/loadtest2/schedule"
+	"github.com/ethereum-optimism/optimism/op-acceptance-tests/tests/interop/loadtest2/schedule"
 )
 
 type Sender interface {
@@ -19,7 +19,7 @@ type Runner struct {
 	numSubmitters uint
 }
 
-func NewRunner(sched schedule.Schedule, prod Sender, numSubmitters uint) *Runner {
+func New(sched schedule.Schedule, prod Sender, numSubmitters uint) *Runner {
 	return &Runner{
 		sched:         sched,
 		sender:        prod,
@@ -28,18 +28,11 @@ func NewRunner(sched schedule.Schedule, prod Sender, numSubmitters uint) *Runner
 }
 
 func (r *Runner) Start(ctx context.Context) {
-	var wg sync.WaitGroup
-	defer wg.Wait()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		r.sched.Start(ctx)
-	}()
-
 	// Send transactions on schedule, adjusting the schedule based on the result.
 	// Because waiting for inclusion takes a while even in the happy path, we use
 	// r.numSubmitters worker goroutines.
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	for range r.numSubmitters {
 		wg.Add(1)
 		go func() {
@@ -64,6 +57,3 @@ func (r *Runner) sendAndAdjust(ctx context.Context) {
 		r.metrics = schedule.Metrics{}
 	}
 }
-
-// TODO track how many txs that are pending
-// TODO need to adjsut the gas ratio
