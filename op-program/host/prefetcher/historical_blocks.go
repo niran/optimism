@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 
 	preimage "github.com/ethereum-optimism/optimism/op-preimage"
@@ -38,7 +39,10 @@ func (p *Prefetcher) fetchBlockNumberProofs(ctx context.Context, hint l2.BlockAn
 	currentBlockNum := blockInfo.NumberU64()
 
 	lastHistoryStorageIdx := (currentBlockNum + 1) % params.HistoryServeWindow
-	lastHistoryStorageBlockNum := currentBlockNum - (params.HistoryServeWindow - 1)
+	lastHistoryStorageBlockNum := uint64(0)
+	if currentBlockNum > params.HistoryServeWindow-1 {
+		lastHistoryStorageBlockNum = currentBlockNum - (params.HistoryServeWindow - 1)
+	}
 
 	keysToFetchPerBlockHash := make(map[common.Hash][]common.Hash)
 	slices.SortFunc(blockNumbers, func(a, b uint64) int {
@@ -51,7 +55,7 @@ func (p *Prefetcher) fetchBlockNumberProofs(ctx context.Context, hint l2.BlockAn
 	keysToFetch := make([]common.Hash, 0, len(blockNumbers))
 	for _, n := range blockNumbers {
 		if n > currentBlockNum {
-			return ErrBlockNumberPastParent
+			return fmt.Errorf("error fetching block %d with head at %d: %w", n, currentBlockNum, ErrBlockNumberPastParent)
 		}
 
 		if n < lastHistoryStorageBlockNum {

@@ -519,23 +519,26 @@ func (p *Prefetcher) prefetch(ctx context.Context, hint string) error {
 		return p.kvStore.Put(preimage.Keccak256Key(hash).PreimageKey(), p.agreedPrestate)
 	case l2.HintL2BlockAncestors:
 		hintBytesLen := len(hintBytes)
-		if hintBytesLen < 32+8 || (hintBytesLen-32-8)%8 != 0 {
+		if hintBytesLen < 32+32 || (hintBytesLen-32-32)%8 != 0 {
 			return fmt.Errorf("invalid L2 block ancestors hint: %x", hintBytes)
 		}
 
-		hintBytesWithoutChainIDAndHash := hintBytes[:32+8]
+		hintBytesWithoutChainIDAndHash := hintBytes[:32+32]
 
 		numBlocks := (hintBytesLen - len(hintBytesWithoutChainIDAndHash)) / 8
 
 		blockNums := make([]uint64, numBlocks)
 		for i := 0; i < numBlocks; i++ {
-			blockNums[i] = binary.BigEndian.Uint64(hintBytesWithoutChainIDAndHash[32+i*8 : 32+(i+1)*8])
+			blockNums[i] = binary.BigEndian.Uint64(hintBytesWithoutChainIDAndHash[32+32+i*8 : 32+32+(i+1)*8])
 		}
+
+		var chainID [32]byte
+		copy(chainID[:], hintBytesWithoutChainIDAndHash[32:32+32])
 
 		hint := l2.BlockAncestorHint{
 			FromBlockHash: common.Hash(hintBytesWithoutChainIDAndHash[:32]),
 			BlockNumbers:  blockNums,
-			ChainID:       eth.ChainIDFromUInt64(binary.BigEndian.Uint64(hintBytesWithoutChainIDAndHash[32:])),
+			ChainID:       eth.ChainIDFromBytes32(chainID),
 		}
 
 		return p.fetchBlockNumberProofs(ctx, hint)

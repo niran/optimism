@@ -197,21 +197,23 @@ type BlockAncestorHint struct {
 var _ preimage.Hint = BlockAncestorHint{}
 
 func (l BlockAncestorHint) Hash() common.Hash {
-	hintBytes := make([]byte, 32+8+8*len(l.BlockNumbers))
+	hintBytes := make([]byte, 32+32+8*len(l.BlockNumbers))
 	copy(hintBytes[:32], l.FromBlockHash.Bytes())
-	binary.BigEndian.PutUint64(hintBytes[32:], eth.EvilChainIDToUInt64(l.ChainID))
+	chainID := l.ChainID.Bytes32()
+	copy(hintBytes[32:64], chainID[:])
 	for i, blockNumber := range l.BlockNumbers {
-		binary.BigEndian.PutUint64(hintBytes[40+i*8:48+i*8], blockNumber)
+		binary.BigEndian.PutUint64(hintBytes[32+32+i*8:32+32+(i+1)*8], blockNumber)
 	}
 	return crypto.Keccak256Hash(hintBytes)
 }
 
 func (l BlockAncestorHint) Hint() string {
-	hintBytes := make([]byte, 32+8+8*len(l.BlockNumbers))
+	hintBytes := make([]byte, 32+32+8*len(l.BlockNumbers))
 	copy(hintBytes[:32], l.FromBlockHash.Bytes())
-	binary.BigEndian.PutUint64(hintBytes[32:], eth.EvilChainIDToUInt64(l.ChainID))
+	chainID := l.ChainID.Bytes32()
+	copy(hintBytes[32:64], chainID[:])
 	for i, blockNumber := range l.BlockNumbers {
-		binary.BigEndian.PutUint64(hintBytes[40+i*8:48+i*8], blockNumber)
+		binary.BigEndian.PutUint64(hintBytes[32+32+i*8:32+32+(i+1)*8], blockNumber)
 	}
 	return HintL2BlockAncestors + " " + hexutil.Encode(hintBytes)
 }
