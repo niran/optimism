@@ -47,15 +47,18 @@ func (o *FastCanonicalBlockHeaderOracle) fetchHistoricalBlockProofs() {
 	chainID := eth.ChainIDFromBig(o.config.ChainID)
 	blockNums := make([]uint64, 0, len(o.blockNumberSet))
 	for n := range o.blockNumberSet {
-		blockNums = append(blockNums, n)
+		if n != o.head.Number.Uint64() {
+			blockNums = append(blockNums, n)
+		}
 	}
 
 	provenBlocks := o.oracle.BlockAncestorsByNumbers(eth.BlockID{
-		Hash:   o.head.Hash(),
-		Number: o.head.Number.Uint64(),
+		Hash:   o.head.ParentHash,
+		Number: o.head.Number.Uint64() - 1,
 	}, blockNums, chainID)
 
 	o.canonicalBlockHashes = provenBlocks
+	o.canonicalBlockHashes[o.head.Number.Uint64()] = o.head.Hash()
 }
 
 func (o *FastCanonicalBlockHeaderOracle) GetHeaderByNumber(n uint64) *types.Header {
