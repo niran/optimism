@@ -27,5 +27,8 @@ type Config struct {
 	// to be compatible with verifiers forcefully generating the same block while catching up the sequencing window timeout.
 	RecoverMode bool `json:"recover_mode"`
 
+	// SequencerSealingDuration is the amount of the time the sequencer allocates to sealing the block
+	// (i.e. it will fetch the payload from the execution engine this much prior to the block's timestamp).
+	// If this is <= 0 it is automatically adjusted to 50ms.
 	SequencerSealingDuration time.Duration `json:"sequencer_sealing_duration"`
 }

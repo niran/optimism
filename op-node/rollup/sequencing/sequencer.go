@@ -133,6 +133,9 @@ func NewSequencer(driverCtx context.Context, log log.Logger, rollupCfg *rollup.C
 	asyncGossip AsyncGossiper,
 	metrics Metrics,
 ) *Sequencer {
+	if sealingDuration <= 0 {
+		sealingDuration = time.Millisecond * 50
+	}
 	return &Sequencer{
 		ctx:              driverCtx,
 		log:              log,
