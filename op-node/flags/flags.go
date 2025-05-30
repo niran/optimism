@@ -263,6 +263,13 @@ var (
 		Value:    false,
 		Category: SequencerCategory,
 	}
+	SequencerSealingDurationFlag = &cli.DurationFlag{
+		Name:     "sequencer.sealing-duration",
+		Usage:    "This is the amount of the time the sequencer allocates to sealing the block (i.e. it will fetch the payload from the execution engine this much prior to the block's timestamp).",
+		EnvVars:  prefixEnvVars("SEQUENCER_SEALING_DURATION"),
+		Value:    50 * time.Millisecond,
+		Category: SequencerCategory,
+	}
 	L1EpochPollIntervalFlag = &cli.DurationFlag{
 		Name:     "l1.epoch-poll-interval",
 		Usage:    "Poll interval for retrieving new L1 epoch updates such as safe and finalized block changes. Disabled if 0 or negative.",
@@ -482,6 +489,7 @@ var optionalFlags = []cli.Flag{
 	SequencerMaxSafeLagFlag,
 	SequencerL1Confs,
 	SequencerRecoverMode,
+	SequencerSealingDurationFlag,
 	L1EpochPollIntervalFlag,
 	RuntimeConfigReloadIntervalFlag,
 	RPCEnableAdmin,

@@ -20,9 +20,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 )
 
-// sealingDuration defines the expected time it takes to seal the block
-const sealingDuration = time.Millisecond * 50
-
 var (
 	ErrSequencerAlreadyStarted = errors.New("sequencer already running")
 	ErrSequencerAlreadyStopped = errors.New("sequencer not running")
@@ -80,9 +77,10 @@ type Sequencer struct {
 	// closed when driver system closes, to interrupt any ongoing API calls etc.
 	ctx context.Context
 
-	log       log.Logger
-	rollupCfg *rollup.Config
-	spec      *rollup.ChainSpec
+	log             log.Logger
+	rollupCfg       *rollup.Config
+	spec            *rollup.ChainSpec
+	sealingDuration time.Duration
 
 	maxSafeLag atomic.Uint64
 
@@ -127,6 +125,7 @@ type Sequencer struct {
 var _ SequencerIface = (*Sequencer)(nil)
 
 func NewSequencer(driverCtx context.Context, log log.Logger, rollupCfg *rollup.Config,
+	sealingDuration time.Duration,
 	attributesBuilder derive.AttributesBuilder,
 	l1OriginSelector L1OriginSelectorIface,
 	listener SequencerStateListener,
@@ -139,6 +138,7 @@ func NewSequencer(driverCtx context.Context, log log.Logger, rollupCfg *rollup.C
 		log:              log,
 		rollupCfg:        rollupCfg,
 		spec:             rollup.NewChainSpec(rollupCfg),
+		sealingDuration:  sealingDuration,
 		listener:         listener,
 		conductor:        conductor,
 		asyncGossip:      asyncGossip,
@@ -230,11 +230,11 @@ func (d *Sequencer) onBuildStarted(x engine.BuildStartedEvent) {
 	now := d.timeNow()
 	payloadTime := time.Unix(int64(x.Parent.Time+d.rollupCfg.BlockTime), 0)
 	remainingTime := payloadTime.Sub(now)
-	if remainingTime < sealingDuration {
+	if remainingTime < d.sealingDuration {
 		d.nextAction = now // if there's not enough time for sealing, don't wait.
 	} else {
 		// finish with margin of sealing duration before payloadTime
-		d.nextAction = payloadTime.Add(-sealingDuration)
+		d.nextAction = payloadTime.Add(-d.sealingDuration)
 	}
 }
 
