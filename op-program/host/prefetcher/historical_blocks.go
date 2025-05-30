@@ -7,6 +7,7 @@ import (
 	"errors"
 	"slices"
 
+	preimage "github.com/ethereum-optimism/optimism/op-preimage"
 	"github.com/ethereum-optimism/optimism/op-program/client/l2"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
@@ -109,5 +110,5 @@ func (p *Prefetcher) fetchBlockNumberProofs(ctx context.Context, hint l2.BlockAn
 		return err
 	}
 
-	return p.kvStore.Put(hint.Hash(), proofsJson)
+	return p.kvStore.Put(preimage.PrecompileKey(hint.Hash()).PreimageKey(), proofsJson)
 }

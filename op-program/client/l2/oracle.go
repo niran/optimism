@@ -215,7 +215,7 @@ func (p *PreimageOracle) BlockAncestorsByNumbers(fromBlock eth.BlockID, ancestor
 	hintHash := hint.Hash()
 
 	p.hint.Hint(hint)
-	ancestorHashJson := p.oracle.Get(preimage.Keccak256Key(hintHash))
+	ancestorHashJson := p.oracle.Get(preimage.PrecompileKey(hintHash))
 
 	var ancestorProofs map[common.Hash]eth.AccountResult
 	if err := json.Unmarshal(ancestorHashJson, &ancestorProofs); err != nil {

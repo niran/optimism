@@ -42,6 +42,8 @@ const (
 	BlobKeyType KeyType = 5
 	// PrecompileKeyType is for precompile result pre-images.
 	PrecompileKeyType KeyType = 6
+	// ProofKeyType is for pre-images that are proofs of some data.
+	ProofKeyType KeyType = 7
 )
 
 // LocalIndexKey is a key local to the program, indexing a special program input.
@@ -118,6 +120,23 @@ func (k PrecompileKey) String() string {
 }
 
 func (k PrecompileKey) TerminalString() string {
+	return "0x" + hex.EncodeToString(k[:])
+}
+
+// PrecompileKey is the hash of precompile address and its input data
+type ProofKey [32]byte
+
+func (k ProofKey) PreimageKey() (out [32]byte) {
+	out = k
+	out[0] = byte(ProofKeyType)
+	return
+}
+
+func (k ProofKey) String() string {
+	return "0x" + hex.EncodeToString(k[:])
+}
+
+func (k ProofKey) TerminalString() string {
 	return "0x" + hex.EncodeToString(k[:])
 }
 

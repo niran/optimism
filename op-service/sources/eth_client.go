@@ -12,7 +12,6 @@ package sources
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -403,18 +402,18 @@ func (s *EthClient) GetProof(ctx context.Context, address common.Address, storag
 func (s *EthClient) BatchGetProofs(ctx context.Context, proofsToFetch []eth.ProofParams) ([]*eth.AccountResult, error) {
 	batchElems := make([]rpc.BatchElem, len(proofsToFetch))
 	for i, proof := range proofsToFetch {
-		storageJson, err := json.Marshal(proof.Storage)
-		if err != nil {
-			return nil, err
+		hexStorage := make([]string, len(proof.Storage))
+		for j, slot := range proof.Storage {
+			hexStorage[j] = slot.String()
 		}
-
 		batchElems[i] = rpc.BatchElem{
 			Method: "eth_getProof",
 			Args: []interface{}{
 				proof.Address.String(),
-				storageJson,
+				hexStorage,
 				proof.BlockHash.String(),
 			},
+			Result: new(eth.AccountResult),
 		}
 	}
 
@@ -432,8 +431,8 @@ func (s *EthClient) BatchGetProofs(ctx context.Context, proofsToFetch []eth.Proo
 			return nil, fmt.Errorf("no result for proof request %d", i)
 		}
 
-		var proof *eth.AccountResult
-		if err := json.Unmarshal(elem.Result.(json.RawMessage), &proof); err != nil {
+		proof, ok := elem.Result.(*eth.AccountResult)
+		if !ok {
 			return nil, fmt.Errorf("failed to unmarshal proof result for %s at %s: %w", proofsToFetch[i].Address, proofsToFetch[i].BlockHash, err)
 		}
 		result = append(result, proof)
