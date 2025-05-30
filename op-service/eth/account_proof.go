@@ -138,7 +138,7 @@ func CheckProofChain(accountProofs map[common.Hash]AccountResult, chainHead Bloc
 		for _, proof := range currAccountProof.StorageProof {
 			key := common.BytesToHash(common.LeftPadBytes(proof.Key[:], 32))
 			// big endian
-			storageKeys[key] = common.Hash(proof.Value.ToInt().Bytes())
+			storageKeys[key] = common.Hash(common.LeftPadBytes(proof.Value.ToInt().Bytes(), 32))
 		}
 
 		for historyIdxKey, historyBlockHash := range storageKeys {
