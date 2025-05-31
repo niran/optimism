@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/big"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -20,13 +19,12 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 )
 
-// SatisfyExecMsgContraint waits supervisor to index initiating message,
+// SatisfyExecMsgConstraint waits supervisor to index initiating message,
 // and destination chain has advanced enough to satisfy messaging time invariant.
-func SatisfyExecMsgContraint(t systest.T, logger log.Logger, sys system.InteropSystem, initBlockNum uint64, initTimestamp uint64) {
+func SatisfyExecMsgConstraint(t systest.T, logger log.Logger, sys system.InteropSystem, initBlockNum uint64, initTimestamp uint64) {
 	ctx := t.Context()
 
 	supervisor, err := sys.Supervisor(ctx)
@@ -78,7 +76,7 @@ func initAndExecMsg(
 		blockA, err := txA.PlannedTx.IncludedBlock.Eval(ctx)
 		require.NoError(t, err)
 		// wait for supervisor and destination chain be in sync
-		SatisfyExecMsgContraint(t, logger, sys, blockA.Number, blockA.Time)
+		SatisfyExecMsgConstraint(t, logger, sys, blockA.Number, blockA.Time)
 
 		// Intent to validate message on chain B
 		txB := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput](opts[1])
@@ -125,7 +123,7 @@ func initAndExecMultipleMsg(
 		blockA, err := txA.PlannedTx.IncludedBlock.Eval(ctx)
 		require.NoError(t, err)
 		// wait for supervisor and destination chain be in sync
-		SatisfyExecMsgContraint(t, logger, sys, blockA.Number, blockA.Time)
+		SatisfyExecMsgConstraint(t, logger, sys, blockA.Number, blockA.Time)
 
 		// Intent to validate messages on chain B
 		txB := txintent.NewIntent[*txintent.MultiTrigger, *txintent.InteropOutput](opts[1])
@@ -169,7 +167,7 @@ func execSameMsgTwice(
 		blockA, err := txA.PlannedTx.IncludedBlock.Eval(ctx)
 		require.NoError(t, err)
 		// wait for supervisor and destination chain be in sync
-		SatisfyExecMsgContraint(t, logger, sys, blockA.Number, blockA.Time)
+		SatisfyExecMsgConstraint(t, logger, sys, blockA.Number, blockA.Time)
 
 		// Intent to validate same message two times on chain B
 		txB := txintent.NewIntent[*txintent.MultiTrigger, *txintent.InteropOutput](opts[1])
@@ -200,7 +198,7 @@ func execMsgDifferentTopicCount(
 		eventLoggerAddress, err := DeployEventLogger(ctx, wallets[0], logger)
 		require.NoError(t, err)
 
-		// Intent to initiate message with differet topic counts on chain A
+		// Intent to initiate message with different topic counts on chain A
 		initCalls := make([]txintent.Call, 5)
 		for topicCnt := range 5 {
 			index := topicCnt
@@ -223,7 +221,7 @@ func execMsgDifferentTopicCount(
 		blockA, err := txA.PlannedTx.IncludedBlock.Eval(ctx)
 		require.NoError(t, err)
 		// wait for supervisor and destination chain be in sync
-		SatisfyExecMsgContraint(t, logger, sys, blockA.Number, blockA.Time)
+		SatisfyExecMsgConstraint(t, logger, sys, blockA.Number, blockA.Time)
 
 		// Intent to validate message on chain B
 		txB := txintent.NewIntent[*txintent.MultiTrigger, *txintent.InteropOutput](opts[1])
@@ -242,9 +240,9 @@ func execMsgDifferentTopicCount(
 	}
 }
 
-// execMsgOpagueData tests below scenario:
+// execMsgOpaqueData tests below scenario:
 // Execute message that links with initiating message with: 0, 10KB of opaque event data in it
-func execMsgOpagueData(
+func execMsgOpaqueData(
 	l2ChainNums int,
 	walletGetters []validators.WalletGetter,
 ) systest.InteropSystemTestFunc {
@@ -275,7 +273,7 @@ func execMsgOpagueData(
 		blockA, err := txA.PlannedTx.IncludedBlock.Eval(ctx)
 		require.NoError(t, err)
 		// wait for supervisor and destination chain be in sync
-		SatisfyExecMsgContraint(t, logger, sys, blockA.Number, blockA.Time)
+		SatisfyExecMsgConstraint(t, logger, sys, blockA.Number, blockA.Time)
 
 		// Intent to validate messages on chain B
 		txB := txintent.NewIntent[*txintent.MultiTrigger, *txintent.InteropOutput](opts[1])
@@ -325,7 +323,7 @@ func execMsgDifferEventIndexInSingleTx(
 		blockA, err := txA.PlannedTx.IncludedBlock.Eval(ctx)
 		require.NoError(t, err)
 		// wait for supervisor and destination chain be in sync
-		SatisfyExecMsgContraint(t, logger, sys, blockA.Number, blockA.Time)
+		SatisfyExecMsgConstraint(t, logger, sys, blockA.Number, blockA.Time)
 
 		// Intent to validate messages on chain B
 		txB := txintent.NewIntent[*txintent.MultiTrigger, *txintent.InteropOutput](opts[1])
@@ -445,7 +443,7 @@ func executeMessageInvalidAttributes(
 		blockA, err := txA.PlannedTx.IncludedBlock.Eval(ctx)
 		require.NoError(t, err)
 		// wait for supervisor and destination chain be in sync
-		SatisfyExecMsgContraint(t, logger, sys, blockA.Number, blockA.Time)
+		SatisfyExecMsgConstraint(t, logger, sys, blockA.Number, blockA.Time)
 
 		// construct txplan opts for testing failed validating messages
 		optsForFail := txplan.Combine(
@@ -486,124 +484,6 @@ func executeMessageInvalidAttributes(
 	}
 }
 
-// randomDirectedGraph tests below scenario:
-// Construct random directed graph of messages
-func randomDirectedGraph(
-	l2ChainNums int,
-	walletGetters []validators.WalletGetter,
-) systest.InteropSystemTestFunc {
-	return func(t systest.T, sys system.InteropSystem) {
-		ctx, rng, logger, _, wallets, opts := DefaultInteropSetup(t, sys, l2ChainNums, walletGetters)
-
-		// pubSubPairCnt is the count of (publisher, subscriber) pairs which
-		// - publisher initiates messages
-		// - subsciber validates messages
-		pubSubPairCnt := 10
-		// txCnt is the count of transactions that each publisher emits
-		txCnt := 3
-		// fundAmount is the ETH amount which publisher and subscriber needs to transact
-		fundAmount := big.NewInt(params.Ether / 10)
-
-		// Deploy eventLoggers per every L2 chains because initiating messages can happen on any L2 chains
-		eventLoggerAddresses := []common.Address{}
-		{
-			var mu sync.Mutex
-			var wg sync.WaitGroup
-			for chainIdx := range l2ChainNums {
-				wg.Add(1)
-				go func(chainIdx int) {
-					defer wg.Done()
-					eventLoggerAddress, err := DeployEventLogger(ctx, wallets[chainIdx], logger)
-					require.NoError(t, err)
-					mu.Lock()
-					eventLoggerAddresses = append(eventLoggerAddresses, eventLoggerAddress)
-					mu.Unlock()
-				}(chainIdx)
-			}
-			wg.Wait()
-		}
-
-		// chainWalletsOpts collects wallet options to transact, grouped per L2 chain
-		chainWalletsOpts := [][]txplan.Option{}
-		logger.Info("funding accounts", "amount", fundAmount.String())
-		{
-			var mu sync.Mutex
-			var wg sync.WaitGroup
-			for chainIdx := range l2ChainNums {
-				wg.Add(1)
-				go func(chainIdx int) {
-					defer wg.Done()
-					// each goroutine funds wallets per L2 chain
-					chainWalletOpts, err := FundWalletsFromFaucet(ctx, logger, sys, chainIdx, opts[chainIdx], fundAmount, pubSubPairCnt)
-					require.NoError(t, err)
-					mu.Lock()
-					chainWalletsOpts = append(chainWalletsOpts, chainWalletOpts)
-					mu.Unlock()
-				}(chainIdx)
-			}
-			wg.Wait()
-		}
-
-		// runPubSubPair spawns publisher goroutine, paired with subscriber goroutine
-		runPubSubPair := func(pubOpt, subOpt txplan.Option, eventLoggerAddress common.Address, localRng *rand.Rand) {
-			var wg sync.WaitGroup
-			wg.Add(2)
-
-			ch := make(chan *txintent.IntentTx[*txintent.MultiTrigger, *txintent.InteropOutput])
-
-			// publisher initiates txCnt transactions that includes multiple random messages
-			publisherRng := rand.New(rand.NewSource(localRng.Int63()))
-			go func(ch chan<- *txintent.IntentTx[*txintent.MultiTrigger, *txintent.InteropOutput], rng *rand.Rand) {
-				defer wg.Done()
-				for range txCnt {
-					tx, receipt, err := InitiateRandomMessages(ctx, pubOpt, rng, eventLoggerAddress)
-					require.NoError(t, err)
-					logger.Info("initiate messages included", "chainID", tx.PlannedTx.ChainID.Value().String(), "blockNumber", receipt.BlockNumber, "block", receipt.BlockHash)
-					ch <- tx
-					time.Sleep(time.Duration(rng.Intn(250)) * time.Millisecond)
-				}
-				close(ch)
-			}(ch, publisherRng)
-
-			subscriberRng := rand.New(rand.NewSource(localRng.Int63()))
-			// subscriber validates every messages that was initiated by the publisher
-			go func(ch <-chan *txintent.IntentTx[*txintent.MultiTrigger, *txintent.InteropOutput], rng *rand.Rand) {
-				defer wg.Done()
-				for dependsOn := range ch {
-					tx, receipt, err := ValidateEveryMessage(ctx, subOpt, dependsOn)
-					require.NoError(t, err)
-					logger.Info("validate messages included", "blockNumber", receipt.BlockNumber, "block", receipt.BlockHash)
-					logger.Info("message dependency",
-						"sourceChainID", dependsOn.PlannedTx.ChainID.Value().String(),
-						"destChainID", tx.PlannedTx.ChainID.Value().String(),
-						"sourceBlockNum", dependsOn.PlannedTx.IncludedBlock.Value().Number,
-						"destBlockNum", receipt.BlockNumber)
-					time.Sleep(time.Duration(rng.Intn(250)) * time.Millisecond)
-				}
-			}(ch, subscriberRng)
-
-			wg.Wait()
-		}
-
-		runPubSubPairWrapper := func(sourceIdx, destIdx, pairIdx int, wg *sync.WaitGroup, localRng *rand.Rand) {
-			defer wg.Done()
-			runPubSubPair(chainWalletsOpts[sourceIdx][pairIdx], chainWalletsOpts[destIdx][pairIdx], eventLoggerAddresses[sourceIdx], localRng)
-		}
-
-		var wg sync.WaitGroup
-		wg.Add(pubSubPairCnt)
-		for pairIdx := range pubSubPairCnt {
-			// randomize source and destination L2 chains
-			perm := rng.Perm(l2ChainNums)
-			sourceIdx, destIdx := perm[0], perm[1]
-			// localRng is needed per pubsub pair because rng cannot be shared without mutex
-			localRng := rand.New(rand.NewSource(rng.Int63()))
-			go runPubSubPairWrapper(sourceIdx, destIdx, pairIdx, &wg, localRng)
-		}
-		wg.Wait()
-	}
-}
-
 func TestInteropInitAndExecMsg(t *testing.T) {
 	l2ChainNums := 2
 	walletGetters, totalValidators := SetupDefaultInteropSystemTest(l2ChainNums)
@@ -631,15 +511,6 @@ func TestInteropExecSameMsgTwice(t *testing.T) {
 	)
 }
 
-func TestInteropRandomDirectedGraph(t *testing.T) {
-	l2ChainNums := 2
-	walletGetters, totalValidators := SetupDefaultInteropSystemTest(l2ChainNums)
-	systest.InteropSystemTest(t,
-		randomDirectedGraph(l2ChainNums, walletGetters),
-		totalValidators...,
-	)
-}
-
 func TestInteropExecMsgDifferentTopicCount(t *testing.T) {
 	l2ChainNums := 2
 	walletGetters, totalValidators := SetupDefaultInteropSystemTest(l2ChainNums)
@@ -649,11 +520,11 @@ func TestInteropExecMsgDifferentTopicCount(t *testing.T) {
 	)
 }
 
-func TestInteropExecMsgOpagueData(t *testing.T) {
+func TestInteropExecMsgOpaqueData(t *testing.T) {
 	l2ChainNums := 2
 	walletGetters, totalValidators := SetupDefaultInteropSystemTest(l2ChainNums)
 	systest.InteropSystemTest(t,
-		execMsgOpagueData(l2ChainNums, walletGetters),
+		execMsgOpaqueData(l2ChainNums, walletGetters),
 		totalValidators...,
 	)
 }

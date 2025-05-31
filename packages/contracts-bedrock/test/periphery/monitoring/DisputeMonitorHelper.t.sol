@@ -89,7 +89,7 @@ contract DisputeMonitorHelper_search_Test is DisputeMonitorHelper_TestInit {
     /// @param _numGames Number of games to generate for the test.
     /// @param _searchOlderThan Search direction.
     function testFuzz_search_succeeds(uint8 _numGames, bool _searchOlderThan) external {
-        // Convert into search directon.
+        // Convert into search direction.
         DisputeMonitorHelper.SearchDirection direction = _searchOlderThan
             ? DisputeMonitorHelper.SearchDirection.OLDER_THAN_OR_EQ
             : DisputeMonitorHelper.SearchDirection.NEWER_THAN_OR_EQ;
@@ -178,7 +178,7 @@ contract DisputeMonitorHelper_search_Test is DisputeMonitorHelper_TestInit {
     /// @param _timestamp The timestamp to search for.
     /// @param _searchOlderThan Whether to search for an older or newer game.
     function testFuzz_search_noGames_succeeds(uint256 _timestamp, bool _searchOlderThan) external view {
-        // Convert into search directon.
+        // Convert into search direction.
         DisputeMonitorHelper.SearchDirection direction = _searchOlderThan
             ? DisputeMonitorHelper.SearchDirection.OLDER_THAN_OR_EQ
             : DisputeMonitorHelper.SearchDirection.NEWER_THAN_OR_EQ;
@@ -407,5 +407,23 @@ contract DisputeMonitorHelper_getUnresolvedGames_Test is DisputeMonitorHelper_Te
         // Get the unresolved games.
         IDisputeGame[] memory results = helper.getUnresolvedGames(disputeGameFactory, 0, type(uint256).max);
         assertEq(results.length, _numGames, "expected 5 games");
+    }
+}
+
+contract DisputeMonitorHelper_toRpcHexString_Test is DisputeMonitorHelper_TestInit {
+    /// @notice Test that the toRpcHexString function converts a uint256 to a hex string that
+    ///         starts with 0x and doesn't have any leading zeros.
+    function test_toRpcHexString_succeeds() external view {
+        uint256 value = 1234567890;
+        string memory hexString = helper.toRpcHexString(value);
+        assertEq(hexString, "0x499602d2");
+    }
+
+    /// @notice Test that the toRpcHexString function converts a uint256 to a hex string that
+    ///         doesn't have any leading zeros.
+    function test_toRpcHexString_noLeadingZero_succeeds() external view {
+        uint256 value = 136210625;
+        string memory hexString = helper.toRpcHexString(value);
+        assertEq(hexString, "0x81e68c1");
     }
 }

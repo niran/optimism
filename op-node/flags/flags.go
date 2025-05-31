@@ -400,13 +400,6 @@ var (
 		Category: SequencerCategory,
 	}
 	/* Interop flags, experimental. */
-	InteropSupervisor = &cli.StringFlag{
-		Name: "interop.supervisor",
-		Usage: "Interop standard-mode: RPC address of interop supervisor to use for cross-chain safety verification." +
-			"Applies only to Interop-enabled networks.",
-		EnvVars:  prefixEnvVars("INTEROP_SUPERVISOR"),
-		Category: InteropCategory,
-	}
 	InteropRPCAddr = &cli.StringFlag{
 		Name: "interop.rpc.addr",
 		Usage: "Interop Websocket-only RPC listening address, to serve supervisor syncing." +
@@ -432,6 +425,13 @@ var (
 		Value:       "",
 		Destination: new(string),
 		Category:    InteropCategory,
+	}
+	InteropDependencySet = &cli.PathFlag{
+		Name:      "interop.dependency-set",
+		Usage:     "Dependency-set configuration, point at JSON file.",
+		EnvVars:   prefixEnvVars("INTEROP_DEPENDENCY_SET"),
+		TakesFile: true,
+		Category:  InteropCategory,
 	}
 
 	IgnoreMissingPectraBlobSchedule = &cli.BoolFlag{
@@ -501,10 +501,10 @@ var optionalFlags = []cli.Flag{
 	SafeDBPath,
 	L2EngineKind,
 	L2EngineRpcTimeout,
-	InteropSupervisor,
 	InteropRPCAddr,
 	InteropRPCPort,
 	InteropJWTSecret,
+	InteropDependencySet,
 	IgnoreMissingPectraBlobSchedule,
 	ExperimentalOPStackAPI,
 }

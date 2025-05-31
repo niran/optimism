@@ -26,19 +26,22 @@ type Orchestrator struct {
 	// nil if no time travel is supported
 	timeTravelClock *clock.AdvancingClock
 
-	superchains locks.RWMap[stack.SuperchainID, *Superchain]
-	clusters    locks.RWMap[stack.ClusterID, *Cluster]
-	l1Nets      locks.RWMap[eth.ChainID, *L1Network]
-	l2Nets      locks.RWMap[eth.ChainID, *L2Network]
-	l1ELs       locks.RWMap[stack.L1ELNodeID, *L1ELNode]
-	l1CLs       locks.RWMap[stack.L1CLNodeID, *L1CLNode]
-	l2ELs       locks.RWMap[stack.L2ELNodeID, *L2ELNode]
-	l2CLs       locks.RWMap[stack.L2CLNodeID, *L2CLNode]
-	supervisors locks.RWMap[stack.SupervisorID, *Supervisor]
-	sequencers  locks.RWMap[stack.SequencerID, *Sequencer]
-	batchers    locks.RWMap[stack.L2BatcherID, *L2Batcher]
-	//challengers locks.RWMap[stack.L2ChallengerID, *L2Challenger] // TODO(#15057): op-challenger support
-	proposers locks.RWMap[stack.L2ProposerID, *L2Proposer]
+	// options
+	batcherOptions []BatcherOption
+
+	superchains    locks.RWMap[stack.SuperchainID, *Superchain]
+	clusters       locks.RWMap[stack.ClusterID, *Cluster]
+	l1Nets         locks.RWMap[eth.ChainID, *L1Network]
+	l2Nets         locks.RWMap[eth.ChainID, *L2Network]
+	l1ELs          locks.RWMap[stack.L1ELNodeID, *L1ELNode]
+	l1CLs          locks.RWMap[stack.L1CLNodeID, *L1CLNode]
+	l2ELs          locks.RWMap[stack.L2ELNodeID, *L2ELNode]
+	l2CLs          locks.RWMap[stack.L2CLNodeID, *L2CLNode]
+	supervisors    locks.RWMap[stack.SupervisorID, *Supervisor]
+	testSequencers locks.RWMap[stack.TestSequencerID, *TestSequencer]
+	batchers       locks.RWMap[stack.L2BatcherID, *L2Batcher]
+	challengers    locks.RWMap[stack.L2ChallengerID, *L2Challenger]
+	proposers      locks.RWMap[stack.L2ProposerID, *L2Proposer]
 
 	faucet *FaucetService
 
@@ -51,6 +54,15 @@ type Orchestrator struct {
 	jwtPath     string
 	jwtSecret   [32]byte
 	jwtPathOnce sync.Once
+}
+
+func (o *Orchestrator) ClusterForL2(chainID eth.ChainID) (*Cluster, bool) {
+	for _, cluster := range o.clusters.Values() {
+		if cluster.DepSet() != nil && cluster.DepSet().HasChain(chainID) {
+			return cluster, true
+		}
+	}
+	return nil, false
 }
 
 func (o *Orchestrator) ControlPlane() stack.ControlPlane {
@@ -81,6 +93,7 @@ func (o *Orchestrator) writeDefaultJWT() (jwtPath string, secret [32]byte) {
 }
 
 func (o *Orchestrator) Hydrate(sys stack.ExtensibleSystem) {
+	o.sysHook.PreHydrate(sys)
 	o.superchains.Range(rangeHydrateFn[stack.SuperchainID, *Superchain](sys))
 	o.clusters.Range(rangeHydrateFn[stack.ClusterID, *Cluster](sys))
 	o.l1Nets.Range(rangeHydrateFn[eth.ChainID, *L1Network](sys))
@@ -90,8 +103,9 @@ func (o *Orchestrator) Hydrate(sys stack.ExtensibleSystem) {
 	o.l2ELs.Range(rangeHydrateFn[stack.L2ELNodeID, *L2ELNode](sys))
 	o.l2CLs.Range(rangeHydrateFn[stack.L2CLNodeID, *L2CLNode](sys))
 	o.supervisors.Range(rangeHydrateFn[stack.SupervisorID, *Supervisor](sys))
-	o.sequencers.Range(rangeHydrateFn[stack.SequencerID, *Sequencer](sys))
+	o.testSequencers.Range(rangeHydrateFn[stack.TestSequencerID, *TestSequencer](sys))
 	o.batchers.Range(rangeHydrateFn[stack.L2BatcherID, *L2Batcher](sys))
+	o.challengers.Range(rangeHydrateFn[stack.L2ChallengerID, *L2Challenger](sys))
 	o.proposers.Range(rangeHydrateFn[stack.L2ProposerID, *L2Proposer](sys))
 	o.faucet.hydrate(sys)
 	o.sysHook.PostHydrate(sys)

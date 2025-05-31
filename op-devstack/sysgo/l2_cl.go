@@ -27,9 +27,9 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/oppprof"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 )
@@ -63,7 +63,7 @@ func (n *L2CLNode) hydrate(system stack.ExtensibleSystem) {
 		InteropEndpoint:  n.interopEndpoint,
 		InteropJwtSecret: n.interopJwtSecret,
 	})
-	l2Net := system.L2Network(stack.L2NetworkID(n.id.ChainID))
+	l2Net := system.L2Network(stack.L2NetworkID(n.id.ChainID()))
 	l2Net.(stack.ExtensibleL2Network).AddL2CLNode(sysL2CL)
 	sysL2CL.(stack.LinkableL2CLNode).LinkEL(l2Net.L2ELNode(n.el))
 }
@@ -125,9 +125,11 @@ func (n *L2CLNode) Stop() {
 
 func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNodeID, l1ELID stack.L1ELNodeID, l2ELID stack.L2ELNodeID) stack.Option[*Orchestrator] {
 	return stack.AfterDeploy(func(orch *Orchestrator) {
-		require := orch.P().Require()
+		p := orch.P().WithCtx(stack.ContextWithID(orch.P().Ctx(), l2CLID))
 
-		l2Net, ok := orch.l2Nets.Get(l2CLID.ChainID)
+		require := p.Require()
+
+		l2Net, ok := orch.l2Nets.Get(l2CLID.ChainID())
 		require.True(ok, "l2 network required")
 
 		l1EL, ok := orch.l1ELs.Get(l1ELID)
@@ -139,9 +141,14 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 		l2EL, ok := orch.l2ELs.Get(l2ELID)
 		require.True(ok, "l2 EL node required")
 
+		var depSet depset.DependencySet
+		if cluster, ok := orch.ClusterForL2(l2ELID.ChainID()); ok {
+			depSet = cluster.DepSet()
+		}
+
 		jwtPath, jwtSecret := orch.writeDefaultJWT()
 
-		logger := orch.P().Logger().New("service", "op-node", "id", l2CLID)
+		logger := p.Logger()
 
 		var p2pSignerSetup p2p.SignerSetup
 		var p2pConfig *p2p.Config
@@ -173,7 +180,7 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 
 			cliCtx := cli.NewContext(&cli.App{}, fs, nil)
 			if isSequencer {
-				p2pKey, err := orch.keys.Secret(devkeys.SequencerP2PRole.Key(l2CLID.ChainID.ToBig()))
+				p2pKey, err := orch.keys.Secret(devkeys.SequencerP2PRole.Key(l2CLID.ChainID().ToBig()))
 				require.NoError(err, "need p2p key for sequencer")
 				p2pKeyHex := hex.EncodeToString(crypto.FromECDSA(p2pKey))
 				require.NoError(fs.Set(opNodeFlags.SequencerP2PKeyName, p2pKeyHex))
@@ -206,8 +213,9 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 			Driver: driver.Config{
 				SequencerEnabled: isSequencer,
 			},
-			Rollup:    *l2Net.rollupCfg,
-			P2PSigner: p2pSignerSetup, // nil when not sequencer
+			Rollup:        *l2Net.rollupCfg,
+			DependencySet: depSet,
+			P2PSigner:     p2pSignerSetup, // nil when not sequencer
 			RPC: node.RPCConfig{
 				ListenAddr: "127.0.0.1",
 				// When L2CL starts, store its RPC port here
@@ -248,12 +256,12 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 			id:     l2CLID,
 			cfg:    nodeCfg,
 			logger: logger,
-			p:      orch.P(),
+			p:      p,
 			el:     l2ELID,
 		}
 		require.True(orch.l2CLs.SetIfMissing(l2CLID, l2CLNode), "must not already exist")
 		l2CLNode.Start()
-		orch.p.Cleanup(l2CLNode.Stop)
+		p.Cleanup(l2CLNode.Stop)
 	})
 }
 
@@ -343,48 +351,6 @@ func WithL2CLP2PConnection(l2CL1ID, l2CL2ID stack.L2CLNodeID) stack.Option[*Orch
 			multiAddress := peerInfo.PeerID.String()
 			_, ok := peerDump.Peers[multiAddress]
 			require.True(ok, "peer register invalid")
-		}
-
-		peerDump1, err := GetPeers(ctx, p.client1)
-		require.NoError(err)
-		peerDump2, err := GetPeers(ctx, p.client2)
-		require.NoError(err)
-
-		check(peerDump1, p.peerInfo2)
-		check(peerDump2, p.peerInfo1)
-	})
-}
-
-// DisconnectL2CLP2P disconnects P2P between two L2CLs
-func DisconnectL2CLP2P(l2CL1ID, l2CL2ID stack.L2CLNodeID) stack.Option[*Orchestrator] {
-	return stack.AfterDeploy(func(orch *Orchestrator) {
-		require := orch.P().Require()
-
-		l2CL1, ok := orch.l2CLs.Get(l2CL1ID)
-		require.True(ok, "looking for L2 CL node 1 to disconnect p2p")
-		l2CL2, ok := orch.l2CLs.Get(l2CL2ID)
-		require.True(ok, "looking for L2 CL node 2 to disconnect p2p")
-		require.Equal(l2CL1.cfg.Rollup.L2ChainID, l2CL2.cfg.Rollup.L2ChainID, "must be same l2 chain")
-
-		ctx := orch.P().Ctx()
-		logger := orch.P().Logger()
-
-		p := getP2PClientsAndPeers(ctx, logger, require, l2CL1, l2CL2)
-
-		disconnectPeer := func(p2pClient *sources.P2PClient, id peer.ID) {
-			err := retry.Do0(ctx, 3, retry.Exponential(), func() error {
-				return p2pClient.DisconnectPeer(ctx, id)
-			})
-			require.NoError(err, "failed to disconnect peer")
-		}
-
-		disconnectPeer(p.client1, p.peerInfo2.PeerID)
-		disconnectPeer(p.client2, p.peerInfo1.PeerID)
-
-		check := func(peerDump *apis.PeerDump, peerInfo *apis.PeerInfo) {
-			multiAddress := peerInfo.PeerID.String()
-			_, ok := peerDump.Peers[multiAddress]
-			require.False(ok, "peer deregister invalid")
 		}
 
 		peerDump1, err := GetPeers(ctx, p.client1)

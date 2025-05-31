@@ -33,14 +33,14 @@ import (
 	gn "github.com/ethereum/go-ethereum/node"
 )
 
-type Sequencer struct {
-	id           stack.SequencerID
+type TestSequencer struct {
+	id           stack.TestSequencerID
 	userRPC      string
 	jwtSecret    [32]byte
 	l2sequencers map[eth.ChainID]seqtypes.SequencerID
 }
 
-func (s *Sequencer) hydrate(sys stack.ExtensibleSystem) {
+func (s *TestSequencer) hydrate(sys stack.ExtensibleSystem) {
 	tlog := sys.Logger().New("id", s.id)
 
 	opts := []client.RPCOption{
@@ -61,7 +61,7 @@ func (s *Sequencer) hydrate(sys stack.ExtensibleSystem) {
 		l2sequencersRpcs[chainID] = seqRpc
 	}
 
-	sys.AddSequencer(shim.NewSequencer(shim.SequencerConfig{
+	sys.AddTestSequencer(shim.NewTestSequencer(shim.TestSequencerConfig{
 		CommonConfig:       shim.NewCommonConfig(sys.T()),
 		ID:                 s.id,
 		Client:             sqClient,
@@ -69,11 +69,12 @@ func (s *Sequencer) hydrate(sys stack.ExtensibleSystem) {
 	}))
 }
 
-func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELID stack.L1ELNodeID, l2ELID stack.L2ELNodeID) stack.Option[*Orchestrator] {
+func WithTestSequencer(testSequencerID stack.TestSequencerID, l2CLID stack.L2CLNodeID, l1ELID stack.L1ELNodeID, l2ELID stack.L2ELNodeID) stack.Option[*Orchestrator] {
 	return stack.AfterDeploy(func(orch *Orchestrator) {
-		require := orch.P().Require()
+		p := orch.P().WithCtx(stack.ContextWithID(orch.P().Ctx(), testSequencerID))
+		require := p.Require()
 
-		logger := orch.P().Logger().New("service", "op-test-sequencer", "id", sequencerID)
+		logger := p.Logger()
 
 		l1EL, ok := orch.l1ELs.Get(l1ELID)
 		require.True(ok, "l1 EL node required")
@@ -89,11 +90,11 @@ func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELI
 		signerID := seqtypes.SignerID("test-local-signer")
 		publisherID := seqtypes.PublisherID("test-standard-publisher")
 
-		p2pKey, err := orch.keys.Secret(devkeys.SequencerP2PRole.Key(l2CLID.ChainID.ToBig()))
+		p2pKey, err := orch.keys.Secret(devkeys.SequencerP2PRole.Key(l2CLID.ChainID().ToBig()))
 		require.NoError(err, "need p2p key for sequencer")
 		raw := hexutil.Bytes(crypto.FromECDSA(p2pKey))
 
-		l2SequencerID := seqtypes.SequencerID(fmt.Sprintf("test-seq-%s", l2CLID.ChainID))
+		l2SequencerID := seqtypes.SequencerID(fmt.Sprintf("test-seq-%s", l2CLID.ChainID()))
 
 		v := &config.Ensemble{
 			Endpoints: nil,
@@ -116,7 +117,7 @@ func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELI
 				"test-local-signer": {
 					LocalKey: &localkey.Config{
 						RawKey:  &raw,
-						ChainID: l2CLID.ChainID,
+						ChainID: l2CLID.ChainID(),
 					},
 				},
 			},
@@ -141,7 +142,7 @@ func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELI
 			Sequencers: map[seqtypes.SequencerID]*config.SequencerEntry{
 				l2SequencerID: {
 					Full: &fullseq.Config{
-						ChainID: l2CLID.ChainID,
+						ChainID: l2CLID.ChainID(),
 
 						Builder:   builderID,
 						Signer:    signerID,
@@ -189,29 +190,29 @@ func WithSequencer(sequencerID stack.SequencerID, l2CLID stack.L2CLNodeID, l1ELI
 			MockRun:       false,
 		}
 
-		sq, err := sequencer.FromConfig(context.Background(), cfg, logger)
+		sq, err := sequencer.FromConfig(p.Ctx(), cfg, logger)
 		require.NoError(err)
 
-		err = sq.Start(context.Background())
+		err = sq.Start(p.Ctx())
 		require.NoError(err)
 
-		orch.p.Cleanup(func() {
-			ctx, cancel := context.WithCancel(context.Background())
+		p.Cleanup(func() {
+			ctx, cancel := context.WithCancel(p.Ctx())
 			cancel()
 			logger.Info("Closing sequencer")
 			closeErr := sq.Stop(ctx)
 			logger.Info("Closed sequencer", "err", closeErr)
 		})
 
-		sequencerNode := &Sequencer{
-			id:        sequencerID,
+		testSequencerNode := &TestSequencer{
+			id:        testSequencerID,
 			userRPC:   sq.RPC(),
 			jwtSecret: jwtSecret,
 			l2sequencers: map[eth.ChainID]seqtypes.SequencerID{
-				l2CLID.ChainID: l2SequencerID,
+				l2CLID.ChainID(): l2SequencerID,
 			},
 		}
-		logger.Info("Sequencer User RPC", "http_endpoint", sequencerNode.userRPC)
-		orch.sequencers.Set(sequencerID, sequencerNode)
+		logger.Info("Sequencer User RPC", "http_endpoint", testSequencerNode.userRPC)
+		orch.testSequencers.Set(testSequencerID, testSequencerNode)
 	})
 }

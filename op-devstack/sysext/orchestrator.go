@@ -59,11 +59,12 @@ func (o *Orchestrator) P() devtest.P {
 }
 
 func (o *Orchestrator) Hydrate(sys stack.ExtensibleSystem) {
+	o.sysHook.PreHydrate(sys)
 	o.hydrateL1(sys)
 	o.hydrateSuperchain(sys)
 	o.hydrateClustersMaybe(sys)
 	o.hydrateSupervisorsMaybe(sys)
-	o.hydrateSequencersMaybe(sys)
+	o.hydrateTestSequencersMaybe(sys)
 	for _, l2Net := range o.env.Env.L2 {
 		o.hydrateL2(l2Net, sys)
 	}

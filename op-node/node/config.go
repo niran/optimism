@@ -7,6 +7,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/log"
 
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
@@ -30,6 +31,8 @@ type Config struct {
 	Driver driver.Config
 
 	Rollup rollup.Config
+
+	DependencySet depset.DependencySet
 
 	// P2PSigner will be used for signing off on published content
 	// if the node is sequencing and if the p2p stack is enabled
@@ -168,6 +171,9 @@ func (cfg *Config) Check() error {
 			"If you know what you are doing, you can disable this error by setting the " +
 			"'--ignore-missing-pectra-blob-schedule' flag or 'IGNORE_MISSING_PECTRA_BLOB_SCHEDULE' env var.")
 		return ErrMissingPectraBlobSchedule
+	}
+	if cfg.Rollup.InteropTime != nil && cfg.DependencySet == nil {
+		return fmt.Errorf("the Interop upgrade is scheduled (timestamp = %d) but not dependency set is configured", *cfg.Rollup.InteropTime)
 	}
 	if err := cfg.Metrics.Check(); err != nil {
 		return fmt.Errorf("metrics config error: %w", err)
