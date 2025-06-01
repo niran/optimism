@@ -79,15 +79,7 @@ func CrossSafeUpdate(logger log.Logger, chainID eth.ChainID, d CrossSafeDeps, li
 	if err != nil {
 		return fmt.Errorf("cannot find parent-block of cross-safe: %w", err)
 	}
-
-	var crossSafeRef eth.BlockRef
-	// During non-genesis Interop activation, the parent may be zero, which is ok.
-	if parent.ID() == (eth.BlockID{}) {
-		crossSafeRef = currentCrossSafe.Derived.WithZeroParent()
-	} else {
-		crossSafeRef = currentCrossSafe.Derived.MustWithParent(parent.ID())
-	}
-
+	crossSafeRef := currentCrossSafe.Derived.MustWithParent(parent.ID())
 	// If any of the reads were invalidated due to reorg,
 	// don't attempt to proceed with an update, as the reasoning for the update may be wrong.
 	if !h.IsValid() {

@@ -769,6 +769,7 @@ func TestContains(t *testing.T) {
 
 			// when the timestamp invariant is broken, ErrConflict is returned
 			requireConflicts(t, db, 51, 2, 4000, createHash(2)) // 4000 != 5001
+
 		})
 }
 

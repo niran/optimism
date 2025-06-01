@@ -134,12 +134,6 @@ func (db *DB) updateEntryCountMetric() {
 	db.m.RecordDBEntryCount("log", db.store.Size())
 }
 
-func (db *DB) IsEmpty() bool {
-	db.rwLock.RLock()
-	defer db.rwLock.RUnlock()
-	return db.lastEntryContext.nextEntryIndex == 0
-}
-
 func (db *DB) IteratorStartingAt(sealedNum uint64, logsSince uint32) (Iterator, error) {
 	db.rwLock.RLock()
 	defer db.rwLock.RUnlock()
@@ -177,8 +171,8 @@ func (db *DB) FindSealedBlock(number uint64) (seal types.BlockSeal, err error) {
 	}, nil
 }
 
-// FirstSealedBlock returns the first block seal in the DB, if any.
-func (db *DB) FirstSealedBlock() (seal types.BlockSeal, err error) {
+// StartingBlock returns the first block seal in the DB, if any.
+func (db *DB) StartingBlock() (seal types.BlockSeal, err error) {
 	db.rwLock.RLock()
 	defer db.rwLock.RUnlock()
 	iter := db.newIterator(0)
@@ -191,7 +185,7 @@ func (db *DB) FirstSealedBlock() (seal types.BlockSeal, err error) {
 		Hash:      h,
 		Number:    n,
 		Timestamp: t,
-	}, nil
+	}, err
 }
 
 // OpenBlock returns the Executing Messages for the block at the given number.
@@ -200,16 +194,14 @@ func (db *DB) OpenBlock(blockNum uint64) (ref eth.BlockRef, logCount uint32, exe
 	db.rwLock.RLock()
 	defer db.rwLock.RUnlock()
 
-	// Note: newIteratorAt below handles the not-at-genesis interop start case.
-	// But here we explicitly handle blockNum 0 to avoid a block number underflow.
 	if blockNum == 0 {
-		seal, err := db.FirstSealedBlock()
+		seal, err := db.StartingBlock()
 		if err != nil {
 			retErr = err
 			return
 		}
 		if seal.Number != 0 {
-			return eth.BlockRef{}, 0, nil, fmt.Errorf("looked for block 0 but got %s: %w", seal, types.ErrSkipped)
+			db.log.Warn("The first block is not block 0", "block", seal.Number)
 		}
 		ref = eth.BlockRef{
 			Hash:       seal.Hash,

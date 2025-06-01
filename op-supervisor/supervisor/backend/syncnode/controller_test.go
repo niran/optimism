@@ -22,7 +22,6 @@ type mockSyncControl struct {
 	anchorPointFn       func(ctx context.Context) (types.DerivedBlockRefPair, error)
 	provideL1Fn         func(ctx context.Context, ref eth.BlockRef) error
 	resetFn             func(ctx context.Context, unsafe, safe, finalized eth.BlockID) error
-	resetPreInteropFn   func(ctx context.Context) error
 	updateCrossSafeFn   func(ctx context.Context, derived, source eth.BlockID) error
 	updateCrossUnsafeFn func(ctx context.Context, derived eth.BlockID) error
 	updateFinalizedFn   func(ctx context.Context, id eth.BlockID) error
@@ -53,13 +52,6 @@ func (m *mockSyncControl) ProvideL1(ctx context.Context, ref eth.BlockRef) error
 func (m *mockSyncControl) Reset(ctx context.Context, lUnsafe, xUnsafe, lSafe, xSafe, finalized eth.BlockID) error {
 	if m.resetFn != nil {
 		return m.resetFn(ctx, lUnsafe, lSafe, finalized)
-	}
-	return nil
-}
-
-func (m *mockSyncControl) ResetPreInterop(ctx context.Context) error {
-	if m.resetPreInteropFn != nil {
-		return m.resetPreInteropFn(ctx)
 	}
 	return nil
 }
@@ -124,7 +116,7 @@ type mockBackend struct {
 	isLocalUnsafeFn   func(ctx context.Context, chainID eth.ChainID, blockID eth.BlockID) error
 }
 
-func (m *mockBackend) ActivationBlock(ctx context.Context, chainID eth.ChainID) (types.DerivedBlockSealPair, error) {
+func (m *mockBackend) AnchorPoint(ctx context.Context, chainID eth.ChainID) (types.DerivedBlockSealPair, error) {
 	if m.anchorPointFn != nil {
 		return m.anchorPointFn(ctx, chainID)
 	}
@@ -209,6 +201,7 @@ func sampleDepSet(t *testing.T) depset.DependencySet {
 }
 
 type eventMonitor struct {
+	anchorCalled             int
 	localDerived             int
 	receivedLocalUnsafe      int
 	localDerivedOriginUpdate int
@@ -216,6 +209,8 @@ type eventMonitor struct {
 
 func (m *eventMonitor) OnEvent(ev event.Event) bool {
 	switch ev.(type) {
+	case superevents.AnchorEvent:
+		m.anchorCalled += 1
 	case superevents.LocalDerivedEvent:
 		m.localDerived += 1
 	case superevents.LocalUnsafeReceivedEvent:
