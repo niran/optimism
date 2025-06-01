@@ -258,6 +258,9 @@ func (h *FactoryHelper) startSuperCannonGameOfType(ctx context.Context, timestam
 
 	extraData := h.CreateSuperGameExtraData(ctx, rootProvider, timestamp, cfg)
 
+	// Gas estimation will fail if the current L1 head is genesis
+	require.NoError(h.T, wait.ForBlock(ctx, h.Client, 1), "Wait for L1 to advance past genesis")
+
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
