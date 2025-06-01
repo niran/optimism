@@ -188,11 +188,3 @@ type UpdateLocalSafeFailedEvent struct {
 func (ev UpdateLocalSafeFailedEvent) String() string {
 	return "update-local-safe-failed"
 }
-
-type ChainIndexingContinueEvent struct {
-	ChainID eth.ChainID
-}
-
-func (ev ChainIndexingContinueEvent) String() string {
-	return "chain-indexing-continue"
-}
