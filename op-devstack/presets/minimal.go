@@ -45,6 +45,12 @@ func WithMinimal() stack.CommonOption {
 	return stack.MakeCommon(sysgo.DefaultMinimalSystem(&sysgo.DefaultMinimalSystemIDs{}))
 }
 
+func WithFinalizationPeriodSeconds(n uint64) stack.CommonOption {
+	return stack.MakeCommon(sysgo.WithDeployerOptions(
+		sysgo.WithFinalizationPeriodSeconds(n),
+	))
+}
+
 func NewMinimal(t devtest.T) *Minimal {
 	system := shim.NewSystem(t)
 	orch := Orchestrator()

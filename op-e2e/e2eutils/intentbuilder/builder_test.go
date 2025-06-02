@@ -66,6 +66,7 @@ func TestBuilder(t *testing.T) {
 	// Test direct L2Configurator methods
 	require.Equal(t, eth.ChainIDFromUInt64(420), l2Config.ChainID())
 	l2Config.WithBlockTime(2)
+	l2Config.WithFinalizationPeriodSeconds(2)
 	l2Config.WithL1StartBlockHash(common.HexToHash("0x5678"))
 
 	// Test ContractsConfigurator methods
@@ -159,6 +160,7 @@ func TestBuilder(t *testing.T) {
 				OperatorFeeConstant:      200,
 				DeployOverrides: map[string]any{
 					"l2BlockTime":                 uint64(2),
+					"l2FinalizationPeriodSeconds": uint64(2),
 					"l2GenesisRegolithTimeOffset": hexutil.Uint64(0),
 					"l2GenesisCanyonTimeOffset":   hexutil.Uint64(0),
 					"l2GenesisDeltaTimeOffset":    hexutil.Uint64(0),
