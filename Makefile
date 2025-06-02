@@ -302,8 +302,8 @@ go-tests-fraud-proofs-ci: ## Runs fraud proofs Go tests with gotestsum for CI (a
 	@echo "Running Go tests with gotestsum..."
 	$(DEFAULT_TEST_ENV_VARS) && \
 	$(CI_ENV_VARS) && \
-	export OP_E2E_CANNON_ENABLED="true" \
-	export PARALLEL="24" \
+	export OP_E2E_CANNON_ENABLED="true" && \
+	export PARALLEL="24" && \
 	gotestsum --format=testname \
 		--junitfile=./tmp/test-results/results.xml \
 		--jsonfile=./tmp/testlogs/log.json \
