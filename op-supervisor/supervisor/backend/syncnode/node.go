@@ -79,7 +79,7 @@ var (
 func NewManagedNode(log log.Logger, id eth.ChainID, node SyncControl, backend backend, noSubscribe bool) *ManagedNode {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &ManagedNode{
-		log:     log.New("chain", id),
+		log:     log.New("chain", id, "node", node.String()),
 		backend: backend,
 		Node:    node,
 		chainID: id,
@@ -147,6 +147,7 @@ func (m *ManagedNode) OnEvent(ctx context.Context, ev event.Event) bool {
 		if x.ChainID != m.chainID {
 			return false
 		}
+		m.resetIfAhead()
 	case superevents.ResetPreInteropRequestEvent:
 		if x.ChainID != m.chainID {
 			return false
@@ -292,13 +293,16 @@ func (m *ManagedNode) onResetEvent(errStr string) {
 }
 
 func (m *ManagedNode) onUpdateLocalSafeFailed(ev superevents.UpdateLocalSafeFailedEvent) {
+	log := m.log.New("err", ev.Err)
 	switch {
 	case errors.Is(ev.Err, types.ErrConflict):
-		m.log.Warn("DB indicated a conflict with this node, checking if node is inconsistent")
+		log.Warn("DB indicated a conflict with this node, checking if node is inconsistent")
 		m.resetIfInconsistent()
 	case errors.Is(ev.Err, types.ErrFuture):
-		m.log.Warn("DB indicated this node provided an update from the future, checking if node is ahead")
+		log.Warn("DB indicated this node provided an update from the future, checking if node is ahead")
 		m.resetIfAhead()
+	default:
+		log.Error("Unknown error on local-safe update")
 	}
 }
 
@@ -355,7 +359,8 @@ func (m *ManagedNode) onUnsafeBlock(unsafeRef eth.BlockRef) {
 		NewLocalUnsafe: unsafeRef,
 	})
 	m.lastNodeLocalUnsafe = unsafeRef.ID()
-	m.resetIfInconsistent()
+	// TODO: why should we test safe head consistency after an unsafe head?
+	// m.resetIfInconsistent()
 }
 
 func (m *ManagedNode) onDerivationUpdate(pair types.DerivedBlockRefPair) {
@@ -367,7 +372,8 @@ func (m *ManagedNode) onDerivationUpdate(pair types.DerivedBlockRefPair) {
 		NodeID:  m.Node.String(),
 	})
 	m.lastNodeLocalSafe = pair.Derived.ID()
-	m.resetIfInconsistent()
+	// TODO: Don't reset yet, node and DB may be inconsistent because of inflight replacement block.
+	// m.resetIfInconsistent()
 }
 
 func (m *ManagedNode) onDerivationOriginUpdate(origin eth.BlockRef) {
@@ -429,7 +435,9 @@ func (m *ManagedNode) onReplaceBlock(replacement types.BlockReplacement) {
 	// if the node replaced a block, both the unsafe and safe are reset to this point
 	m.lastNodeLocalSafe = replacement.Replacement.ID()
 	m.lastNodeLocalUnsafe = replacement.Replacement.ID()
-	m.resetIfInconsistent()
+	// TODO: I don't think we should initiate a reset at this point, since the database will already be properly updated
+	// to the replacement block once the event emitted above is processed.
+	// m.resetIfInconsistent()
 }
 
 func (m *ManagedNode) Close() error {
@@ -444,7 +452,7 @@ func (m *ManagedNode) Close() error {
 }
 
 // resetIfInconsistent checks if the node is consistent with the logs db
-// and initiates a bisection based reset preparation if it is
+// and initiates a bisection based reset preparation if it isn't
 func (m *ManagedNode) resetIfInconsistent() {
 	ctx, cancel := context.WithTimeout(m.ctx, internalTimeout)
 	defer cancel()
@@ -467,7 +475,7 @@ func (m *ManagedNode) resetIfInconsistent() {
 	// If there is a mismatch, we want to reset back no further than latest local-safe
 	localSafe, err := m.backend.LocalSafe(ctx, m.chainID)
 	if err != nil {
-		m.log.Debug("Cannot determine how to handle inconsistency, no local-safe data available",
+		m.log.Error("Cannot determine how to handle inconsistency, no local-safe data available",
 			"localSafeMatchErr", localSafeMatchErr, "err", err)
 		return
 	}
@@ -493,7 +501,7 @@ func (m *ManagedNode) resetIfAhead() {
 	// if the node is ahead of the logs db, initiate a reset
 	// with the end of the range being the last safe block in the db
 	if m.lastNodeLocalSafe.Number > lastDBLocalSafe.Derived.Number {
-		m.log.Warn("local safe block on node is ahead of logs db. Initiating reset",
+		m.log.Warn("local safe block on node is ahead of local safe db. Initiating reset",
 			"lastNodeLocalSafe", m.lastNodeLocalSafe,
 			"lastDBLocalSafe", lastDBLocalSafe.Derived)
 		m.initiateReset(lastDBLocalSafe.Derived)
