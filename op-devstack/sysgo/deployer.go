@@ -215,6 +215,15 @@ func WithInteropAtGenesis() DeployerOption {
 	}
 }
 
+// WithFinalizationPeriodSeconds overrides the number of L1 blocks in a sequencing window, applied to all L2s.
+func WithFinalizationPeriodSeconds(n uint64) DeployerOption {
+	return func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {
+		for _, l2Cfg := range builder.L2s() {
+			l2Cfg.WithFinalizationPeriodSeconds(n)
+		}
+	}
+}
+
 // WithSequencingWindow overrides the number of L1 blocks in a sequencing window, applied to all L2s.
 func WithSequencingWindow(n uint64) DeployerOption {
 	return func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {

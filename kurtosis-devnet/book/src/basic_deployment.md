@@ -231,3 +231,18 @@ A: This is typically caused by Docker Hub rate limiting. Here are several soluti
    osascript -e 'quit app "Docker"'
    open -a Docker
    ```
+
+#### Q: Git operations are timing out or failing
+
+If you're experiencing Git timeouts or slow operations, you can adjust Git's network settings to be more resilient:
+
+```sh
+# Increase the low speed limit to 1000 bytes per second
+git config --global http.lowSpeedLimit 1000
+
+# Increase the time window to 300 seconds (5 minutes)
+git config --global http.lowSpeedTime 300
+
+# Optional: Increase the buffer size for better performance
+git config --global http.postBuffer 524288000
+```

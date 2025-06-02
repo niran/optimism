@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/bindings"
 	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/constants"
 	"github.com/ethereum-optimism/optimism/op-acceptance-tests/tests/interop"
+	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
@@ -48,6 +49,10 @@ func (u *EOA) String() string {
 
 func (u *EOA) Address() common.Address {
 	return u.key.Address()
+}
+
+func (u *EOA) EthClient() apis.EthClient {
+	return u.el.stackEL().EthClient()
 }
 
 // Key returns the cross-chain user identity/key,

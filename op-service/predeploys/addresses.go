@@ -44,6 +44,8 @@ const (
 	EntryPoint_v060               = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
 	SenderCreator_v070            = "0xEFC2c1444eBCC4Db75e7613d20C6a62fF67A167C"
 	EntryPoint_v070               = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+	L2OutputOracle                = "0x46DFCe3DFfE7BB36890326D3724eA5ba13aE6124"
+	L2OutputOracleProxy           = "0x9F7D5524b2Bc81E78d0b9bdFA9Fa7ee19E965d6F"
 )
 
 var (
@@ -85,6 +87,8 @@ var (
 	EntryPoint_v060Addr               = common.HexToAddress(EntryPoint_v060)
 	SenderCreator_v070Addr            = common.HexToAddress(SenderCreator_v070)
 	EntryPoint_v070Addr               = common.HexToAddress(EntryPoint_v070)
+	L2OutputOracleAddr                = common.HexToAddress(L2OutputOracle)
+	L2OutputOracleProxyAddr           = common.HexToAddress(L2OutputOracleProxy)
 
 	Predeploys          = make(map[string]*Predeploy)
 	PredeploysByAddress = make(map[common.Address]*Predeploy)
