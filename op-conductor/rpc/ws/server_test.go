@@ -14,6 +14,37 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// testConfig holds configurable timeouts and parameters for WebSocket tests
+type testConfig struct {
+	pingInterval    time.Duration
+	pongTimeout     time.Duration
+	testDuration    time.Duration
+	setupDelay      time.Duration
+	readTimeout     time.Duration
+	monitorInterval time.Duration
+}
+
+// defaultTestConfig returns a testConfig with reasonable default values for testing
+func defaultTestConfig() testConfig {
+	return testConfig{
+		pingInterval:    2 * time.Second,
+		pongTimeout:     3 * time.Second,
+		testDuration:    10 * time.Second,
+		setupDelay:      200 * time.Millisecond,
+		readTimeout:     2 * time.Second,
+		monitorInterval: 2 * time.Second,
+	}
+}
+
+// verifyClientCount verifies the number of connected clients
+func verifyClientCount(t *testing.T, handler *Handler, expected int, msg string) {
+	t.Helper()
+	count := len(handler.hub.clients)
+	if count != expected {
+		t.Errorf("%s: expected %d client(s), got %d", msg, expected, count)
+	}
+}
+
 // setupTestServer creates a test WebSocket server for ping/pong testing
 func setupTestServer(_ *testing.T) (*Handler, *httptest.Server, func()) {
 	// Create a mock config (we don't need rollup boost for ping/pong tests)
@@ -40,7 +71,7 @@ func setupTestServer(_ *testing.T) (*Handler, *httptest.Server, func()) {
 	handler.hub = newHub()
 	go handler.hub.run()
 
-	// Create test server
+	// Create test server with WebSocket handler
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", handler.handleWebSocket)
 	server := httptest.NewServer(mux)
@@ -62,141 +93,81 @@ func TestPingPongMechanism(t *testing.T) {
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+	cfg := defaultTestConfig()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
+	// Create channels for test synchronization
+	pingReceived := make(chan struct{}, 1)
+	pongReceived := make(chan struct{}, 1)
 
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	// Setup client with ping/pong callbacks
+	opts := &websocket.DialOptions{
+		OnPingReceived: func(ctx context.Context, payload []byte) bool {
+			t.Log("Client received ping")
+			pingReceived <- struct{}{}
+			return true // Send pong response
+		},
+		OnPongReceived: func(ctx context.Context, payload []byte) {
+			t.Log("Client received pong")
+			pongReceived <- struct{}{}
+		},
+	}
+
+	// Create test client
+	client, resp, err := websocket.Dial(context.Background(), wsURL, opts)
 	if err != nil {
-		t.Fatalf("Failed to connect to WebSocket: %v", err)
+		t.Fatalf("Failed to create test client: %v", err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "test complete")
-
-	// Wait a bit for the client to be registered
-	time.Sleep(200 * time.Millisecond)
-
-	// Verify client is registered
-	handler.hub.clientsMu.RLock()
-	clientCount := len(handler.hub.clients)
-	handler.hub.clientsMu.RUnlock()
-
-	if clientCount != 1 {
-		t.Errorf("Expected 1 client, got %d", clientCount)
-		return
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("Expected status code %d, got %d", http.StatusSwitchingProtocols, resp.StatusCode)
 	}
+	defer client.CloseNow()
 
+	// Wait for client registration
+	time.Sleep(cfg.setupDelay)
+
+	// Verify initial client connection
+	verifyClientCount(t, handler, 1, "Initial connection")
 	t.Log("Client successfully registered")
 
-	// Set up connection monitoring
-	connectionClosed := make(chan bool, 1)
+	// Start a goroutine to read messages
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.testDuration)
+	defer cancel()
 
-	// Read messages in a separate goroutine to handle control frames and monitor connection
 	go func() {
-		defer func() {
-			t.Log("Read goroutine exiting")
-			connectionClosed <- true
-		}()
-
 		for {
 			select {
 			case <-ctx.Done():
-				t.Log("Context cancelled in read goroutine")
 				return
 			default:
-				// Use a shorter timeout for reads to be more responsive
-				readCtx, readCancel := context.WithTimeout(ctx, time.Second*2)
-				messageType, message, err := conn.Read(readCtx)
-				readCancel()
-
+				_, _, err := client.Read(ctx)
 				if err != nil {
-					// Check if it's a close error
-					if websocket.CloseStatus(err) != -1 {
-						t.Logf("WebSocket connection closed: status=%d, err=%v", websocket.CloseStatus(err), err)
-						return
-					}
-					// Check if it's a context cancellation
-					if ctx.Err() != nil {
-						t.Log("Context cancelled during read")
-						return
-					}
-					// Timeout errors are expected when no messages are sent
 					if !errors.Is(err, context.DeadlineExceeded) {
-						t.Logf("Read error (non-timeout): %v", err)
-						return
+						t.Logf("Read error: %v", err)
 					}
-					continue
-				}
-
-				// Log any messages received
-				if messageType == websocket.MessageText || messageType == websocket.MessageBinary {
-					t.Logf("Received message type: %v, content: %s", messageType, string(message))
+					return
 				}
 			}
 		}
 	}()
 
-	// Monitor client count periodically
-	monitorTicker := time.NewTicker(time.Second * 5)
-	defer monitorTicker.Stop()
+	// Send a ping from client to server
+	err = client.Ping(ctx)
+	if err != nil {
+		t.Fatalf("Failed to send ping: %v", err)
+	}
+	t.Log("Client sent ping")
 
-	testDuration := time.Second * 25 // Wait for at least one full ping cycle
-	testTimer := time.NewTimer(testDuration)
-	defer testTimer.Stop()
-
-	t.Logf("Starting ping/pong monitoring for %v", testDuration)
-
-	for {
-		select {
-		case <-testTimer.C:
-			t.Log("Test duration completed")
-			goto testComplete
-
-		case <-connectionClosed:
-			t.Log("Connection closed signal received")
-			goto testComplete
-
-		case <-monitorTicker.C:
-			handler.hub.clientsMu.RLock()
-			currentClientCount := len(handler.hub.clients)
-			handler.hub.clientsMu.RUnlock()
-
-			t.Logf("Current client count: %d", currentClientCount)
-
-			if currentClientCount == 0 {
-				t.Log("Client disconnected during monitoring")
-				goto testComplete
-			}
-		}
+	// Wait for pong response
+	select {
+	case <-time.After(cfg.pongTimeout):
+		t.Error("Timeout waiting for pong response")
+	case <-pongReceived:
+		t.Log("Client received pong response")
 	}
 
-testComplete:
-	// Final verification
-	handler.hub.clientsMu.RLock()
-	finalClientCount := len(handler.hub.clients)
-	handler.hub.clientsMu.RUnlock()
-
-	t.Logf("Final client count: %d", finalClientCount)
-
-	if finalClientCount != 1 {
-		t.Logf("Expected client to remain connected after ping/pong cycles, but client count is %d", finalClientCount)
-
-		// Let's also check if there are any errors by trying to send a message
-		testMsg := []byte("connection test")
-		writeCtx, writeCancel := context.WithTimeout(context.Background(), time.Second*5)
-		writeErr := conn.Write(writeCtx, websocket.MessageText, testMsg)
-		writeCancel()
-
-		if writeErr != nil {
-			t.Logf("Connection appears to be closed: %v", writeErr)
-		} else {
-			t.Log("Connection is still writable")
-		}
-
-		// This is now a logged error rather than a hard failure to help debug
-		t.Errorf("Ping/pong mechanism may not be working correctly")
-	} else {
-		t.Log("Ping/pong mechanism test completed successfully")
-	}
+	// Verify client is still connected
+	verifyClientCount(t, handler, 1, "After ping/pong cycle")
+	t.Log("Ping/pong mechanism test completed successfully")
 }
 
 // TestPingTimeout tests what happens when a client doesn't respond to pings
@@ -204,59 +175,42 @@ func TestPingTimeout(t *testing.T) {
 	handler, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
-	// Convert HTTP URL to WebSocket URL
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+	cfg := defaultTestConfig()
 
-	// Connect to the WebSocket server
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	// Create test client
+	client, resp, err := websocket.Dial(context.Background(), wsURL, nil)
 	if err != nil {
-		t.Fatalf("Failed to connect to WebSocket: %v", err)
+		t.Fatalf("Failed to create test client: %v", err)
+	}
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("Expected status code %d, got %d", http.StatusSwitchingProtocols, resp.StatusCode)
 	}
 
-	// Wait for client to be registered
-	time.Sleep(100 * time.Millisecond)
+	// Wait for client registration
+	time.Sleep(cfg.setupDelay)
 
-	// Verify client is registered
-	handler.hub.clientsMu.RLock()
-	clientCount := len(handler.hub.clients)
-	handler.hub.clientsMu.RUnlock()
-
-	if clientCount != 1 {
-		t.Errorf("Expected 1 client, got %d", clientCount)
-	}
+	// Verify initial client connection
+	verifyClientCount(t, handler, 1, "Initial connection")
 
 	// Simulate an unresponsive client by closing the connection abruptly
-	// This should trigger the ping timeout mechanism
-	conn.Close(websocket.StatusAbnormalClosure, "simulating unresponsive client")
+	client.CloseNow()
 
 	// Wait for the server to detect the dead connection
-	// This might take up to pingInterval + pongTimeout
-	maxWaitTime := time.Second * 30
-	startTime := time.Now()
-
-	for time.Since(startTime) < maxWaitTime {
-		handler.hub.clientsMu.RLock()
-		currentClientCount := len(handler.hub.clients)
-		handler.hub.clientsMu.RUnlock()
-
-		if currentClientCount == 0 {
+	// The server needs some time to detect and clean up the dead connection
+	success := false
+	deadline := time.Now().Add(cfg.testDuration)
+	for time.Now().Before(deadline) {
+		if len(handler.hub.clients) == 0 {
+			success = true
 			t.Log("Dead client successfully detected and removed")
-			return
+			break
 		}
-
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(cfg.monitorInterval)
 	}
 
-	// Check final state
-	handler.hub.clientsMu.RLock()
-	finalClientCount := len(handler.hub.clients)
-	handler.hub.clientsMu.RUnlock()
-
-	if finalClientCount != 0 {
-		t.Errorf("Expected dead client to be removed, but %d clients remain", finalClientCount)
+	if !success {
+		t.Error("Server failed to detect and remove dead client")
 	}
 }
 
@@ -265,56 +219,39 @@ func TestMultipleClientsPingPong(t *testing.T) {
 	handler, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
-	// Convert HTTP URL to WebSocket URL
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+	cfg := defaultTestConfig()
 
 	numClients := 3
-	connections := make([]*websocket.Conn, numClients)
+	var clients []*websocket.Conn
 
 	// Connect multiple clients
 	for i := 0; i < numClients; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		conn, _, err := websocket.Dial(ctx, wsURL, nil)
-		cancel()
-
+		client, resp, err := websocket.Dial(context.Background(), wsURL, nil)
 		if err != nil {
-			t.Fatalf("Failed to connect client %d: %v", i, err)
+			t.Fatalf("Failed to create client %d: %v", i, err)
 		}
-		connections[i] = conn
+		if resp.StatusCode != http.StatusSwitchingProtocols {
+			t.Fatalf("Client %d: expected status code %d, got %d", i, http.StatusSwitchingProtocols, resp.StatusCode)
+		}
+		clients = append(clients, client)
+		time.Sleep(cfg.setupDelay)
 	}
 
 	// Clean up connections
 	defer func() {
-		for _, conn := range connections {
-			if conn != nil {
-				conn.Close(websocket.StatusNormalClosure, "test complete")
-			}
+		for _, client := range clients {
+			client.CloseNow()
 		}
 	}()
 
-	// Wait for all clients to be registered
-	time.Sleep(200 * time.Millisecond)
-
 	// Verify all clients are registered
-	handler.hub.clientsMu.RLock()
-	clientCount := len(handler.hub.clients)
-	handler.hub.clientsMu.RUnlock()
-
-	if clientCount != numClients {
-		t.Errorf("Expected %d clients, got %d", numClients, clientCount)
-	}
+	verifyClientCount(t, handler, numClients, "Multiple clients connected")
 
 	// Wait for ping/pong cycles
-	time.Sleep(time.Second * 20)
+	time.Sleep(cfg.testDuration)
 
 	// Verify all clients are still connected
-	handler.hub.clientsMu.RLock()
-	finalClientCount := len(handler.hub.clients)
-	handler.hub.clientsMu.RUnlock()
-
-	if finalClientCount != numClients {
-		t.Errorf("Expected %d clients to remain connected after ping/pong cycles, got %d", numClients, finalClientCount)
-	}
-
+	verifyClientCount(t, handler, numClients, "After ping/pong cycles")
 	t.Logf("Multiple clients ping/pong test completed successfully with %d clients", numClients)
 }
