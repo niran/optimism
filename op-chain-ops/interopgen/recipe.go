@@ -111,10 +111,16 @@ func (r *InteropDevRecipe) hydrated() InteropDevRecipe {
 		GenesisTimestamp: r.GenesisTimestamp,
 	}
 	for i, l := range r.L2s {
-		out.L2s[i] = l
 		if l.BlockTime == 0 {
-			out.L2s[i].BlockTime = defaultBlockTime
+			l.BlockTime = defaultBlockTime
 		}
+		if l.DisputeMaxGameDepth == 0 {
+			l.DisputeMaxGameDepth = 73
+		}
+		if l.DisputeSplitDepth == 0 {
+			l.DisputeSplitDepth = 30
+		}
+		out.L2s[i] = l
 	}
 	return out
 }
@@ -122,9 +128,11 @@ func (r *InteropDevRecipe) hydrated() InteropDevRecipe {
 const defaultBlockTime = 2
 
 type InteropDevL2Recipe struct {
-	ChainID       uint64
-	BlockTime     uint64
-	InteropOffset uint64
+	ChainID             uint64
+	BlockTime           uint64
+	InteropOffset       uint64
+	DisputeMaxGameDepth uint64
+	DisputeSplitDepth   uint64
 }
 
 func prefundL2Accounts(l1Cfg *L1Config, l2Cfg *L2Config, addrs devkeys.Addresses) error {
@@ -282,8 +290,8 @@ func (r *InteropDevL2Recipe) build(l1ChainID uint64, addrs devkeys.Addresses) (*
 		GasLimit:                60_000_000,
 		DisputeGameType:         1, // PERMISSIONED_CANNON Game Type
 		DisputeAbsolutePrestate: common.HexToHash("0x038512e02c4c3f7bdaec27d00edf55b7155e0905301e1a88083e4e0a6764d54c"),
-		DisputeMaxGameDepth:     73,
-		DisputeSplitDepth:       30,
+		DisputeMaxGameDepth:     r.DisputeMaxGameDepth,
+		DisputeSplitDepth:       r.DisputeSplitDepth,
 		DisputeClockExtension:   10800,  // 3 hours (input in seconds)
 		DisputeMaxClockDuration: 302400, // 3.5 days (input in seconds)
 	}

@@ -31,8 +31,18 @@ func StartInteropFaultDisputeSystem(t *testing.T, opts ...faultDisputeConfigOpts
 	}
 
 	recipe := interopgen.InteropDevRecipe{
-		L1ChainID:        InteropL1ChainID.Uint64(),
-		L2s:              []interopgen.InteropDevL2Recipe{{ChainID: 900200}, {ChainID: 900201}},
+		L1ChainID: InteropL1ChainID.Uint64(),
+		L2s: []interopgen.InteropDevL2Recipe{
+			{
+				ChainID:             900200,
+				DisputeMaxGameDepth: 51,
+				DisputeSplitDepth:   14,
+			},
+			{
+				ChainID:             900201,
+				DisputeMaxGameDepth: 51,
+				DisputeSplitDepth:   14,
+			}},
 		GenesisTimestamp: uint64(time.Now().Unix() + 3), // start chain 3 seconds from now
 	}
 	worldResources := interop.WorldResourcePaths{
