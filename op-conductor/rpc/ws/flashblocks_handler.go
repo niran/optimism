@@ -44,15 +44,15 @@ type Config struct {
 
 // Handler implements the FlashblockHandler interface
 type Handler struct {
-	cfg             Config
-	log             log.Logger
-	isLeaderFn      func(context.Context) bool
-	metrics         metrics.Metricer
-	rollupBoostConn *websocket.Conn
-	rollupBoostCtx  context.Context
-	rollupCancel    context.CancelFunc
-	server          *http.Server
-	hub             *Hub
+	cfg                 Config
+	log                 log.Logger
+	isLeaderFn          func(context.Context) bool
+	metrics             metrics.Metricer
+	rollupBoostConn     *websocket.Conn
+	rollupBoostCtx      context.Context
+	rollupBoostWsCancel context.CancelFunc
+	server              *http.Server
+	hub                 *Hub
 }
 
 // NewHandler creates a new flashblocks handler
@@ -116,7 +116,7 @@ func (h *Handler) Start(ctx context.Context) error {
 	}
 
 	// Start the rollup boost listener
-	h.rollupBoostCtx, h.rollupCancel = context.WithCancel(ctx)
+	h.rollupBoostCtx, h.rollupBoostWsCancel = context.WithCancel(ctx)
 	go h.listenToRollupBoost(h.rollupBoostCtx)
 
 	return nil
@@ -130,8 +130,8 @@ func (h *Handler) Stop() {
 	}
 
 	// Cancel the rollup boost context if it exists
-	if h.rollupCancel != nil {
-		h.rollupCancel()
+	if h.rollupBoostWsCancel != nil {
+		h.rollupBoostWsCancel()
 	}
 
 	// Close the rollup boost connection if it exists
