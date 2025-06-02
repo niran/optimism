@@ -32,6 +32,7 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IHasSuperchainConfig } from "interfaces/L1/IHasSuperchainConfig.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
+import { IStandardValidator } from "interfaces/L1/IStandardValidator.sol";
 
 contract OPContractsManagerContractsContainer {
     /// @notice Addresses of the Blueprint contracts.
@@ -59,7 +60,30 @@ contract OPContractsManagerContractsContainer {
     }
 }
 
-abstract contract OPContractsManagerBase {
+contract OPContractsManagerValidator {
+    address public immutable standardValidatorImpl;
+
+    constructor(address _standardValidatorImpl) {
+        standardValidatorImpl = _standardValidatorImpl;
+    }
+
+    function validate(
+        IStandardValidator.ValidationInput memory _input,
+        bool _allowFailure,
+        IStandardValidator.ValidationOverrides memory _overrides
+    )
+        internal
+        returns (string memory)
+    {
+        bytes memory _retData = _performDelegateCall(
+            standardValidatorImpl,
+            abi.encodeCall(IStandardValidator.validateWithOverrides, (_input, _allowFailure, _overrides))
+        );
+        return abi.decode(_retData, (string));
+    }
+}
+
+abstract contract OPContractsManagerBase is OPContractsManagerValidator {
     /// @notice Thrown when an invalid game type is used.
     error OPContractsManager_InvalidGameType();
 
@@ -71,7 +95,12 @@ abstract contract OPContractsManagerBase {
 
     /// @notice Constructor to initialize the immutable thisOPCM variable and contract addresses
     /// @param _contractsContainer The blueprint contract addresses and implementation contract addresses
-    constructor(OPContractsManagerContractsContainer _contractsContainer) {
+    constructor(
+        OPContractsManagerContractsContainer _contractsContainer,
+        address _standardValidator
+    )
+        OPContractsManagerValidator(_standardValidator)
+    {
         contractsContainer = _contractsContainer;
         thisOPCM = this;
     }
@@ -328,7 +357,12 @@ contract OPContractsManagerGameTypeAdder is OPContractsManagerBase {
 
     /// @notice Constructor to initialize the immutable thisOPCM variable and contract addresses
     /// @param _contractsContainer The blueprint contract addresses and implementation contract addresses
-    constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
+    constructor(
+        OPContractsManagerContractsContainer _contractsContainer,
+        address _standardValidator
+    )
+        OPContractsManagerBase(_contractsContainer, _standardValidator)
+    { }
 
     /// @notice Deploys a new dispute game and installs it into the DisputeGameFactory. Inputted
     ///         game configs must be added in ascending GameType order.
@@ -592,7 +626,12 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
     error OPContractsManagerUpgrader_SuperchainConfigMismatch();
 
     /// @param _contractsContainer The OPContractsManagerContractsContainer to use.
-    constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
+    constructor(
+        OPContractsManagerContractsContainer _contractsContainer,
+        address _standardValidator
+    )
+        OPContractsManagerBase(_contractsContainer, _standardValidator)
+    { }
 
     /// @notice Upgrades a set of chains to the latest implementation contracts
     /// @param _superchainConfig The SuperchainConfig contract to upgrade
@@ -841,6 +880,17 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
                 }
             }
 
+            validate(
+                IStandardValidator.ValidationInput({
+                    proxyAdmin: _opChainConfigs[i].proxyAdmin,
+                    sysCfg: _opChainConfigs[i].systemConfigProxy,
+                    absolutePrestate: Claim.unwrap(_opChainConfigs[i].absolutePrestate),
+                    l2ChainID: l2ChainId
+                }),
+                true,
+                IStandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
+            );
+
             // Emit the upgraded event with the address of the caller. Since this will be a delegatecall,
             // the caller will be the value of the ADDRESS opcode.
             emit Upgraded(l2ChainId, _opChainConfigs[i].systemConfigProxy, address(this));
@@ -944,7 +994,12 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
     /// @param deployOutput ABI-encoded output of the deployment.
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
 
-    constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
+    constructor(
+        OPContractsManagerContractsContainer _contractsContainer,
+        address _standardValidator
+    )
+        OPContractsManagerBase(_contractsContainer, _standardValidator)
+    { }
 
     function deploy(
         OPContractsManager.DeployInput calldata _input,
@@ -1146,6 +1201,17 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
         // -------- Finalize Deployment --------
         // Transfer ownership of the ProxyAdmin from this contract to the specified owner.
         transferOwnership(address(output.opChainProxyAdmin), _input.roles.opChainProxyAdminOwner);
+
+        validate(
+            IStandardValidator.ValidationInput({
+                proxyAdmin: output.opChainProxyAdmin,
+                sysCfg: output.systemConfigProxy,
+                absolutePrestate: Claim.unwrap(_input.disputeAbsolutePrestate),
+                l2ChainID: _input.l2ChainId
+            }),
+            true,
+            IStandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
+        );
 
         emit Deployed(_input.l2ChainId, _deployer, abi.encode(output));
         return output;
@@ -1387,7 +1453,12 @@ contract OPContractsManagerInteropMigrator is OPContractsManagerBase {
     }
 
     /// @param _contractsContainer Container of blueprints and implementations.
-    constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
+    constructor(
+        OPContractsManagerContractsContainer _contractsContainer,
+        address _standardValidator
+    )
+        OPContractsManagerBase(_contractsContainer, _standardValidator)
+    { }
 
     /// @notice Migrates one or more OP Stack chains to use the Super Root dispute games and shared
     ///         dispute game contracts.
@@ -1949,23 +2020,23 @@ contract OPContractsManager is ISemver {
         if (msg.sender != upgradeController) revert OnlyUpgradeController();
         isRC = _isRC;
     }
+}
 
-    /// @notice Helper function to perform a delegatecall to a target contract
-    /// @param _target The target contract address
-    /// @param _data The calldata to send to the target
-    /// @return bytes The return data from the delegatecall
-    function _performDelegateCall(address _target, bytes memory _data) internal returns (bytes memory) {
-        // Perform the delegatecall
-        (bool success, bytes memory returnData) = _target.delegatecall(_data);
+/// @notice Helper function to perform a delegatecall to a target contract
+/// @param _target The target contract address
+/// @param _data The calldata to send to the target
+/// @return bytes The return data from the delegatecall
+function _performDelegateCall(address _target, bytes memory _data) returns (bytes memory) {
+    // Perform the delegatecall
+    (bool success, bytes memory returnData) = _target.delegatecall(_data);
 
-        // Check if the delegatecall was successful
-        if (!success) {
-            // If there was a revert message, bubble it up
-            assembly {
-                revert(add(returnData, 32), mload(returnData))
-            }
+    // Check if the delegatecall was successful
+    if (!success) {
+        // If there was a revert message, bubble it up
+        assembly {
+            revert(add(returnData, 32), mload(returnData))
         }
-
-        return returnData;
     }
+
+    return returnData;
 }
