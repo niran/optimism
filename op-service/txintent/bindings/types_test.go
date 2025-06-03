@@ -10,24 +10,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:unused
 type TestSimpleStructA struct {
 	a *big.Int
 	b []byte
 	c common.Address
 }
 
+//nolint:unused
 type TestSimpleStructB struct {
 	a [3]byte
 	b [32]byte
 	c *uint256.Int
 }
 
+//nolint:unused
 type TestNestedStruct struct {
 	a TestSimpleStructA
 	b TestSimpleStructB
 	c [3]TestSimpleStructA
 }
 
+//nolint:unused
 type TestComplexStruct struct {
 	a TestSimpleStructB
 	b []TestNestedStruct
@@ -40,14 +44,17 @@ type TestComplexStruct struct {
 	i [5]byte
 }
 
+//nolint:unused
 type TestRecursiveStruct struct {
 	a TestNestedStruct
 }
 
+//nolint:unused
 type TestRecursiveStruct2 struct {
 	a TestRecursiveStruct
 }
 
+//nolint:unused
 type TestRecursiveStruct3 struct {
 	a TestRecursiveStruct2
 }
