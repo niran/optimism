@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -89,6 +90,41 @@ func TestTypeConversion(t *testing.T) {
 	}
 
 	tests := []testCase{
+		{
+			value:    eth.ETH{},
+			want:     "uint64[4]",
+			testName: "eth.ETH",
+		},
+		{
+			value:    eth.ChainID{},
+			want:     "uint64[4]",
+			testName: "eth.ChainID",
+		},
+		{
+			value:    common.Address{},
+			want:     "address",
+			testName: "address (value)",
+		},
+		{
+			value:    &common.Address{},
+			want:     "address",
+			testName: "address (pointer)",
+		},
+		{
+			value:    big.NewInt(0),
+			want:     "uint256",
+			testName: "big.NewInt",
+		},
+		{
+			value:    []byte{0x13},
+			want:     "bytes",
+			testName: "bytes",
+		},
+		{
+			value:    [3]byte{0x13, 0x33, 0x37},
+			want:     "bytes3",
+			testName: "fixed size bytes",
+		},
 		{
 			value:    TestSimpleStructA{},
 			want:     "(uint256,bytes,address)",
