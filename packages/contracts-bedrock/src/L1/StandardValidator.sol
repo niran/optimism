@@ -786,7 +786,6 @@ contract StandardValidator is ISemver {
         } else if (_superCannon != address(0) && _superPermissionedCannon != address(0)) {
             address _cannon = address(_factory.gameImpls(GameTypes.CANNON));
             address _permissionedCannon = address(_factory.gameImpls(GameTypes.PERMISSIONED_CANNON));
-            _errors = internalRequire(_cannon == address(0) && _permissionedCannon == address(0), "SUPER-10", _errors);
 
             _errors = assertValidPermissionedDisputeGame(
                 _errors, _input.sysCfg, _input.absolutePrestate, _input.l2ChainID, _input.proxyAdmin, true, _overrides
@@ -801,12 +800,12 @@ contract StandardValidator is ISemver {
             _errors = internalRequire(
                 GameType.unwrap(_respectedGameType)
                     == GameType.unwrap(_cannon == address(0) ? GameTypes.PERMISSIONED_CANNON : GameTypes.CANNON),
-                "GAMES-10",
+                "GAMES-20",
                 _errors
             );
         } else {
             // Only one super game is registered.
-            _errors = internalRequire(false, "SUPER-20", _errors);
+            _errors = internalRequire(false, "GAMES-30", _errors);
         }
 
         _errors = assertValidETHLockbox(_errors, _input.sysCfg, _input.proxyAdmin);
