@@ -27,7 +27,8 @@ func goStructTypeToSolidityType(t reflect.Type) (abi.Type, error) {
 		field := t.Field(i)
 		fieldTyp := field.Type
 		fieldName := field.Name
-		abiTypeStr, _, err := goTypeToSolidityType(fieldTyp)
+		abiType, err := goTypeToSolidityType(fieldTyp)
+		abiTypeStr := abiType.String()
 		if err != nil {
 			return abi.Type{}, fmt.Errorf("field %s: %w", fieldName, err)
 		}
@@ -64,10 +65,12 @@ func goTypeToSolidityType(typ reflect.Type) (abi.Type, error) {
 			}
 			return abi.NewType(fmt.Sprintf("bytes%d", typ.Len()), "", nil)
 		}
-		elemTyp, internalTyp, err := goTypeToSolidityType(typ.Elem())
+		abiType, err := goTypeToSolidityType(typ.Elem())
 		if err != nil {
 			return abi.Type{}, fmt.Errorf("unrecognized slice-elem type: %w", err)
 		}
+		elemTyp := abiType.String()
+		internalTyp := abiType.TupleType.String()
 		if internalTyp != "" {
 			return abi.Type{}, fmt.Errorf("nested internal types not supported: %w", err)
 		}
@@ -76,14 +79,16 @@ func goTypeToSolidityType(typ reflect.Type) (abi.Type, error) {
 		if typ.Elem().Kind() == reflect.Uint8 {
 			return abi.NewType("bytes", "", nil)
 		}
-		elemABITyp, internalTyp, err := goTypeToSolidityType(typ.Elem())
+		abiType, err := goTypeToSolidityType(typ.Elem())
 		if err != nil {
 			return abi.Type{}, fmt.Errorf("unrecognized slice-elem type: %w", err)
 		}
+		elemTyp := abiType.String()
+		internalTyp := abiType.TupleType.String()
 		if internalTyp != "" {
 			return abi.Type{}, fmt.Errorf("nested internal types not supported: %w", err)
 		}
-		return elemABITyp + "[]", "", nil
+		return abi.NewType(elemTyp+"[]", "", nil)
 	case reflect.Struct:
 		if typ.AssignableTo(abiInt256Type) {
 			return abi.NewType("int256", "", nil)
@@ -98,11 +103,11 @@ func goTypeToSolidityType(typ reflect.Type) (abi.Type, error) {
 		return abiType, err
 		// We can parse into abi.TupleTy in the future, if necessary
 	case reflect.Pointer:
-		elemABITyp, internalTyp, err := goTypeToSolidityType(typ.Elem())
+		abiType, err := goTypeToSolidityType(typ.Elem())
 		if err != nil {
 			return abi.Type{}, fmt.Errorf("unrecognized pointer-elem type: %w", err)
 		}
-		return elemABITyp, internalTyp, nil
+		return abiType, nil
 	default:
 		return abi.Type{}, fmt.Errorf("unrecognized typ: %s", typ)
 	}
