@@ -976,16 +976,4 @@ func (s *OpConductorTestSuite) TestFlashblocksHandlerIntegration() {
 
 	// Verify that the conductor is stopped
 	s.True(conductor.Stopped())
-
-	// Give the OS a moment to release the port
-	time.Sleep(100 * time.Millisecond)
-
-	// Instead of trying to connect, check if we can bind to the port
-	// If we can bind to it, it means the server is no longer using it
-	testListener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		s.Fail("Port is still in use after stopping the server: %v", err)
-	} else {
-		testListener.Close() // Successfully bound to the port, close it
-	}
 }

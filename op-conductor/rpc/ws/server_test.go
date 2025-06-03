@@ -255,3 +255,69 @@ func TestMultipleClientsPingPong(t *testing.T) {
 	verifyClientCount(t, handler, numClients, "After ping/pong cycles")
 	t.Logf("Multiple clients ping/pong test completed successfully with %d clients", numClients)
 }
+
+// TestReadPumpTimeout tests the readPump's behavior when read timeouts occur
+func TestReadPumpTimeout(t *testing.T) {
+	handler, server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+	cfg := defaultTestConfig()
+
+	// Create test client that will not send any messages
+	client, resp, err := websocket.Dial(context.Background(), wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to create test client: %v", err)
+	}
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("Expected status code %d, got %d", http.StatusSwitchingProtocols, resp.StatusCode)
+	}
+
+	// Wait for client registration
+	time.Sleep(cfg.setupDelay)
+
+	// Verify initial client connection
+	verifyClientCount(t, handler, 1, "Initial connection")
+
+	// Wait for a reasonable amount of time to ensure the readPump is running
+	// We can't easily test the 30s timeout in a unit test, but we can verify
+	// that the connection remains stable and functional
+	time.Sleep(2 * time.Second)
+
+	// Verify client is still connected
+	verifyClientCount(t, handler, 1, "After waiting period")
+
+	// Send a test message to verify the readPump is still processing
+	err = client.Write(context.Background(), websocket.MessageText, []byte("test message"))
+	if err != nil {
+		t.Errorf("Failed to write test message: %v", err)
+	}
+
+	// Give the server time to process the message
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify client is still connected after sending message
+	verifyClientCount(t, handler, 1, "After sending message")
+
+	// Close the client connection properly
+	err = client.Close(websocket.StatusNormalClosure, "test complete")
+	if err != nil {
+		t.Errorf("Failed to close connection: %v", err)
+	}
+
+	// Wait for the client to be unregistered
+	unregistered := false
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(handler.hub.clients) == 0 {
+			unregistered = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !unregistered {
+		t.Fatal("Client was not properly unregistered")
+	}
+
+	t.Log("ReadPump timeout test completed successfully")
+}

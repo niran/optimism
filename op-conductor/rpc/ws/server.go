@@ -15,8 +15,6 @@ import (
 type Hub struct {
 	// Registered clients
 	clients map[*Client]bool
-	// Mutex to protect access to clients map
-	clientsMu sync.RWMutex
 
 	// Register requests from the clients
 	register chan *Client
@@ -51,29 +49,22 @@ func (h *Hub) run() {
 	for {
 		select {
 		case <-h.done:
-			// Close all client connections
-			h.clientsMu.Lock()
+			// Close all remaining client connections
 			for client := range h.clients {
 				client.Close()
 				delete(h.clients, client)
 			}
-			h.clientsMu.Unlock()
 			return
 		case client := <-h.register:
-			h.clientsMu.Lock()
 			h.clients[client] = true
 			clientCount := len(h.clients)
 			h.log.Info("Client registered with hub", "totalClients", clientCount)
-			h.clientsMu.Unlock()
 		case client := <-h.unregister:
-			h.clientsMu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				client.Close()
 			}
-			h.clientsMu.Unlock()
 		case message := <-h.broadcast:
-			h.clientsMu.Lock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
@@ -84,7 +75,6 @@ func (h *Hub) run() {
 					h.log.Debug("Failed to send message to client, channel full")
 				}
 			}
-			h.clientsMu.Unlock()
 		}
 	}
 }
@@ -95,24 +85,21 @@ type Client struct {
 	send   chan []byte
 	ctx    context.Context
 	cancel context.CancelFunc
-	mu     sync.Mutex // protects closed flag
-	closed bool
 	hub    *Hub
 	log    log.Logger
+	mu     sync.Mutex
 }
 
 // Close closes the client's WebSocket connection and send channel
 func (c *Client) Close() {
-	// this mutex is used to prevent race conditions on the closed flag
+	// this mutex is used to prevent concurrent close operations
+	// double close will panic
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if !c.closed {
-		c.closed = true
-		c.cancel()
-		c.conn.Close(websocket.StatusNormalClosure, "client closed")
-		close(c.send)
-	}
+	c.cancel()
+	c.conn.Close(websocket.StatusNormalClosure, "client closed")
+	close(c.send)
 }
 
 // newClient creates a new client with default settings
@@ -172,6 +159,7 @@ func (h *Handler) readPump(client *Client) {
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					// Timeout is expected when no messages - continue reading
+					h.log.Debug("Read timeout occurred, continuing to process control frames")
 					continue
 				}
 				if websocket.CloseStatus(err) != -1 {
@@ -193,7 +181,9 @@ func (h *Handler) readPump(client *Client) {
 // writePump pumps messages from the hub to the WebSocket connection
 func (h *Handler) writePump(client *Client) {
 	defer func() {
-		client.Close()
+		// Don't close the client here - let the hub handle it
+		// Just unregister when this pump exits
+		h.hub.unregister <- client
 	}()
 
 	// Configure ping for connection keepalive
