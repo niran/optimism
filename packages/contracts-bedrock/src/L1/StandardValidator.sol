@@ -472,18 +472,21 @@ contract StandardValidator is ISemver {
         bytes32 _absolutePrestate,
         uint256 _l2ChainID,
         IProxyAdmin _admin,
+        bool _isSuperGame,
         ValidationOverrides memory _overrides
     )
         internal
         view
         returns (string memory)
     {
+        GameType _gameType = _isSuperGame ? GameTypes.SUPER_PERMISSIONED_CANNON : GameTypes.PERMISSIONED_CANNON;
+        string memory _errorPrefix = _isSuperGame ? "SPPDDG" : "PDDG";
+
         IDisputeGameFactory _factory = IDisputeGameFactory(_sysCfg.disputeGameFactory());
-        IPermissionedDisputeGame _game =
-            IPermissionedDisputeGame(address(_factory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
+        IPermissionedDisputeGame _game = IPermissionedDisputeGame(address(_factory.gameImpls(_gameType)));
 
         if (address(_game) == address(0)) {
-            _errors = internalRequire(false, "PDDG-10", _errors);
+            _errors = internalRequire(false, string.concat(_errorPrefix, "-10"), _errors);
             // Return early to avoid reverting, since this means that there is no valid game impl
             // for this game type.
             return _errors;
@@ -497,14 +500,14 @@ contract StandardValidator is ISemver {
             _absolutePrestate,
             _l2ChainID,
             _admin,
-            GameTypes.PERMISSIONED_CANNON,
+            _gameType,
             _overrides,
-            "PDDG"
+            _errorPrefix
         );
 
         // Challenger is specific to the PermissionedDisputeGame contract.
         address _challenger = expectedChallenger(_overrides);
-        _errors = internalRequire(_game.challenger() == _challenger, "PDDG-130", _errors);
+        _errors = internalRequire(_game.challenger() == _challenger, string.concat(_errorPrefix, "-130"), _errors);
 
         return _errors;
     }
@@ -516,17 +519,21 @@ contract StandardValidator is ISemver {
         bytes32 _absolutePrestate,
         uint256 _l2ChainID,
         IProxyAdmin _admin,
+        bool _isSuperGame,
         ValidationOverrides memory _overrides
     )
         internal
         view
         returns (string memory)
     {
+        GameType _gameType = _isSuperGame ? GameTypes.SUPER_CANNON : GameTypes.CANNON;
+        string memory _errorPrefix = _isSuperGame ? "SPLDG" : "PLDG";
+
         IDisputeGameFactory _factory = IDisputeGameFactory(_sysCfg.disputeGameFactory());
-        IPermissionedDisputeGame _game = IPermissionedDisputeGame(address(_factory.gameImpls(GameTypes.CANNON)));
+        IPermissionedDisputeGame _game = IPermissionedDisputeGame(address(_factory.gameImpls(_gameType)));
 
         if (address(_game) == address(0)) {
-            _errors = internalRequire(false, "PLDG-10", _errors);
+            _errors = internalRequire(false, string.concat(_errorPrefix, "-10"), _errors);
             // Return early to avoid reverting, since this means that there is no valid game impl
             // for this game type.
             return _errors;
@@ -540,9 +547,9 @@ contract StandardValidator is ISemver {
             _absolutePrestate,
             _l2ChainID,
             _admin,
-            GameTypes.CANNON,
+            _gameType,
             _overrides,
-            "PLDG"
+            _errorPrefix
         );
 
         return _errors;
@@ -753,12 +760,55 @@ contract StandardValidator is ISemver {
         _errors = assertValidL1ERC721Bridge(_errors, _input.sysCfg, _input.proxyAdmin);
         _errors = assertValidOptimismPortal(_errors, _input.sysCfg, _input.proxyAdmin);
         _errors = assertValidDisputeGameFactory(_errors, _input.sysCfg, _input.proxyAdmin, _overrides);
-        _errors = assertValidPermissionedDisputeGame(
-            _errors, _input.sysCfg, _input.absolutePrestate, _input.l2ChainID, _input.proxyAdmin, _overrides
-        );
-        _errors = assertValidPermissionlessDisputeGame(
-            _errors, _input.sysCfg, _input.absolutePrestate, _input.l2ChainID, _input.proxyAdmin, _overrides
-        );
+
+        // Both super games registered and NO other games, or
+        // No super games and ONLY (permissionedDisputeGame) OR (permissionedDisputeGame + faultDisputeGame).
+        IDisputeGameFactory _factory = IDisputeGameFactory(_input.sysCfg.disputeGameFactory());
+        address _superCannon = address(_factory.gameImpls(GameTypes.SUPER_CANNON));
+        address _superPermissionedCannon = address(_factory.gameImpls(GameTypes.SUPER_PERMISSIONED_CANNON));
+        if (_superCannon == address(0) && _superPermissionedCannon == address(0)) {
+            _errors = assertValidPermissionedDisputeGame(
+                _errors, _input.sysCfg, _input.absolutePrestate, _input.l2ChainID, _input.proxyAdmin, false, _overrides
+            );
+            _errors = assertValidPermissionlessDisputeGame(
+                _errors, _input.sysCfg, _input.absolutePrestate, _input.l2ChainID, _input.proxyAdmin, false, _overrides
+            );
+
+            // Ensure respectedGameTypes matches one of the registered impls in each state.
+            GameType _respectedGameType =
+                IPermissionedDisputeGame(_superCannon).anchorStateRegistry().respectedGameType();
+            _errors = internalRequire(
+                GameType.unwrap(_respectedGameType) == GameType.unwrap(GameTypes.SUPER_CANNON)
+                    || GameType.unwrap(_respectedGameType) == GameType.unwrap(GameTypes.SUPER_PERMISSIONED_CANNON),
+                "GAMES-10",
+                _errors
+            );
+        } else if (_superCannon != address(0) && _superPermissionedCannon != address(0)) {
+            address _cannon = address(_factory.gameImpls(GameTypes.CANNON));
+            address _permissionedCannon = address(_factory.gameImpls(GameTypes.PERMISSIONED_CANNON));
+            _errors = internalRequire(_cannon == address(0) && _permissionedCannon == address(0), "SUPER-10", _errors);
+
+            _errors = assertValidPermissionedDisputeGame(
+                _errors, _input.sysCfg, _input.absolutePrestate, _input.l2ChainID, _input.proxyAdmin, true, _overrides
+            );
+            _errors = assertValidPermissionlessDisputeGame(
+                _errors, _input.sysCfg, _input.absolutePrestate, _input.l2ChainID, _input.proxyAdmin, true, _overrides
+            );
+
+            // Ensure respectedGameTypes matches one of the registered impls in each state.
+            address _game = _cannon == address(0) ? _permissionedCannon : _cannon;
+            GameType _respectedGameType = IPermissionedDisputeGame(_game).anchorStateRegistry().respectedGameType();
+            _errors = internalRequire(
+                GameType.unwrap(_respectedGameType)
+                    == GameType.unwrap(_cannon == address(0) ? GameTypes.PERMISSIONED_CANNON : GameTypes.CANNON),
+                "GAMES-10",
+                _errors
+            );
+        } else {
+            // Only one super game is registered.
+            _errors = internalRequire(false, "SUPER-20", _errors);
+        }
+
         _errors = assertValidETHLockbox(_errors, _input.sysCfg, _input.proxyAdmin);
 
         string memory overridesString = getOverridesString(_overrides);
