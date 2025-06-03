@@ -15,6 +15,11 @@ func NewOptimismPortal2Factory(opts ...CallFactoryOption) *OptimismPortal2CallFa
 	return &OptimismPortal2CallFactory{BaseCallFactory: *NewBaseCallFactory(opts...)}
 }
 
+type ProvenWithdrawalsResult struct {
+	DisputeGameProxy common.Address
+	Timestamp        uint64
+}
+
 type OptimismPortal2 struct {
 	OptimismPortal2CallFactory
 
@@ -33,18 +38,15 @@ type OptimismPortal2 struct {
 		PrevBoughtGas uint64
 		PrevBlockNum  uint64
 	}] `sol:"params"`
-	Paused                    func() TypedCall[bool]                                                  `sol:"paused"`
-	ProofMaturityDelaySeconds func() TypedCall[*big.Int]                                              `sol:"proofMaturityDelaySeconds"`
-	ProofSubmitters           func(withdrawalHash [32]byte, index *big.Int) TypedCall[common.Address] `sol:"proofSubmitters"`
-	ProvenWithdrawals         func(withdrawalHash [32]byte, submitter common.Address) TypedCall[struct {
-		DisputeGameProxy common.Address
-		Timestamp        uint64
-	}] `sol:"provenWithdrawals"`
-	RespectedGameType          func() TypedCall[uint32]         `sol:"respectedGameType"`
-	RespectedGameTypeUpdatedAt func() TypedCall[uint64]         `sol:"respectedGameTypeUpdatedAt"`
-	SuperchainConfig           func() TypedCall[common.Address] `sol:"superchainConfig"`
-	SystemConfig               func() TypedCall[common.Address] `sol:"systemConfig"`
-	Version                    func() TypedCall[string]         `sol:"version"`
+	Paused                     func() TypedCall[bool]                                                                     `sol:"paused"`
+	ProofMaturityDelaySeconds  func() TypedCall[*big.Int]                                                                 `sol:"proofMaturityDelaySeconds"`
+	ProofSubmitters            func(withdrawalHash [32]byte, index *big.Int) TypedCall[common.Address]                    `sol:"proofSubmitters"`
+	ProvenWithdrawals          func(withdrawalHash [32]byte, submitter common.Address) TypedCall[ProvenWithdrawalsResult] `sol:"provenWithdrawals"`
+	RespectedGameType          func() TypedCall[uint32]                                                                   `sol:"respectedGameType"`
+	RespectedGameTypeUpdatedAt func() TypedCall[uint64]                                                                   `sol:"respectedGameTypeUpdatedAt"`
+	SuperchainConfig           func() TypedCall[common.Address]                                                           `sol:"superchainConfig"`
+	SystemConfig               func() TypedCall[common.Address]                                                           `sol:"systemConfig"`
+	Version                    func() TypedCall[string]                                                                   `sol:"version"`
 
 	// Write functions
 	DepositTransaction            func(to common.Address, value eth.ETH, gaslimit uint64, isCreation bool, data []byte) TypedCall[any] `sol:"depositTransaction"`

@@ -2,6 +2,7 @@ package withdrawal
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -48,7 +49,18 @@ func ForWithdrawalCheck(t devtest.T, alice *dsl.EOA, withdrawal crossdomain.With
 			err = err2
 			return false
 		}
-		return contract.Read(portal.CheckWithdrawal(wdHash, proofSubmitter)).(bool)
+		// CheckWithdrawal doesn't return a value, it just reverts if the check fails
+		// So we need to check if the call succeeds by catching any reverts
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					// Call reverted, which means the withdrawal check failed
+					err = fmt.Errorf("withdrawal check failed: %v", r)
+				}
+			}()
+			contract.Read(portal.CheckWithdrawal(wdHash, proofSubmitter))
+		}()
+		return err == nil
 	}, 30*time.Second, 500*time.Millisecond, "withdrawal check not found")
 	return err
 }

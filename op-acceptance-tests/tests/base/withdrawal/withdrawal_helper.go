@@ -137,8 +137,7 @@ func ProveWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Withdr
 		params.OutputRootProof,
 		params.WithdrawalProof,
 	)
-	proveReceipt := contract.Write(alice.AsEL(sys.L1EL), args)
-	require.NoError(t, err, "prove withdrawal")
+	proveReceipt := contract.Write(alice, args)
 	require.Equal(t, types.ReceiptStatusSuccessful, proveReceipt.Status)
 	return params, proveReceipt
 }

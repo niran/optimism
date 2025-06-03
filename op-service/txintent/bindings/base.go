@@ -309,13 +309,13 @@ func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
 	abiTargetType := CustomTypeToGoType(retTyp)
 	abiType, _, err := goTypeToABIType(abiTargetType)
 	if err != nil {
-		panic(err)
+		return zero, fmt.Errorf("failed to convert type to ABI type: %w", err)
 	}
 
 	outputs := abi.Arguments{{Type: abiType}}
 	decoded, err := outputs.Unpack(data)
 	if err != nil {
-		panic(err)
+		return zero, fmt.Errorf("failed to unpack data: %w", err)
 	}
 
 	val := ABIValueToCustomValue[ReturnType](retTyp, decoded[0])
