@@ -1,18 +1,25 @@
 package withdrawal
 
 import (
+	"context"
 	"math/big"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/op-acceptance-tests/tests/base/withdrawal/utils"
+	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/contracts"
+	"github.com/ethereum-optimism/optimism/op-challenger/game/fault/contracts/metrics"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl/contract"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
+	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils/wait"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/crossdomain"
 
+	gameTypes "github.com/ethereum-optimism/optimism/op-challenger/game/types"
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
+	"github.com/ethereum-optimism/optimism/op-service/sources/batching"
 	"github.com/ethereum-optimism/optimism/op-service/txintent/bindings"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum/go-ethereum/common"
@@ -21,10 +28,6 @@ import (
 )
 
 const SolErrClaimAlreadyResolved = "0xf1a94581"
-
-type ClientProvider interface {
-	NodeClient(name string) apis.EthClient
-}
 
 func SendWithdrawal(t devtest.T, alice *dsl.EOA, applyOpts WithdrawalTxOptsFn) *types.Receipt {
 	opts := defaultWithdrawalTxOpts()
@@ -161,52 +164,55 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 	optimismPortalAddr := rollupConfig.DepositContractAddress
 	portalFactory := bindings.NewOptimismPortal2Factory(bindings.WithClient(l1Client), bindings.WithTo(optimismPortalAddr), bindings.WithTest(t))
 	portal := bindings.NewOptimismPortal2(portalFactory)
-	var resolveClaimReceipt *types.Receipt
-	var resolveReceipt *types.Receipt
 	wdHash, err := wd.Hash()
 	require.NoError(t, err)
 
 	game := contract.Read(portal.ProvenWithdrawals(wdHash, alice.Address()))
 	require.NotNil(t, game, "withdrawal should be proven")
 
-	/*
-		gameContract, err := contracts.NewFaultDisputeGameContract(t.Ctx(), metrics.NoopContractMetrics, game.DisputeGameProxy, batching.NewMultiCaller(l1Client, batching.DefaultBatchSize))
+	gameContract, err := contracts.NewFaultDisputeGameContract(t.Ctx(), metrics.NoopContractMetrics, game.DisputeGameProxy, l1Client.NewMultiCaller(batching.DefaultBatchSize))
+	require.NoError(t, err)
+
+	timedCtx, cancel := context.WithTimeout(t.Ctx(), 30*time.Second)
+	defer cancel()
+	require.NoError(t, wait.For(timedCtx, time.Second, func() (bool, error) {
+		err := gameContract.CallResolveClaim(t.Ctx(), 0)
+		if err != nil {
+			t.Logf("Could not resolve dispute game claim: %v", err)
+		}
+		return err == nil, nil
+	}))
+
+	t.Logf("FinalizeWithdrawal: resolveClaim...")
+	tx, err := gameContract.ResolveClaimTx(0)
+	require.NoError(t, err)
+	resolveClaimReceipt := alice.Transact(
+		alice.Plan(),
+		txplan.WithTo(tx.To),
+		txplan.WithValue(tx.Value),
+		txplan.WithGasLimit(tx.GasLimit),
+		txplan.WithData(tx.TxData),
+	)
+
+	t.Logf("FinalizeWithdrawal: resolve...")
+	tx, err = gameContract.ResolveTx()
+	require.NoError(t, err)
+	resolveReceipt := alice.Transact(
+		alice.Plan(),
+		txplan.WithTo(tx.To),
+		txplan.WithValue(tx.Value),
+		txplan.WithGasLimit(tx.GasLimit),
+		txplan.WithData(tx.TxData),
+	)
+
+	if resolveReceipt.Included.Value().Status == types.ReceiptStatusFailed {
+		t.Logf("resolve failed (tx: %s)! But game may have resolved already. Checking now...", resolveReceipt.Included.Value().TxHash)
+		// it may have failed because someone else front-ran this by calling `resolve()` first.
+		status, err := gameContract.GetStatus(t.Ctx())
 		require.NoError(t, err)
-
-		timedCtx, cancel := context.WithTimeout(t.Ctx(), 30*time.Second)
-		defer cancel()
-		require.NoError(t, wait.For(timedCtx, time.Second, func() (bool, error) {
-			err := gameContract.CallResolveClaim(t.Ctx(), 0)
-			if err != nil {
-				t.Logf("Could not resolve dispute game claim: %v", err)
-			}
-			return err == nil, nil
-		}))
-
-		t.Logf("FinalizeWithdrawal: resolveClaim...")
-		tx, err := gameContract.ResolveClaimTx(0)
-		require.NoError(t, err, "create resolveClaim tx")
-		_, resolveClaimReceipt, err = transactions.SendTx(t.Ctx(), l1Client, tx, privKey)
-		var rsErr *wait.ReceiptStatusError
-		if errors.As(err, &rsErr) && rsErr.TxTrace.Output.String() == SolErrClaimAlreadyResolved {
-			t.Logf("resolveClaim failed (tx: %s) because claim got already resolved", resolveClaimReceipt.TxHash)
-		} else {
-			require.NoError(t, err)
-		}
-
-		t.Logf("FinalizeWithdrawal: resolve...")
-		tx, err = gameContract.ResolveTx()
-		require.NoError(t, err, "create resolve tx")
-		_, resolveReceipt = transactions.RequireSendTx(t, ctx, l1Client, tx, privKey, transactions.WithReceiptStatusIgnore())
-		if resolveReceipt.Status == types.ReceiptStatusFailed {
-			t.Logf("resolve failed (tx: %s)! But game may have resolved already. Checking now...", resolveReceipt.TxHash)
-			// it may have failed because someone else front-ran this by calling `resolve()` first.
-			status, err := gameContract.GetStatus(ctx)
-			require.NoError(t, err)
-			require.Equal(t, gameTypes.GameStatusDefenderWon, status, "game must have resolved with defender won")
-			t.Logf("resolve was not needed, the game was already resolved")
-		}
-	*/
+		require.Equal(t, gameTypes.GameStatusDefenderWon, status, "game must have resolved with defender won")
+		t.Logf("resolve was not needed, the game was already resolved")
+	}
 
 	t.Logf("FinalizeWithdrawal: waiting for successful withdrawal check...")
 	err = ForWithdrawalCheck(t, alice, wd, optimismPortalAddr, alice.Address())
@@ -214,9 +220,9 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 
 	// Finalize withdrawal
 	t.Logf("FinalizeWithdrawal: finalizing withdrawal...")
-	tx := contract.Write(alice, portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()))
+	tx2 := contract.Write(alice, portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()))
 
 	// Ensure that our withdrawal was finalized successfully
-	require.Equal(t, types.ReceiptStatusSuccessful, tx.Status)
-	return tx, resolveClaimReceipt, resolveReceipt
+	require.Equal(t, types.ReceiptStatusSuccessful, tx2.Status)
+	return tx2, resolveClaimReceipt.Included.Value(), resolveReceipt.Included.Value()
 }
