@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 	"github.com/ethereum-optimism/optimism/op-service/apis"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/testreq"
@@ -244,7 +243,7 @@ func CustomTypeToGoType(retTyp reflect.Type) reflect.Type {
 	case reflect.TypeOf(eth.ETH{}), reflect.TypeOf(eth.ChainID{}):
 		return reflect.TypeOf(big.NewInt(0))
 	case reflect.TypeOf(suptypes.Identifier{}):
-		return reflect.TypeOf(script.ABIIdentifier{})
+		return reflect.TypeOf(ABIIdentifier{})
 	default:
 		return retTyp
 	}
@@ -259,7 +258,7 @@ func CustomValueToABIValue(arg any) any {
 	case eth.ChainID:
 		value = v.ToBig()
 	case suptypes.Identifier:
-		identifier := script.ABIIdentifier{
+		identifier := ABIIdentifier{
 			Origin:      v.Origin,
 			BlockNumber: big.NewInt(int64(v.BlockNumber)),
 			LogIndex:    big.NewInt(int64(v.LogIndex)),
