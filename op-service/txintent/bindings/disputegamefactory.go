@@ -3,7 +3,6 @@ package bindings
 import (
 	"math/big"
 
-	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -13,6 +12,14 @@ type DisputeGameFactoryCallFactory struct {
 
 func NewDisputeGameFactory(opts ...CallFactoryOption) *DisputeGameFactoryCallFactory {
 	return &DisputeGameFactoryCallFactory{BaseCallFactory: *NewBaseCallFactory(opts...)}
+}
+
+type GameSearchResult struct {
+	Index     *big.Int
+	Metadata  [32]byte
+	Timestamp uint64
+	RootClaim [32]byte
+	ExtraData []byte
 }
 
 type DisputeGame struct {
@@ -30,11 +37,11 @@ type DisputeGame struct {
 		Proxy     common.Address
 		Timestamp uint64
 	}] `sol:"games"`
-	GetGameUUID     func(gameType uint32, rootClaim [32]byte, extraData []byte) TypedCall[[32]byte]        `sol:"getGameUUID"`
-	InitBonds       func(gameType uint32) TypedCall[*big.Int]                                              `sol:"initBonds"`
-	Owner           func() TypedCall[common.Address]                                                       `sol:"owner"`
-	Version         func() TypedCall[string]                                                               `sol:"version"`
-	FindLatestGames func(gameType uint32, start *big.Int, n *big.Int) TypedCall[[]script.GameSearchResult] `sol:"findLatestGames"`
+	GetGameUUID     func(gameType uint32, rootClaim [32]byte, extraData []byte) TypedCall[[32]byte] `sol:"getGameUUID"`
+	InitBonds       func(gameType uint32) TypedCall[*big.Int]                                       `sol:"initBonds"`
+	Owner           func() TypedCall[common.Address]                                                `sol:"owner"`
+	Version         func() TypedCall[string]                                                        `sol:"version"`
+	FindLatestGames func(gameType uint32, start *big.Int, n *big.Int) TypedCall[[]GameSearchResult] `sol:"findLatestGames"`
 
 	// Write functions
 	Create            func(gameType uint32, rootClaim [32]byte, extraData []byte) TypedCall[common.Address] `sol:"create"`
