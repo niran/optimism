@@ -81,23 +81,6 @@ func tupleTypeToArgumentMarshaling(t *abi.Type) ([]abi.ArgumentMarshaling, error
 	return args, nil
 }
 
-func canonicalTypeString(t *abi.Type) string {
-	switch t.T {
-	case abi.TupleTy:
-		elems := make([]string, len(t.TupleElems))
-		for i, e := range t.TupleElems {
-			elems[i] = canonicalTypeString(e)
-		}
-		return fmt.Sprintf("tuple(%s)", strings.Join(elems, ","))
-	case abi.SliceTy:
-		return canonicalTypeString(t.Elem) + "[]"
-	case abi.ArrayTy:
-		return fmt.Sprintf("%s[%d]", canonicalTypeString(t.Elem), t.Size)
-	default:
-		return t.String()
-	}
-}
-
 func goTypeToABIType(typ reflect.Type) (abi.Type, error) {
 	switch typ.Kind() {
 	case reflect.Int, reflect.Uint:
