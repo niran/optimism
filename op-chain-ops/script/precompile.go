@@ -343,6 +343,14 @@ func convertType(src, dest any) (out any, err error) {
 	return
 }
 
+type GameSearchResult struct {
+	Index     *big.Int
+	Metadata  [32]byte
+	Timestamp uint64
+	RootClaim [32]byte
+	ExtraData []byte
+}
+
 // GoTypeToABIType infers the geth ABI type definition from a Go reflect type definition.
 func GoTypeToABIType(typ reflect.Type) (abi.Type, error) {
 	// temporal hardcode for tuple types
@@ -354,6 +362,16 @@ func GoTypeToABIType(typ reflect.Type) (abi.Type, error) {
 			{Name: "Timestamp", Type: "uint256"},
 			{Name: "ChainId", Type: "uint256"},
 		})
+	}
+	if typ == reflect.TypeFor[[]GameSearchResult]() {
+		tupleArgs := []abi.ArgumentMarshaling{
+			{Name: "index", Type: "uint256"},
+			{Name: "metadata", Type: "bytes32"},
+			{Name: "timestamp", Type: "uint64"},
+			{Name: "rootClaim", Type: "bytes32"},
+			{Name: "extraData", Type: "bytes"},
+		}
+		return abi.NewType("tuple[]", "", tupleArgs)
 	}
 	solType, internalType, err := goTypeToSolidityType(typ)
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/gethclient"
 
+	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl/contract"
@@ -138,7 +139,7 @@ func ProveWithdrawalParametersForEvent(t devtest.T, l2Client apis.EthClient, ev 
 }
 
 // FindLatestGame finds the latest game in the DisputeGameFactory contract.
-func FindLatestGame(t devtest.T, l2Chain *dsl.L2Network, l1Client apis.EthClient) (bindingsnew.GameSearchResult, error) {
+func FindLatestGame(t devtest.T, l2Chain *dsl.L2Network, l1Client apis.EthClient) (script.GameSearchResult, error) {
 	rollupConfig := l2Chain.Escape().RollupConfig()
 	disputeGameFactoryAddr := l2Chain.Escape().Deployment().DisputeGameFactoryProxyAddr()
 	optimismPortalAddr := rollupConfig.DepositContractAddress
@@ -153,13 +154,13 @@ func FindLatestGame(t devtest.T, l2Chain *dsl.L2Network, l1Client apis.EthClient
 
 	gameCount := contract.Read(disputeGame.GameCount())
 	if gameCount.Cmp(common.Big0) == 0 {
-		return bindingsnew.GameSearchResult{}, errors.New("no games")
+		return script.GameSearchResult{}, errors.New("no games")
 	}
 
 	searchStart := new(big.Int).Sub(gameCount, common.Big1)
 	latestGames := contract.Read(disputeGame.FindLatestGames(respectedGameType, searchStart, common.Big1))
 	if len(latestGames) == 0 {
-		return bindingsnew.GameSearchResult{}, errors.New("no latest games")
+		return script.GameSearchResult{}, errors.New("no latest games")
 	}
 
 	latestGame := latestGames[0]
