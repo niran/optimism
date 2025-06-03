@@ -45,6 +45,28 @@ type TestComplexStruct struct {
 }
 
 //nolint:unused
+type TestNestedStructVarLen struct {
+	a []TestNestedStruct
+}
+
+type TestNestedStructFixLen struct {
+	a [7]TestNestedStruct
+}
+
+//nolint:unused
+type TestStruct struct {
+	a TestSimpleStructB
+	b []TestNestedStruct
+	c TestSimpleStructA
+	d *big.Int
+	e TestSimpleStructB
+	f TestSimpleStructA
+	g [5]TestNestedStruct
+	h []byte
+	i [5]byte
+}
+
+//nolint:unused
 type TestRecursiveStruct struct {
 	a TestNestedStruct
 }
@@ -88,6 +110,16 @@ func TestTypeConversion(t *testing.T) {
 			testName: "NestedStruct",
 		},
 		{
+			value:    TestNestedStructVarLen{},
+			want:     "(((uint256,bytes,address),(bytes3,bytes32,uint256),(uint256,bytes,address)[3])[])",
+			testName: "TestNestedStructVarLen",
+		},
+		{
+			value:    TestNestedStructFixLen{},
+			want:     "(((uint256,bytes,address),(bytes3,bytes32,uint256),(uint256,bytes,address)[3])[7])",
+			testName: "TestNestedStructFixLen",
+		},
+		{
 			value:    TestRecursiveStruct2{},
 			want:     "((((uint256,bytes,address),(bytes3,bytes32,uint256),(uint256,bytes,address)[3])))",
 			testName: "RecursiveStruct2",
@@ -104,14 +136,14 @@ func TestTypeConversion(t *testing.T) {
 		},
 		{
 			value:    TestComplexStruct{},
-			want:     "((bytes3,bytes32,uint256),(uint256,bytes3,uint256[3])[3])[],(uint256,bytes,address),uint256,(bytes3,bytes32,uint256),(uint256,bytes,address),(uint256,bytes3,uint256[3])[3])[5],bytes,bytes5)",
+			want:     "((bytes3,bytes32,uint256),((uint256,bytes,address),(bytes3,bytes32,uint256),(uint256,bytes,address)[3])[],(uint256,bytes,address),uint256,(bytes3,bytes32,uint256),(uint256,bytes,address),((uint256,bytes,address),(bytes3,bytes32,uint256),(uint256,bytes,address)[3])[5],bytes,bytes5)",
 			testName: "ComplexStruct",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.testName, func(t *testing.T) {
-			typ, err := goTypeToABIType(reflect.TypeOf(tc.value))
+			typ, _, err := goTypeToABIType(reflect.TypeOf(tc.value))
 			require.NoError(t, err)
 			require.Equal(t, tc.want, typ.String())
 		})

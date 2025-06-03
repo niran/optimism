@@ -311,7 +311,7 @@ func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
 	}
 
 	abiTargetType := CustomTypeToGoType(retTyp)
-	abiType, err := goTypeToABIType(abiTargetType)
+	abiType, _, err := goTypeToABIType(abiTargetType)
 	if err != nil {
 		panic(err)
 	}
@@ -333,7 +333,7 @@ func ABIEncoder(name string, args ...any) ([]byte, error) {
 	for i, arg := range args {
 		goType := CustomTypeToGoType(reflect.TypeOf(arg))
 		abiValue := CustomValueToABIValue(arg)
-		abiType, err := goTypeToABIType(goType)
+		abiType, _, err := goTypeToABIType(goType)
 		if err != nil {
 			panic(err)
 		}
