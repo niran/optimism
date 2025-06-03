@@ -50,6 +50,7 @@ type TestNestedStructVarLen struct {
 	a []TestNestedStruct
 }
 
+//nolint:unused
 type TestNestedStructFixLen struct {
 	a [7]TestNestedStruct
 }
