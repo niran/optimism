@@ -794,15 +794,17 @@ contract StandardValidator is ISemver {
                 _errors, _input.sysCfg, _input.absolutePrestate, _input.l2ChainID, _input.proxyAdmin, true, _overrides
             );
 
-            // Ensure respectedGameTypes matches one of the registered impls in each state.
-            address _game = _cannon == address(0) ? _permissionedCannon : _cannon;
-            GameType _respectedGameType = IPermissionedDisputeGame(_game).anchorStateRegistry().respectedGameType();
-            _errors = internalRequire(
-                GameType.unwrap(_respectedGameType)
-                    == GameType.unwrap(_cannon == address(0) ? GameTypes.PERMISSIONED_CANNON : GameTypes.CANNON),
-                "GAMES-20",
-                _errors
-            );
+            if (_cannon != address(0) && _permissionedCannon != address(0)) {
+                // Ensure respectedGameTypes matches one of the registered impls in each state.
+                address _game = _cannon == address(0) ? _permissionedCannon : _cannon;
+                GameType _respectedGameType = IPermissionedDisputeGame(_game).anchorStateRegistry().respectedGameType();
+                _errors = internalRequire(
+                    GameType.unwrap(_respectedGameType)
+                        == GameType.unwrap(_cannon == address(0) ? GameTypes.PERMISSIONED_CANNON : GameTypes.CANNON),
+                    "GAMES-20",
+                    _errors
+                );
+            }
         } else {
             // Only one super game is registered.
             _errors = internalRequire(false, "GAMES-30", _errors);
