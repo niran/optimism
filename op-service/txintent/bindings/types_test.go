@@ -175,6 +175,11 @@ func TestTypeConversion(t *testing.T) {
 			want:     "((bytes3,bytes32,uint256),((uint256,bytes,address),(bytes3,bytes32,uint256),(uint256,bytes,address)[3])[],(uint256,bytes,address),uint256,(bytes3,bytes32,uint256),(uint256,bytes,address),((uint256,bytes,address),(bytes3,bytes32,uint256),(uint256,bytes,address)[3])[5],bytes,bytes5)",
 			testName: "ComplexStruct",
 		},
+		{
+			value:    ABIIdentifier{},
+			want:     "(address,uint256,uint256,uint256,uint256)",
+			testName: "supervisor Identifier",
+		},
 	}
 
 	for _, tc := range tests {
