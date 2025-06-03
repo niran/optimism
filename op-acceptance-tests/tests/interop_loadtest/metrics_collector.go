@@ -1,4 +1,4 @@
-package loadtest
+package interop_loadtest
 
 import (
 	"context"

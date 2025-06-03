@@ -49,3 +49,11 @@ gates:
         timeout: 10m
       - package: github.com/ethereum-optimism/optimism/op-acceptance-tests/tests/interop/message
       - package: github.com/ethereum-optimism/optimism/op-acceptance-tests/tests/interop/sync
+
+
+  - id: interop-load
+    inherits:
+      - base
+    description: "Interop network load tests. Packaged as a separate gate to reduce CI time."
+    tests:
+      - package: github.com/ethereum-optimism/optimism/op-acceptance-tests/tests/interop_loadtest
