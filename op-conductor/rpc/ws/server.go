@@ -65,15 +65,23 @@ func (h *Hub) run() {
 				client.Close()
 			}
 		case message := <-h.broadcast:
+			successCount := 0
+			dropCount := 0
+
 			for client := range h.clients {
 				select {
 				case client.send <- message:
 					// Message sent successfully
+					successCount++
 				default:
 					// Channel is full, client is likely slow/dead
 					// The ping mechanism will detect and clean up dead clients
 					h.log.Debug("Failed to send message to client, channel full")
+					dropCount++
 				}
+			}
+			if dropCount > 0 {
+				h.log.Warn("Failed to send message to all clients, dropped", "successCount", successCount, "dropCount", dropCount)
 			}
 		}
 	}
@@ -107,7 +115,7 @@ func newClient(conn *websocket.Conn, ctx context.Context, hub *Hub, logger log.L
 	ctx, cancel := context.WithCancel(ctx)
 	return &Client{
 		conn:   conn,
-		send:   make(chan []byte, 256),
+		send:   make(chan []byte, sendChannelBufferSize),
 		ctx:    ctx,
 		cancel: cancel,
 		hub:    hub,

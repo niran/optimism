@@ -22,6 +22,8 @@ const (
 	pongTimeout = 10 * time.Second
 	// writeTimeout for all message writes
 	writeTimeout = 5 * time.Second
+	// send channel buffer size
+	sendChannelBufferSize = 256
 )
 
 // FlashblockHandler manages WebSocket connections for flashblocks
@@ -160,7 +162,6 @@ func (h *Handler) BroadcastMessage(message []byte) {
 	h.hub.broadcast <- message
 }
 
-// Your startWebSocketServer should look like this:
 func (h *Handler) startWebSocketServer(_ context.Context) error {
 	if h.cfg.WebsocketServerPort <= 0 {
 		return fmt.Errorf("WebSocket server port not configured or invalid: %d", h.cfg.WebsocketServerPort)
