@@ -182,14 +182,11 @@ contract StandardValidator_TestInit is CommonTest {
                             (
                                 IFaultDisputeGame.GameConstructorParams({
                                     gameType: GameTypes.CANNON,
-                                    absolutePrestate: absolutePrestate,
                                     maxGameDepth: 73,
                                     splitDepth: 30,
                                     clockExtension: Duration.wrap(10800),
                                     maxClockDuration: Duration.wrap(302400),
-                                    vm: mips,
                                     weth: delayedWeth,
-                                    anchorStateRegistry: anchorStateRegistry,
                                     l2ChainId: l2ChainId
                                 })
                             )
@@ -200,7 +197,7 @@ contract StandardValidator_TestInit is CommonTest {
 
             // Add the FaultDisputeGame to the DisputeGameFactory.
             vm.prank(disputeGameFactory.owner());
-            disputeGameFactory.setImplementation(GameTypes.CANNON, IDisputeGame(address(fdg)));
+            disputeGameFactory.setImplementation(GameTypes.CANNON, IDisputeGame(address(fdg)), ""); // TODO(snevins): validate correct parameters later
         }
     }
 

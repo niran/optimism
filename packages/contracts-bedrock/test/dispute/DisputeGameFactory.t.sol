@@ -64,14 +64,11 @@ contract DisputeGameFactory_Init is CommonTest {
     {
         return IFaultDisputeGame.GameConstructorParams({
             gameType: _gameType,
-            absolutePrestate: _absolutePrestate,
             maxGameDepth: 2 ** 3,
             splitDepth: 2 ** 2,
             clockExtension: Duration.wrap(3 hours),
             maxClockDuration: Duration.wrap(3.5 days),
-            vm: _vm,
             weth: delayedWeth,
-            anchorStateRegistry: anchorStateRegistry,
             l2ChainId: 0
         });
     }
@@ -91,7 +88,7 @@ contract DisputeGameFactory_Init is CommonTest {
 
     function _setGame(address _gameImpl, GameType _gameType) internal {
         vm.startPrank(disputeGameFactory.owner());
-        disputeGameFactory.setImplementation(_gameType, IDisputeGame(_gameImpl));
+        disputeGameFactory.setImplementation(_gameType, IDisputeGame(_gameImpl), ""); // TODO(snevins): validate correct parameters later
         disputeGameFactory.setInitBond(_gameType, 0.08 ether);
         vm.stopPrank();
     }
