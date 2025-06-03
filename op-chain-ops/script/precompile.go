@@ -378,6 +378,33 @@ type ABIIdentifier struct {
 	ChainId     *big.Int
 }
 
+func goStructTypeToSolidityType(t reflect.Type) (*abi.Type, error) {
+	if t.Kind() != reflect.Struct {
+		return nil, errors.New("input must be a struct type")
+	}
+	components := []abi.ArgumentMarshaling{}
+	names := []string{}
+	for i := range t.NumField() {
+		field := t.Field(i)
+		fieldTyp := field.Type
+		fieldName := field.Name
+		abiTypeStr, _, err := goTypeToSolidityType(fieldTyp)
+		if err != nil {
+			return nil, fmt.Errorf("field %s: %w", fieldName, err)
+		}
+		names = append(names, fieldName)
+		components = append(components, abi.ArgumentMarshaling{
+			Name: fieldName, Type: abiTypeStr,
+		})
+	}
+	tuple, err := abi.NewType("tuple", "", components)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct tuple: %w", err)
+	}
+	tuple.TupleRawNames = names
+	return &tuple, nil
+}
+
 // goTypeToSolidityType converts a Go type to the solidity ABI type definition.
 // The "internalType" is a quirk of the Geth ABI utils, for nested structures.
 // Unfortunately we have to convert to string, not directly to ABI type structure,
@@ -429,8 +456,11 @@ func goTypeToSolidityType(typ reflect.Type) (typeDef, internalType string, err e
 		if typ.ConvertibleTo(typeFor[big.Int]()) {
 			return "uint256", "", nil
 		}
-		// We can parse into abi.TupleTy in the future, if necessary
-		return "", "", fmt.Errorf("structs are not supported, cannot handle type %s", typ)
+		abiType, err := goStructTypeToSolidityType(typ)
+		if err != nil {
+			return "", "", fmt.Errorf("struct conversion failure, cannot handle type %s: %w", typ, err)
+		}
+		return "tuple" + abiType.String(), "", nil
 	case reflect.Pointer:
 		elemABITyp, internalTyp, err := goTypeToSolidityType(typ.Elem())
 		if err != nil {
