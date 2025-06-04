@@ -479,8 +479,15 @@ contract StandardValidator is ISemver {
         view
         returns (string memory)
     {
-        GameType _gameType = _isSuperGame ? GameTypes.SUPER_PERMISSIONED_CANNON : GameTypes.PERMISSIONED_CANNON;
-        string memory _errorPrefix = _isSuperGame ? "SPPDDG" : "PDDG";
+        GameType _gameType;
+        string memory _errorPrefix;
+        if (_isSuperGame) {
+            _gameType = GameTypes.SUPER_PERMISSIONED_CANNON;
+            _errorPrefix = "SPDDG";
+        } else {
+            _gameType = GameTypes.PERMISSIONED_CANNON;
+            _errorPrefix = "PDDG";
+        }
 
         IDisputeGameFactory _factory = IDisputeGameFactory(_sysCfg.disputeGameFactory());
         IPermissionedDisputeGame _game = IPermissionedDisputeGame(address(_factory.gameImpls(_gameType)));
@@ -526,8 +533,15 @@ contract StandardValidator is ISemver {
         view
         returns (string memory)
     {
-        GameType _gameType = _isSuperGame ? GameTypes.SUPER_CANNON : GameTypes.CANNON;
-        string memory _errorPrefix = _isSuperGame ? "SPLDG" : "PLDG";
+        GameType _gameType;
+        string memory _errorPrefix;
+        if (_isSuperGame) {
+            _gameType = GameTypes.SUPER_CANNON;
+            _errorPrefix = "SPLDG";
+        } else {
+            _gameType = GameTypes.CANNON;
+            _errorPrefix = "PLDG";
+        }
 
         IDisputeGameFactory _factory = IDisputeGameFactory(_sysCfg.disputeGameFactory());
         IPermissionedDisputeGame _game = IPermissionedDisputeGame(address(_factory.gameImpls(_gameType)));
