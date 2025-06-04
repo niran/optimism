@@ -11,6 +11,55 @@ import (
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
+func TestSufficientDataChecks(t *testing.T) {
+	t.Run("empty hazards", func(t *testing.T) {
+		sfcd := &mockSafeFrontierCheckDeps{}
+		l1Source := eth.BlockID{}
+		hazards := map[eth.ChainID]types.BlockSeal{}
+		err := SufficientDataChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
+		require.NoError(t, err)
+	})
+	t.Run("latest ahead of scope", func(t *testing.T) {
+		sfcd := &mockSafeFrontierCheckDeps{}
+		l1Source := eth.BlockID{Number: 1}
+		hazards := map[eth.ChainID]types.BlockSeal{}
+		sfcd.crossSafeFn = func(chain eth.ChainID) (latest types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 1},
+				Derived: types.BlockSeal{Number: 1},
+			}, nil
+		}
+		err := SufficientDataChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
+		require.NoError(t, err)
+	})
+	t.Run("latest equal to scope", func(t *testing.T) {
+		sfcd := &mockSafeFrontierCheckDeps{}
+		l1Source := eth.BlockID{Number: 1}
+		hazards := map[eth.ChainID]types.BlockSeal{}
+		sfcd.crossSafeFn = func(chain eth.ChainID) (latest types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 1},
+				Derived: types.BlockSeal{Number: 1},
+			}, nil
+		}
+		err := SufficientDataChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
+		require.NoError(t, err)
+	})
+	t.Run("latest behind scope", func(t *testing.T) {
+		sfcd := &mockSafeFrontierCheckDeps{}
+		l1Source := eth.BlockID{Number: 5}
+		hazards := map[eth.ChainID]types.BlockSeal{eth.ChainIDFromUInt64(123): {Number: 2}}
+		sfcd.crossSafeFn = func(chain eth.ChainID) (latest types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 2},
+				Derived: types.BlockSeal{Number: 2},
+			}, nil
+		}
+		err := SufficientDataChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
+		require.ErrorIs(t, err, types.ErrFuture)
+	})
+}
+
 func TestHazardSafeFrontierChecks(t *testing.T) {
 	t.Run("empty hazards", func(t *testing.T) {
 		sfcd := &mockSafeFrontierCheckDeps{}
@@ -131,6 +180,7 @@ func TestHazardSafeFrontierChecks(t *testing.T) {
 type mockSafeFrontierCheckDeps struct {
 	candidateCrossSafeFn func() (candidate types.DerivedBlockRefPair, err error)
 	crossSourceFn        func() (source types.BlockSeal, err error)
+	crossSafeFn          func(chain eth.ChainID) (latest types.DerivedBlockSealPair, err error)
 }
 
 func (m *mockSafeFrontierCheckDeps) CandidateCrossSafe(chain eth.ChainID) (candidate types.DerivedBlockRefPair, err error) {
@@ -145,4 +195,11 @@ func (m *mockSafeFrontierCheckDeps) CrossDerivedToSource(chainID eth.ChainID, de
 		return m.crossSourceFn()
 	}
 	return types.BlockSeal{}, nil
+}
+
+func (m *mockSafeFrontierCheckDeps) CrossSafe(chainID eth.ChainID) (latest types.DerivedBlockSealPair, err error) {
+	if m.crossSafeFn != nil {
+		return m.crossSafeFn(chainID)
+	}
+	return types.DerivedBlockSealPair{}, nil
 }
