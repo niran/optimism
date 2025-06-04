@@ -25,8 +25,8 @@ func TestSufficientDataChecks(t *testing.T) {
 		hazards := map[eth.ChainID]types.BlockSeal{}
 		sfcd.crossSafeFn = func(chain eth.ChainID) (latest types.DerivedBlockSealPair, err error) {
 			return types.DerivedBlockSealPair{
-				Source:  types.BlockSeal{Number: 1},
-				Derived: types.BlockSeal{Number: 1},
+				Source:  types.BlockSeal{Number: 2},
+				Derived: types.BlockSeal{Number: 2},
 			}, nil
 		}
 		err := SufficientDataChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
@@ -56,6 +56,33 @@ func TestSufficientDataChecks(t *testing.T) {
 			}, nil
 		}
 		err := SufficientDataChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
+		require.ErrorIs(t, err, types.ErrFuture)
+	})
+	t.Run("second dep behind scope", func(t *testing.T) {
+		sfcd := &mockSafeFrontierCheckDeps{}
+		l1Source := eth.BlockID{Number: 5}
+		hazards := map[eth.ChainID]types.BlockSeal{eth.ChainIDFromUInt64(123): {Number: 10}, eth.ChainIDFromUInt64(456): {Number: 2}}
+		checked123 := false
+		checked456 := false
+		sfcd.crossSafeFn = func(chain eth.ChainID) (latest types.DerivedBlockSealPair, err error) {
+			if chain == eth.ChainIDFromUInt64(123) {
+				checked123 = true
+				return types.DerivedBlockSealPair{
+					Source:  types.BlockSeal{Number: 10},
+					Derived: types.BlockSeal{Number: 10},
+				}, nil
+			}
+			if chain == eth.ChainIDFromUInt64(456) {
+				checked456 = true
+				return types.DerivedBlockSealPair{
+					Source:  types.BlockSeal{Number: 2},
+					Derived: types.BlockSeal{Number: 2},
+				}, nil
+			}
+			return types.DerivedBlockSealPair{}, nil
+		}
+		err := SufficientDataChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
+		require.True(t, checked123 && checked456, "expected both chains to be checked")
 		require.ErrorIs(t, err, types.ErrFuture)
 	})
 }

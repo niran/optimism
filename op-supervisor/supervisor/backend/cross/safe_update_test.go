@@ -380,6 +380,12 @@ func TestScopedCrossSafeUpdate(t *testing.T) {
 				Derived: candidate,
 			}, nil
 		}
+		csd.crossSafeFn = func(chainID eth.ChainID) (pair types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 3},
+				Derived: types.BlockSeal{Number: 1},
+			}, nil
+		}
 		opened := eth.BlockRef{Number: 1, Time: 1}
 		em1 := &types.ExecutingMessage{ChainID: chainID, Timestamp: 1, LogIdx: 2}
 		em2 := &types.ExecutingMessage{ChainID: chainID, Timestamp: 1, LogIdx: 1}
@@ -406,6 +412,12 @@ func TestScopedCrossSafeUpdate(t *testing.T) {
 			return types.DerivedBlockRefPair{
 				Source:  candidateScope,
 				Derived: candidate,
+			}, nil
+		}
+		csd.crossSafeFn = func(chainID eth.ChainID) (pair types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 3},
+				Derived: types.BlockSeal{Number: 1},
 			}, nil
 		}
 		opened := eth.BlockRef{Number: 1}
