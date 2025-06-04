@@ -63,7 +63,7 @@ interface IStandardValidator {
     function systemConfigVersion() external pure returns (string memory);
     function withdrawalDelaySeconds() external view returns (uint256);
 
-    function validateWithOverrides(
+    function validate(
         ValidationInput memory _input,
         bool _allowFailure,
         ValidationOverrides memory _overrides

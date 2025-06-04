@@ -33,6 +33,7 @@ import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMin
 import { IHasSuperchainConfig } from "interfaces/L1/IHasSuperchainConfig.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IStandardValidator } from "interfaces/L1/IStandardValidator.sol";
+import { StandardValidator } from "src/L1/StandardValidator.sol";
 
 contract OPContractsManagerContractsContainer {
     /// @notice Addresses of the Blueprint contracts.
@@ -60,30 +61,19 @@ contract OPContractsManagerContractsContainer {
     }
 }
 
-contract OPContractsManagerValidator {
-    address public immutable standardValidatorImpl;
-
-    constructor(address _standardValidatorImpl) {
-        standardValidatorImpl = _standardValidatorImpl;
-    }
-
-    function validate(
-        IStandardValidator.ValidationInput memory _input,
-        bool _allowFailure,
-        IStandardValidator.ValidationOverrides memory _overrides
+contract OPContractsManagerValidator is StandardValidator {
+    constructor(
+        Implementations memory _implementations,
+        ISuperchainConfig _superchainConfig,
+        address _l1PAOMultisig,
+        address _challenger,
+        uint256 _withdrawalDelaySeconds
     )
-        internal
-        returns (string memory)
-    {
-        bytes memory _retData = _performDelegateCall(
-            standardValidatorImpl,
-            abi.encodeCall(IStandardValidator.validateWithOverrides, (_input, _allowFailure, _overrides))
-        );
-        return abi.decode(_retData, (string));
-    }
+        StandardValidator(_implementations, _superchainConfig, _l1PAOMultisig, _challenger, _withdrawalDelaySeconds)
+    { }
 }
 
-abstract contract OPContractsManagerBase is OPContractsManagerValidator {
+abstract contract OPContractsManagerBase {
     /// @notice Thrown when an invalid game type is used.
     error OPContractsManager_InvalidGameType();
 
@@ -95,12 +85,7 @@ abstract contract OPContractsManagerBase is OPContractsManagerValidator {
 
     /// @notice Constructor to initialize the immutable thisOPCM variable and contract addresses
     /// @param _contractsContainer The blueprint contract addresses and implementation contract addresses
-    constructor(
-        OPContractsManagerContractsContainer _contractsContainer,
-        address _standardValidator
-    )
-        OPContractsManagerValidator(_standardValidator)
-    {
+    constructor(OPContractsManagerContractsContainer _contractsContainer) {
         contractsContainer = _contractsContainer;
         thisOPCM = this;
     }
@@ -357,12 +342,7 @@ contract OPContractsManagerGameTypeAdder is OPContractsManagerBase {
 
     /// @notice Constructor to initialize the immutable thisOPCM variable and contract addresses
     /// @param _contractsContainer The blueprint contract addresses and implementation contract addresses
-    constructor(
-        OPContractsManagerContractsContainer _contractsContainer,
-        address _standardValidator
-    )
-        OPContractsManagerBase(_contractsContainer, _standardValidator)
-    { }
+    constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
 
     /// @notice Deploys a new dispute game and installs it into the DisputeGameFactory. Inputted
     ///         game configs must be added in ascending GameType order.
@@ -626,12 +606,7 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
     error OPContractsManagerUpgrader_SuperchainConfigMismatch();
 
     /// @param _contractsContainer The OPContractsManagerContractsContainer to use.
-    constructor(
-        OPContractsManagerContractsContainer _contractsContainer,
-        address _standardValidator
-    )
-        OPContractsManagerBase(_contractsContainer, _standardValidator)
-    { }
+    constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
 
     /// @notice Upgrades a set of chains to the latest implementation contracts
     /// @param _superchainConfig The SuperchainConfig contract to upgrade
@@ -880,17 +855,6 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
                 }
             }
 
-            validate(
-                IStandardValidator.ValidationInput({
-                    proxyAdmin: _opChainConfigs[i].proxyAdmin,
-                    sysCfg: _opChainConfigs[i].systemConfigProxy,
-                    absolutePrestate: Claim.unwrap(_opChainConfigs[i].absolutePrestate),
-                    l2ChainID: l2ChainId
-                }),
-                true,
-                IStandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
-            );
-
             // Emit the upgraded event with the address of the caller. Since this will be a delegatecall,
             // the caller will be the value of the ADDRESS opcode.
             emit Upgraded(l2ChainId, _opChainConfigs[i].systemConfigProxy, address(this));
@@ -994,12 +958,7 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
     /// @param deployOutput ABI-encoded output of the deployment.
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
 
-    constructor(
-        OPContractsManagerContractsContainer _contractsContainer,
-        address _standardValidator
-    )
-        OPContractsManagerBase(_contractsContainer, _standardValidator)
-    { }
+    constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
 
     function deploy(
         OPContractsManager.DeployInput calldata _input,
@@ -1201,17 +1160,6 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
         // -------- Finalize Deployment --------
         // Transfer ownership of the ProxyAdmin from this contract to the specified owner.
         transferOwnership(address(output.opChainProxyAdmin), _input.roles.opChainProxyAdminOwner);
-
-        validate(
-            IStandardValidator.ValidationInput({
-                proxyAdmin: output.opChainProxyAdmin,
-                sysCfg: output.systemConfigProxy,
-                absolutePrestate: Claim.unwrap(_input.disputeAbsolutePrestate),
-                l2ChainID: _input.l2ChainId
-            }),
-            true,
-            IStandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
-        );
 
         emit Deployed(_input.l2ChainId, _deployer, abi.encode(output));
         return output;
@@ -1453,12 +1401,7 @@ contract OPContractsManagerInteropMigrator is OPContractsManagerBase {
     }
 
     /// @param _contractsContainer Container of blueprints and implementations.
-    constructor(
-        OPContractsManagerContractsContainer _contractsContainer,
-        address _standardValidator
-    )
-        OPContractsManagerBase(_contractsContainer, _standardValidator)
-    { }
+    constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
 
     /// @notice Migrates one or more OP Stack chains to use the Super Root dispute games and shared
     ///         dispute game contracts.
@@ -1838,6 +1781,8 @@ contract OPContractsManager is ISemver {
 
     OPContractsManagerInteropMigrator public immutable opcmInteropMigrator;
 
+    OPContractsManagerValidator public immutable opcmValidator;
+
     /// @notice Address of the SuperchainConfig contract shared by all chains.
     ISuperchainConfig public immutable superchainConfig;
 
@@ -1917,6 +1862,7 @@ contract OPContractsManager is ISemver {
         OPContractsManagerDeployer _opcmDeployer,
         OPContractsManagerUpgrader _opcmUpgrader,
         OPContractsManagerInteropMigrator _opcmInteropMigrator,
+        OPContractsManagerValidator _opcmValidator,
         ISuperchainConfig _superchainConfig,
         IProtocolVersions _protocolVersions,
         IProxyAdmin _superchainProxyAdmin,
@@ -1929,10 +1875,12 @@ contract OPContractsManager is ISemver {
         _opcmDeployer.assertValidContractAddress(address(_opcmDeployer));
         _opcmDeployer.assertValidContractAddress(address(_opcmUpgrader));
         _opcmDeployer.assertValidContractAddress(address(_opcmInteropMigrator));
+        _opcmDeployer.assertValidContractAddress(address(_opcmValidator));
         opcmGameTypeAdder = _opcmGameTypeAdder;
         opcmDeployer = _opcmDeployer;
         opcmUpgrader = _opcmUpgrader;
         opcmInteropMigrator = _opcmInteropMigrator;
+        opcmValidator = _opcmValidator;
         superchainConfig = _superchainConfig;
         protocolVersions = _protocolVersions;
         superchainProxyAdmin = _superchainProxyAdmin;
@@ -1941,8 +1889,19 @@ contract OPContractsManager is ISemver {
         upgradeController = _upgradeController;
     }
 
-    function deploy(DeployInput calldata _input) external virtual returns (DeployOutput memory) {
-        return opcmDeployer.deploy(_input, superchainConfig, msg.sender);
+    function deploy(DeployInput calldata _input) external virtual returns (DeployOutput memory output_) {
+        output_ = opcmDeployer.deploy(_input, superchainConfig, msg.sender);
+
+        opcmValidator.validate(
+            StandardValidator.ValidationInput({
+                proxyAdmin: output_.opChainProxyAdmin,
+                sysCfg: output_.systemConfigProxy,
+                absolutePrestate: Claim.unwrap(_input.disputeAbsolutePrestate),
+                l2ChainID: _input.l2ChainId
+            }),
+            true,
+            StandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
+        );
     }
 
     /// @notice Upgrades a set of chains to the latest implementation contracts
@@ -1962,6 +1921,19 @@ contract OPContractsManager is ISemver {
             OPContractsManagerUpgrader.upgrade, (superchainConfig, superchainProxyAdmin, _opChainConfigs)
         );
         _performDelegateCall(address(opcmUpgrader), data);
+
+        for (uint256 i; i < _opChainConfigs.length; i++) {
+            opcmValidator.validate(
+                StandardValidator.ValidationInput({
+                    proxyAdmin: _opChainConfigs[i].proxyAdmin,
+                    sysCfg: _opChainConfigs[i].systemConfigProxy,
+                    absolutePrestate: Claim.unwrap(_opChainConfigs[i].absolutePrestate),
+                    l2ChainID: _opChainConfigs[i].systemConfigProxy.l2ChainId()
+                }),
+                true,
+                StandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
+            );
+        }
     }
 
     /// @notice addGameType deploys a new dispute game and links it to the DisputeGameFactory. The inputted _gameConfigs

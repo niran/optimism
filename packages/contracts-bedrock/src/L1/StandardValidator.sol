@@ -728,13 +728,12 @@ contract StandardValidator is ISemver {
 
     /// @notice Validates the configuration of the L1 contracts.
     function validate(ValidationInput memory _input, bool _allowFailure) external view returns (string memory) {
-        return validateWithOverrides(
-            _input, _allowFailure, ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
-        );
+        return
+            validate(_input, _allowFailure, ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) }));
     }
 
     /// @notice Validates the configuration of the L1 contracts.
-    function validateWithOverrides(
+    function validate(
         ValidationInput memory _input,
         bool _allowFailure,
         ValidationOverrides memory _overrides
