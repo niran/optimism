@@ -1,34 +1,8 @@
 [
   {
-    "420120009": {
-      "genesis": {
-        "l1": {
-          "Hash": "0x9011befaa62e1a920aa3d14e9165107d522b709049c475843725f712bbf693f1",
-          "Number": 8470494,
-          "Timestamp": 1748984964
-        },
-        "l2": {
-          "Hash": "0x1055187f2eb4e8be192ee7e65756efa290267543bad721d3d8a6135addbe75a0",
-          "Number": 0,
-          "Timestamp": 1748984964
-        }
-      },
-      "block_time": 2
-    },
-    "420120010": {
-      "genesis": {
-        "l1": {
-          "Hash": "0x9011befaa62e1a920aa3d14e9165107d522b709049c475843725f712bbf693f1",
-          "Number": 8470494,
-          "Timestamp": 1748984964
-        },
-        "l2": {
-          "Hash": "0xc9f60cb23f0e558123d0479675e47ce182c6fe806af66a002aeba5e54ec56cc4",
-          "Number": 0,
-          "Timestamp": 1748984964
-        }
-      },
-      "block_time": 1
+    "dependencies": {
+      "420120009": {},
+      "420120010": {}
     }
   }
 ]
