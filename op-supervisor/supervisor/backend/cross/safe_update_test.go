@@ -26,6 +26,12 @@ func TestCrossSafeUpdate(t *testing.T) {
 				Derived: candidate,
 			}, nil
 		}
+		csd.crossSafeFn = func(chainID eth.ChainID) (pair types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 3},
+				Derived: types.BlockSeal{Number: 3},
+			}, nil
+		}
 		opened := eth.BlockRef{Number: 1}
 		execs := map[uint32]*types.ExecutingMessage{1: {}}
 		csd.openBlockFn = func(chainID eth.ChainID, blockNum uint64) (ref eth.BlockRef, logCount uint32, execMsgs map[uint32]*types.ExecutingMessage, err error) {
@@ -38,6 +44,37 @@ func TestCrossSafeUpdate(t *testing.T) {
 		// no error is returned
 		err := CrossSafeUpdate(logger, chainID, csd, linkerAny{})
 		require.NoError(t, err)
+	})
+	t.Run("scopedCrossSafeUpdate has insufficient data", func(t *testing.T) {
+		logger := testlog.Logger(t, log.LevelDebug)
+		chainID := eth.ChainIDFromUInt64(123)
+		csd := &mockCrossSafeDeps{}
+		candidate := eth.BlockRef{Number: 1}
+		candidateScope := eth.BlockRef{Number: 2}
+		csd.candidateCrossSafeFn = func() (pair types.DerivedBlockRefPair, err error) {
+			return types.DerivedBlockRefPair{
+				Source:  candidateScope,
+				Derived: candidate,
+			}, nil
+		}
+		csd.crossSafeFn = func(chainID eth.ChainID) (pair types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 1},
+				Derived: types.BlockSeal{Number: 9},
+			}, nil
+		}
+		opened := eth.BlockRef{Number: 1}
+		execs := map[uint32]*types.ExecutingMessage{1: {}}
+		csd.openBlockFn = func(chainID eth.ChainID, blockNum uint64) (ref eth.BlockRef, logCount uint32, execMsgs map[uint32]*types.ExecutingMessage, err error) {
+			return opened, 10, execs, nil
+		}
+		csd.checkFn = func(chainID eth.ChainID, blockNum uint64, logIdx uint32, checksum types.MessageChecksum) (types.BlockSeal, error) {
+			return types.BlockSeal{Number: 1, Timestamp: 1}, nil
+		}
+		// when scopedCrossSafeUpdate returns no error,
+		// no error is returned
+		err := CrossSafeUpdate(logger, chainID, csd, linkerAny{})
+		require.ErrorContains(t, err, "insufficient data")
 	})
 	t.Run("scopedCrossSafeUpdate returns error", func(t *testing.T) {
 		logger := testlog.Logger(t, log.LevelDebug)
@@ -415,6 +452,41 @@ func TestScopedCrossSafeUpdate(t *testing.T) {
 		require.ErrorIs(t, err, types.ErrConflict)
 		require.Equal(t, eth.BlockRef{}, pair.Source)
 	})
+	t.Run("insufficient data", func(t *testing.T) {
+		logger := testlog.Logger(t, log.LevelDebug)
+		chainID := eth.ChainIDFromUInt64(123)
+		csd := &mockCrossSafeDeps{}
+		candidate := eth.BlockRef{Number: 1}
+		candidateScope := eth.BlockRef{Number: 2}
+		csd.candidateCrossSafeFn = func() (types.DerivedBlockRefPair, error) {
+			return types.DerivedBlockRefPair{
+				Source:  candidateScope,
+				Derived: candidate,
+			}, nil
+		}
+		csd.crossSafeFn = func(chainID eth.ChainID) (pair types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 1},
+				Derived: types.BlockSeal{Number: 1},
+			}, nil
+		}
+		opened := eth.BlockRef{Number: 1}
+		execs := map[uint32]*types.ExecutingMessage{1: {}}
+		csd.openBlockFn = func(chainID eth.ChainID, blockNum uint64) (ref eth.BlockRef, logCount uint32, execMsgs map[uint32]*types.ExecutingMessage, err error) {
+			return opened, 10, execs, nil
+		}
+		csd.updateCrossSafeFn = func(chain eth.ChainID, l1View eth.BlockRef, lastCrossDerived eth.BlockRef) error {
+			return nil
+		}
+		// when no errors occur, the update is carried out
+		// the used candidate and scope are from CandidateCrossSafe
+		// the candidateScope is returned
+		csd.checkFn = func(chainID eth.ChainID, blockNum uint64, logIdx uint32, checksum types.MessageChecksum) (types.BlockSeal, error) {
+			return types.BlockSeal{Number: 1, Timestamp: 1}, nil
+		}
+		_, err := scopedCrossSafeUpdate(reads.NoopHandle{}, logger, chainID, csd, linkerAny{})
+		require.ErrorContains(t, err, "insufficient data")
+	})
 	t.Run("successful update", func(t *testing.T) {
 		logger := testlog.Logger(t, log.LevelDebug)
 		chainID := eth.ChainIDFromUInt64(123)
@@ -425,6 +497,12 @@ func TestScopedCrossSafeUpdate(t *testing.T) {
 			return types.DerivedBlockRefPair{
 				Source:  candidateScope,
 				Derived: candidate,
+			}, nil
+		}
+		csd.crossSafeFn = func(chainID eth.ChainID) (pair types.DerivedBlockSealPair, err error) {
+			return types.DerivedBlockSealPair{
+				Source:  types.BlockSeal{Number: 3},
+				Derived: types.BlockSeal{Number: 1},
 			}, nil
 		}
 		opened := eth.BlockRef{Number: 1}
