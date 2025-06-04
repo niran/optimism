@@ -1889,10 +1889,22 @@ contract OPContractsManager is ISemver {
         upgradeController = _upgradeController;
     }
 
+    function validate(
+        StandardValidator.ValidationInput memory _input,
+        bool _allowFailure,
+        StandardValidator.ValidationOverrides memory _overrides
+    )
+        public
+        view
+        returns (string memory)
+    {
+        return opcmValidator.validate(_input, _allowFailure, _overrides);
+    }
+
     function deploy(DeployInput calldata _input) external virtual returns (DeployOutput memory output_) {
         output_ = opcmDeployer.deploy(_input, superchainConfig, msg.sender);
 
-        opcmValidator.validate(
+        validate(
             StandardValidator.ValidationInput({
                 proxyAdmin: output_.opChainProxyAdmin,
                 sysCfg: output_.systemConfigProxy,
@@ -1923,7 +1935,7 @@ contract OPContractsManager is ISemver {
         _performDelegateCall(address(opcmUpgrader), data);
 
         for (uint256 i; i < _opChainConfigs.length; i++) {
-            opcmValidator.validate(
+            validate(
                 StandardValidator.ValidationInput({
                     proxyAdmin: _opChainConfigs[i].proxyAdmin,
                     sysCfg: _opChainConfigs[i].systemConfigProxy,
