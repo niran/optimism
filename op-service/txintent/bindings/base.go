@@ -306,10 +306,6 @@ func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
 		return *new(ReturnType), nil
 	}
 
-	if retTyp.Kind() == reflect.Struct {
-		panic("multiple return type using struct is not supported yet")
-	}
-
 	abiTargetType := CustomTypeToGoType(retTyp)
 	abiType, _, err := goTypeToABIType(abiTargetType)
 	if err != nil {

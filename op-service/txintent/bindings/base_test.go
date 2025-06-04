@@ -26,6 +26,11 @@ type TestGameSearchResult struct {
 	ExtraData []byte
 }
 
+type TestProvenWithdrawalsResult struct {
+	DisputeGameProxy common.Address
+	Timestamp        uint64
+}
+
 type TestBaseContract struct {
 	TestBaseCallContractFactory
 
@@ -53,6 +58,8 @@ type TestBaseContract struct {
 	}, withdrawalProof [][]byte) TypedCall[any] `sol:"proveWithdrawalTransaction"`
 
 	FindLatestGames func(gameType uint32, start *big.Int, n *big.Int) TypedCall[[]TestGameSearchResult] `sol:"findLatestGames"`
+
+	ProvenWithdrawals func(withdrawalHash [32]byte, submitter common.Address) TypedCall[TestProvenWithdrawalsResult] `sol:"provenWithdrawals"`
 }
 
 func NewTestBaseContract(f *TestBaseCallContractFactory) *TestBaseContract {
@@ -149,4 +156,18 @@ func TestDecode(t *testing.T) {
 	require.Equal(t, uint64(1748947476), game.Timestamp)
 	require.Equal(t, *(*[32]byte)(hexutil.MustDecode("0x0fa71262076cb482e6f983cf3dd7eccb8f076d5c7aac1c5f8f5191eed2ad3bf6")), game.RootClaim)
 	require.Equal(t, hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000003"), game.ExtraData)
+}
+
+func TestDecodeStruct(t *testing.T) {
+	factory := NewTestBaseContractCallFactory()
+	testBaseContract := NewTestBaseContract(factory)
+
+	call := testBaseContract.ProvenWithdrawals([32]byte{}, common.Address{})
+
+	data := hexutil.MustDecode("0x00000000000000000000000046d257cf3803b353350ec1edc6aa106f355f3bd200000000000000000000000000000000000000000000000000000000683feed9")
+	result, err := call.DecodeOutput(data)
+	require.NoError(t, err)
+
+	require.Equal(t, common.HexToAddress("0x46D257cf3803b353350ec1Edc6AA106f355F3bd2"), result.DisputeGameProxy)
+	require.Equal(t, uint64(1749020377), result.Timestamp)
 }
