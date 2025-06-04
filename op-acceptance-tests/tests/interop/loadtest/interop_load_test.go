@@ -1,12 +1,17 @@
 // Package loadtest contains interop load tests.
 //
-// Set NAT_INTEROP_LOADTEST_TARGET to the initial amount of messages that should be passed per L2 slot in each test (default: 100).
+// Configure test behavior with the following environment variables:
+//
+//   - NAT_INTEROP_LOADTEST_TARGET (default: 100): the initial amount of messages that should be passed per L2 slot in each test.
+//   - NAT_INTEROP_LOADTEST_BUDGET (default: 10_000): the max amount of ETH to spend per test, per L2. The test ends right before
+//     the budget is depleted.
 //
 // Each test increases the message throughput until some threshold is reached (e.g., the gas target).
 // The throughput is decreased if the threshold is exceeded or if errors are encountered (e.g., transaction inclusion failures).
 package loadtest
 
 import (
+	"errors"
 	"math"
 	"math/rand"
 	"os"
@@ -44,12 +49,12 @@ func TestSteady(gt *testing.T) {
 		deadline = testCtxDeadline.Add(-10 * time.Second) // Give some time for cleanup.
 	}
 	ctx, cancel := context.WithDeadline(t.Ctx(), deadline)
-	t.Cleanup(cancel) // We only care about the deadline.
+	t.Cleanup(cancel)
 	if timeoutStr, exists := os.LookupEnv("NAT_STEADY_TIMEOUT"); exists {
 		timeout, err := time.ParseDuration(timeoutStr)
 		t.Require().NoError(err)
 		ctx, cancel = context.WithTimeout(ctx, timeout)
-		t.Cleanup(cancel) // We only care about the timeout.
+		t.Cleanup(cancel)
 	}
 
 	aimd, source, dest := setupLoadTest(t, ctx, &wg)
@@ -58,7 +63,8 @@ func TestSteady(gt *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if !relayMessage(t, source, dest) {
+			if err := relayMessage(t, source, dest); err != nil {
+				cancelIfInsufficientBudget(err, cancel)
 				aimd.Adjust(false)
 				return
 			}
@@ -79,22 +85,14 @@ func TestBurst(gt *testing.T) {
 	ctx, cancel := context.WithCancel(t.Ctx())
 	defer cancel()
 	aimd, source, dest := setupLoadTest(t, ctx, &wg)
-	targetBaseFee := eth.OneGWei.ToBig()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-aimd.Ready():
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				success := relayMessage(t, source, dest)
-				if dest.Unsafe().BaseFee().Cmp(targetBaseFee) >= 0 {
-					cancel() // End the test when we've met or exceeded the target base fee.
-				}
-				aimd.Adjust(success)
-			}()
-		}
+	for range aimd.Ready() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := relayMessage(t, source, dest)
+			cancelIfInsufficientBudget(err, cancel)
+			aimd.Adjust(err == nil)
+		}()
 	}
 }
 
@@ -124,21 +122,29 @@ func setupLoadTest(t devtest.T, ctx context.Context, wg *sync.WaitGroup) (*AIMD,
 	}()
 
 	// Chains.
+	budget := eth.TenThousandEther
+	if budgetStr, exists := os.LookupEnv("NAT_INTEROP_LOADTEST_BUDGET"); exists {
+		amount, err := strconv.ParseUint(budgetStr, 10, 64)
+		t.Require().NoError(err)
+		budget = eth.Ether(amount)
+	}
 	l2ELA := sys.L2ChainA.PublicRPC()
 	l2ELB := sys.L2ChainB.PublicRPC()
 	funderA := dsl.NewFunder(sys.Wallet, sys.FaucetA, l2ELA)
-	const numEOAs = 300
+	budgetA := NewBudget(budget)
 	source := &L2{
 		Config:       sys.L2ChainA.Escape().ChainConfig(),
 		RollupConfig: sys.L2ChainA.Escape().RollupConfig(),
-		eoas:         NewEOAPool(funderA, numEOAs, eth.MillionEther),
+		budget:       budgetA,
+		eoas:         NewEOAPool(funderA, budget),
 		el:           l2ELA,
-		eventLogger:  funderA.NewFundedEOA(eth.OneEther).DeployEventLogger(),
+		eventLogger:  funderA.NewFundedEOA(eth.OneEther).DeployEventLogger(budgetA.Plan()),
 	}
 	dest := &L2{
 		Config:       sys.L2ChainB.Escape().ChainConfig(),
 		RollupConfig: sys.L2ChainB.Escape().RollupConfig(),
-		eoas:         NewEOAPool(dsl.NewFunder(sys.Wallet, sys.FaucetB, l2ELB), numEOAs, eth.MillionEther),
+		budget:       NewBudget(budget),
+		eoas:         NewEOAPool(dsl.NewFunder(sys.Wallet, sys.FaucetB, l2ELB), budget),
 		el:           l2ELB,
 	}
 	wg.Add(1)
@@ -163,23 +169,30 @@ func setupLoadTest(t devtest.T, ctx context.Context, wg *sync.WaitGroup) (*AIMD,
 	return aimd, source, dest
 }
 
-func relayMessage(t devtest.T, source, dest *L2) bool {
+func relayMessage(t devtest.T, source, dest *L2) error {
 	rng := rand.New(rand.NewSource(1234))
 	inFlightMessages.Inc()
 	start := time.Now()
-	initMsg := source.SendInitiatingMsg(t, rng)
-	if initMsg == nil {
+	initMsg, err := source.SendInitiatingMsg(t, rng)
+	if err != nil {
 		messageStatusCount.WithLabelValues("init_failed").Inc()
 		inFlightMessages.Dec()
-		return false
+		return err
 	}
-	success := dest.SendExecutingMsg(t, *initMsg)
-	if success {
+	err = dest.SendExecutingMsg(t, initMsg)
+	if err == nil {
 		messageLatency.WithLabelValues("e2e").Observe(time.Since(start).Seconds())
 		messageStatusCount.WithLabelValues("success").Inc()
 	} else {
 		messageStatusCount.WithLabelValues("exec_failed").Inc()
 	}
 	inFlightMessages.Dec()
-	return success
+	return err
+}
+
+func cancelIfInsufficientBudget(err error, cancel context.CancelFunc) {
+	var x *InsufficientBudgetError
+	if errors.As(err, &x) {
+		cancel()
+	}
 }

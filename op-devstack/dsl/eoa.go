@@ -131,8 +131,8 @@ func (u *EOA) VerifyBalanceExact(v eth.ETH) {
 	u.t.Require().Equal(v, actual, "must have expected balance")
 }
 
-func (u *EOA) DeployEventLogger() common.Address {
-	tx := txplan.NewPlannedTx(u.Plan(), txplan.WithData(common.FromHex(bindings.EventloggerBin)))
+func (u *EOA) DeployEventLogger(opts ...txplan.Option) common.Address {
+	tx := txplan.NewPlannedTx(u.Plan(), txplan.WithData(common.FromHex(bindings.EventloggerBin)), txplan.Combine(opts...))
 	res, err := tx.Included.Eval(u.ctx)
 	u.t.Require().NoError(err, "failed to deploy EventLogger")
 	eventLoggerAddress := res.ContractAddress

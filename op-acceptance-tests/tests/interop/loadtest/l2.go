@@ -24,6 +24,7 @@ type L2 struct {
 	Config       *params.ChainConfig
 	RollupConfig *rollup.Config
 
+	budget      *Budget
 	eoas        *EOAPool
 	el          *dsl.L2ELNode
 	eventLogger common.Address
@@ -51,14 +52,14 @@ func (l2 *L2) Unsafe() eth.BlockInfo {
 	return l2.unsafe.Load().(eth.BlockInfo)
 }
 
-func (l2 *L2) SendInitiatingMsg(t devtest.T, rng *rand.Rand) *types.Message {
+func (l2 *L2) SendInitiatingMsg(t devtest.T, rng *rand.Rand) (*types.Message, error) {
 	start := time.Now()
 	eoa := l2.eoas.Get()
-	tx := txintent.NewIntent[txintent.Call, *txintent.InteropOutput](eoa.Inner.Plan(), txplan.WithStaticNonce(uint64(eoa.Nonce.Add(1))-1))
+	tx := txintent.NewIntent[txintent.Call, *txintent.InteropOutput](eoa.Inner.Plan(), txplan.WithStaticNonce(uint64(eoa.Nonce.Add(1))-1), l2.budget.Plan())
 	tx.Content.Set(interop.RandomInitTrigger(rng, l2.eventLogger, rng.Intn(2), rng.Intn(5)))
 	if _, err := tx.PlannedTx.Included.Eval(t.Ctx()); err != nil {
 		eoa.Nonce.Add(-1)
-		return nil
+		return nil, err
 	}
 	_, err := tx.PlannedTx.Success.Eval(t.Ctx())
 	t.Require().NoError(err)
@@ -66,16 +67,16 @@ func (l2 *L2) SendInitiatingMsg(t devtest.T, rng *rand.Rand) *types.Message {
 	out, err := tx.Result.Eval(t.Ctx())
 	t.Require().NoError(err)
 	t.Require().Len(out.Entries, 1)
-	return &out.Entries[0]
+	return &out.Entries[0], nil
 }
 
-func (l2 *L2) SendExecutingMsg(t devtest.T, initMsg types.Message) bool {
+func (l2 *L2) SendExecutingMsg(t devtest.T, initMsg *types.Message) error {
 	start := time.Now()
 	eoa := l2.eoas.Get()
-	tx := txintent.NewIntent[*txintent.ExecTrigger, txintent.Result](eoa.Inner.Plan(), txplan.WithStaticNonce(uint64(eoa.Nonce.Add(1))-1), txplan.WithGasRatio(2))
+	tx := txintent.NewIntent[*txintent.ExecTrigger, txintent.Result](eoa.Inner.Plan(), txplan.WithStaticNonce(uint64(eoa.Nonce.Add(1))-1), l2.budget.Plan())
 	tx.Content.Set(&txintent.ExecTrigger{
 		Executor: constants.CrossL2Inbox,
-		Msg:      initMsg,
+		Msg:      *initMsg,
 	})
 	// The tx is invalid until we know it will be included at a higher timestamp than any of the initiating messages, modulo reorgs.
 	// Wait to plan the relay tx against a target block until the timestamp elapses.
@@ -89,10 +90,10 @@ func (l2 *L2) SendExecutingMsg(t devtest.T, initMsg types.Message) bool {
 	})
 	if _, err := tx.PlannedTx.Included.Eval(t.Ctx()); err != nil {
 		eoa.Nonce.Add(-1)
-		return false
+		return err
 	}
 	_, err := tx.PlannedTx.Success.Eval(t.Ctx())
 	t.Require().NoError(err)
 	messageLatency.WithLabelValues("exec").Observe(time.Since(start).Seconds())
-	return true
+	return nil
 }

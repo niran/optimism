@@ -18,16 +18,17 @@ type EOAPool struct {
 	index atomic.Uint64
 }
 
-func NewEOAPool(funder *dsl.Funder, num uint64, amount eth.ETH) *EOAPool {
-	eoas := make([]*SyncEOA, num)
+func NewEOAPool(funder *dsl.Funder, total eth.ETH) *EOAPool {
+	eoas := make([]*SyncEOA, 300)
+	amountPerEOA := total.Div(uint64(len(eoas)))
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	for i := range num {
+	for i := range len(eoas) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			eoas[i] = &SyncEOA{
-				Inner: funder.NewFundedEOA(amount),
+				Inner: funder.NewFundedEOA(amountPerEOA),
 			}
 		}()
 	}

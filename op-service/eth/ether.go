@@ -37,6 +37,7 @@ var (
 	MaxU64Wei            = ETH(uint256.Int{0: ^uint64(0), 1: 0, 2: 0, 3: 0})
 	BillionEther         = Ether(1000_000_000)
 	MillionEther         = Ether(1000_000)
+	TenThousandEther     = Ether(10_000)
 	ThousandEther        = Ether(1000)
 	HundredEther         = Ether(100)
 	TenEther             = Ether(10)
