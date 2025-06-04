@@ -3,12 +3,14 @@ package withdrawal
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	supervisorTypes "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 )
 
 func TestMain(m *testing.M) {
@@ -37,6 +39,11 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 		opts.Data = []byte{}
 		opts.Value = withdrawalAmount.ToBig()
 	})
+
+	t.Require().Eventually(func() bool {
+		head := sys.L2CL.HeadBlockRef(supervisorTypes.LocalUnsafe)
+		return head.L1Origin.Number >= receipt.BlockNumber.Uint64()
+	}, time.Second*30, time.Second, "awaiting withdrawal to be processed by L2")
 
 	sys.L2Chain.WaitForBlock()
 	sys.L1Network.WaitForBlock()
