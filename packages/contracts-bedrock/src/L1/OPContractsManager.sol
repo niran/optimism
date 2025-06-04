@@ -1992,23 +1992,23 @@ contract OPContractsManager is ISemver {
         if (msg.sender != upgradeController) revert OnlyUpgradeController();
         isRC = _isRC;
     }
-}
 
-/// @notice Helper function to perform a delegatecall to a target contract
-/// @param _target The target contract address
-/// @param _data The calldata to send to the target
-/// @return bytes The return data from the delegatecall
-function _performDelegateCall(address _target, bytes memory _data) returns (bytes memory) {
-    // Perform the delegatecall
-    (bool success, bytes memory returnData) = _target.delegatecall(_data);
+    /// @notice Helper function to perform a delegatecall to a target contract
+    /// @param _target The target contract address
+    /// @param _data The calldata to send to the target
+    /// @return bytes The return data from the delegatecall
+    function _performDelegateCall(address _target, bytes memory _data) internal returns (bytes memory) {
+        // Perform the delegatecall
+        (bool success, bytes memory returnData) = _target.delegatecall(_data);
 
-    // Check if the delegatecall was successful
-    if (!success) {
-        // If there was a revert message, bubble it up
-        assembly {
-            revert(add(returnData, 32), mload(returnData))
+        // Check if the delegatecall was successful
+        if (!success) {
+            // If there was a revert message, bubble it up
+            assembly {
+                revert(add(returnData, 32), mload(returnData))
+            }
         }
-    }
 
-    return returnData;
+        return returnData;
+    }
 }
