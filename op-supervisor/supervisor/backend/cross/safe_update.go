@@ -118,6 +118,9 @@ func scopedCrossSafeUpdate(h reads.Handle, logger log.Logger, chainID eth.ChainI
 	if err != nil {
 		return candidate, fmt.Errorf("failed to determine dependencies of cross-safe candidate %s: %w", candidate.Derived, err)
 	}
+	if err := SufficientDataChecks(d, candidate.Source.ID(), hazards); err != nil {
+		return candidate, fmt.Errorf("failed to verify block %s in cross-safe frontier: %w", candidate.Derived, err)
+	}
 	if err := HazardSafeFrontierChecks(d, candidate.Source.ID(), hazards); err != nil {
 		return candidate, fmt.Errorf("failed to verify block %s in cross-safe frontier: %w", candidate.Derived, err)
 	}

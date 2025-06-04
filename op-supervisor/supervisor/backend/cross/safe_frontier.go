@@ -10,8 +10,25 @@ import (
 
 type SafeFrontierCheckDeps interface {
 	CandidateCrossSafe(chain eth.ChainID) (candidate types.DerivedBlockRefPair, err error)
-
+	CrossSafe(chainID eth.ChainID) (latest types.DerivedBlockSealPair, err error)
 	CrossDerivedToSource(chainID eth.ChainID, derived eth.BlockID) (source types.BlockSeal, err error)
+}
+
+// SufficientDataChecks verifies that the dependent chains have safe data to cross-safe verify the block at L1 block `inL1Source`.
+// If a chain has not synced as far as `inL1Source`, we know the database will not have the data to cross-safe verify the block.
+// Rather than bumping scope, we should just wait for the chain to catch up.
+func SufficientDataChecks(d SafeFrontierCheckDeps, inL1Source eth.BlockID, hazards *HazardSet) error {
+	for hazardChainID := range hazards.Entries() {
+		latest, err := d.CrossSafe(hazardChainID)
+		if err != nil {
+			return fmt.Errorf("failed to get latest cross-safe block of referenced chain %s: %w", hazardChainID, err)
+		}
+		if latest.Source.Number < inL1Source.Number {
+			return fmt.Errorf("referenced chain %s does not have safe data to cross-safe verify block at L1 block %s: %w",
+				hazardChainID, inL1Source, types.ErrFuture)
+		}
+	}
+	return nil
 }
 
 // HazardSafeFrontierChecks verifies all the hazard blocks are either:
