@@ -81,7 +81,7 @@ func VerifyStorageProof(root common.Hash, proof eth.StorageProofEntry) error {
 func VerifyProof(stateRoot common.Hash, proof *eth.AccountResult) error {
 	balance, overflow := uint256.FromBig(proof.Balance.ToInt())
 	if overflow {
-		return fmt.Errorf("proof balance overflows uint256: %d", proof.Balance)
+		return fmt.Errorf("proof balance overflows uint256: %d", proof.Balance.ToInt())
 	}
 	err := VerifyAccountProof(
 		stateRoot,

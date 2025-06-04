@@ -38,6 +38,9 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 		opts.Value = withdrawalAmount.ToBig()
 	})
 
+	sys.L2Chain.WaitForBlock()
+	sys.L1Network.WaitForBlock()
+
 	// Get the L1 balance before finalization
 	startBalanceBeforeFinalize, err := l1Client.BalanceAt(t.Ctx(), alice.Address(), nil)
 	require.NoError(t, err)

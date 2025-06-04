@@ -61,17 +61,17 @@ func ProveWithdrawalParameters(t devtest.T, l2Chain *dsl.L2Network, l1Client api
 	l2BlockNumber := new(big.Int).SetBytes(latestGame.ExtraData[0:32])
 	l2OutputIndex := latestGame.Index
 	// Fetch the block header from the L2 node
-	l2Header, err := l2Client.BlockRefByNumber(t.Ctx(), l2BlockNumber.Uint64())
+	l2Header, err := l2Client.InfoByNumber(t.Ctx(), l2BlockNumber.Uint64())
 	if err != nil {
 		return ProvenWithdrawalParameters{}, fmt.Errorf("failed to get l2Block: %w", err)
 	}
-	return ProveWithdrawalParametersForBlock(t, l2Client, l2WithdrawalReceipt, &l2Header, l2OutputIndex)
+	return ProveWithdrawalParametersForBlock(t, l2Client, l2WithdrawalReceipt, l2Header, l2OutputIndex)
 }
 
 // ProveWithdrawalParametersForBlock queries L1 & L2 to generate all withdrawal parameters and proof necessary to prove a withdrawal on L1.
 // The l2Header provided is very important. It should be a block for which there is a submitted output in the L2 Output Oracle
 // contract. If not, the withdrawal will fail as it the storage proof cannot be verified if there is no submitted state root.
-func ProveWithdrawalParametersForBlock(t devtest.T, l2Client apis.EthClient, l2WithdrawalReceipt *types.Receipt, l2Header *eth.BlockRef, l2OutputIndex *big.Int) (ProvenWithdrawalParameters, error) {
+func ProveWithdrawalParametersForBlock(t devtest.T, l2Client apis.EthClient, l2WithdrawalReceipt *types.Receipt, l2Header eth.BlockInfo, l2OutputIndex *big.Int) (ProvenWithdrawalParameters, error) {
 	// Transaction receipt
 	// Parse the receipt
 	ev, err := ParseMessagePassed(l2WithdrawalReceipt)
@@ -84,7 +84,7 @@ func ProveWithdrawalParametersForBlock(t devtest.T, l2Client apis.EthClient, l2W
 // ProveWithdrawalParametersForEvent queries L1 to generate all withdrawal parameters and proof necessary to prove a withdrawal on L1.
 // The l2Header provided is very important. It should be a block for which there is a submitted output in the L2 Output Oracle
 // contract. If not, the withdrawal will fail as it the storage proof cannot be verified if there is no submitted state root.
-func ProveWithdrawalParametersForEvent(t devtest.T, l2Client apis.EthClient, ev *bindings.L2ToL1MessagePasserMessagePassed, l2Header *eth.BlockRef, l2OutputIndex *big.Int) (ProvenWithdrawalParameters, error) {
+func ProveWithdrawalParametersForEvent(t devtest.T, l2Client apis.EthClient, ev *bindings.L2ToL1MessagePasserMessagePassed, l2Header eth.BlockInfo, l2OutputIndex *big.Int) (ProvenWithdrawalParameters, error) {
 	// Generate then verify the withdrawal proof
 	withdrawalHash, err := WithdrawalHash(ev)
 	if !bytes.Equal(withdrawalHash[:], ev.WithdrawalHash[:]) {
@@ -95,7 +95,7 @@ func ProveWithdrawalParametersForEvent(t devtest.T, l2Client apis.EthClient, ev 
 	}
 	slot := StorageSlotOfWithdrawalHash(withdrawalHash)
 
-	p, err := l2Client.GetProof(t.Ctx(), predeploys.L2ToL1MessagePasserAddr, []common.Hash{slot}, "0x"+fmt.Sprintf("%x", l2Header.Number))
+	p, err := l2Client.GetProof(t.Ctx(), predeploys.L2ToL1MessagePasserAddr, []common.Hash{slot}, "0x"+fmt.Sprintf("%x", l2Header.NumberU64()))
 	if err != nil {
 		return ProvenWithdrawalParameters{}, err
 	}
@@ -103,10 +103,10 @@ func ProveWithdrawalParametersForEvent(t devtest.T, l2Client apis.EthClient, ev 
 		return ProvenWithdrawalParameters{}, errors.New("invalid amount of storage proofs")
 	}
 
-	/*err = VerifyProof(l2Header.ParentHash, p)
+	err = VerifyProof(l2Header.Root(), p)
 	if err != nil {
 		return ProvenWithdrawalParameters{}, err
-	}*/
+	}
 
 	// Encode it as expected by the contract
 	trieNodes := make([][]byte, len(p.StorageProof[0].Proof))
@@ -124,9 +124,9 @@ func ProveWithdrawalParametersForEvent(t devtest.T, l2Client apis.EthClient, ev 
 		Data:          ev.Data,
 		OutputRootProof: bindings.TypesOutputRootProof{
 			Version:                  [32]byte{}, // Empty for version 1
-			StateRoot:                l2Header.ParentHash,
+			StateRoot:                l2Header.Root(),
 			MessagePasserStorageRoot: p.StorageHash,
-			LatestBlockhash:          l2Header.Hash,
+			LatestBlockhash:          l2Header.Hash(),
 		},
 		WithdrawalProof: trieNodes,
 	}, nil
