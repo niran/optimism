@@ -16,6 +16,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	//	presets.DoMain(m, presets.WithMinimal(), presets.WithFinalizationPeriodSeconds(2))
+
 	presets.DoMain(m, presets.WithMinimal(), presets.WithFinalizationPeriodSeconds(2), presets.WithAdditonalDisputeGames([]state.AdditionalDisputeGame{
 		{
 			ChainProofParams: state.ChainProofParams{
@@ -31,7 +33,7 @@ func TestMain(m *testing.M) {
 			UseCustomOracle:              true,
 			OracleMinProposalSize:        10000,
 			OracleChallengePeriodSeconds: 0,
-			MakeRespected:                true,
+			MakeRespected:                true, // this is important
 		},
 	}))
 }

@@ -73,11 +73,12 @@ func WithProposer(proposerID stack.L2ProposerID, l1ELID stack.L1ELNodeID,
 				Level:  log.LvlInfo,
 				Format: oplog.FormatText,
 			},
-			MetricsConfig:                opmetrics.CLIConfig{},
-			PprofConfig:                  oppprof.CLIConfig{},
-			DGFAddress:                   disputeGameFactoryAddr.Hex(),
-			ProposalInterval:             6 * time.Second,
-			DisputeGameType:              1, // Permissioned game type is the only one currently deployed
+			MetricsConfig:    opmetrics.CLIConfig{},
+			PprofConfig:      oppprof.CLIConfig{},
+			DGFAddress:       disputeGameFactoryAddr.Hex(),
+			ProposalInterval: 6 * time.Second,
+			//DisputeGameType:              1, // Permissioned game type is the only one currently deployed
+			DisputeGameType:              254, // Permissioned game type is the only one currently deployed
 			ActiveSequencerCheckDuration: time.Second * 5,
 			WaitNodeSync:                 false,
 		}

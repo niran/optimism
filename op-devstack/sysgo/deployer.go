@@ -1,7 +1,6 @@
 package sysgo
 
 import (
-	"math/big"
 	"os"
 	"path/filepath"
 	"time"
@@ -178,16 +177,18 @@ func WithCommons(l1ChainID eth.ChainID) DeployerOption {
 		intentbuilder.WithDevkeySuperRoles(p, keys, l1ChainID, superCfg)
 		l1Config.WithPrefundedAccount(addrFor(devkeys.SuperchainProxyAdminOwner), *millionEth)
 		l1Config.WithPrefundedAccount(addrFor(devkeys.SuperchainProtocolVersionsOwner), *millionEth)
+		// checked when registering at anchorstatereg
 		l1Config.WithPrefundedAccount(addrFor(devkeys.SuperchainConfigGuardianKey), *millionEth)
 	}
 }
 
-func WithPrefundedL2(chainID eth.ChainID) DeployerOption {
+func WithPrefundedL2(l1ChainID, l2ChainID eth.ChainID) DeployerOption {
 	return func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {
-		_, l2Config := builder.WithL2(chainID)
+		_, l2Config := builder.WithL2(l2ChainID)
 		l2Config.ChainID()
 
 		intentbuilder.WithDevkeyVaults(p, keys, l2Config)
+		// sets L1ProxyAdminOwner using the L2 chain ID (wrong)
 		intentbuilder.WithDevkeyRoles(p, keys, l2Config)
 		{
 			faucetFunderAddr, err := keys.Address(devkeys.UserKey(funderMnemonicIndex))
@@ -195,13 +196,19 @@ func WithPrefundedL2(chainID eth.ChainID) DeployerOption {
 			l2Config.WithPrefundedAccount(faucetFunderAddr, *eth.BillionEther.ToU256())
 		}
 		{
-			addrFor := intentbuilder.RoleToAddrProvider(p, keys, chainID)
+			addrFor := intentbuilder.RoleToAddrProvider(p, keys, l1ChainID)
+			l1Config := l2Config.L1Config()
+			l1Config.WithPrefundedAccount(addrFor(devkeys.L1ProxyAdminOwnerRole), *millionEth)
+			l2Config.WithL1ProxyAdminOwner(addrFor(devkeys.L1ProxyAdminOwnerRole))
+			// 0xaEb19978185f5d2aD433F32EdD837CF6E8d070b1
+		}
+		{
+			addrFor := intentbuilder.RoleToAddrProvider(p, keys, l2ChainID)
 			l1Config := l2Config.L1Config()
 			l1Config.WithPrefundedAccount(addrFor(devkeys.BatcherRole), *millionEth)
 			l1Config.WithPrefundedAccount(addrFor(devkeys.ProposerRole), *millionEth)
 			l1Config.WithPrefundedAccount(addrFor(devkeys.ChallengerRole), *millionEth)
 			l1Config.WithPrefundedAccount(addrFor(devkeys.SystemConfigOwner), *millionEth)
-			l1Config.WithPrefundedAccount(addrFor(devkeys.L1ProxyAdminOwnerRole), *millionEth)
 		}
 	}
 }
@@ -299,13 +306,41 @@ func (wb *worldBuilder) Build() {
 		Version: 1,
 	}
 
+	// panic("second")
+
 	// Work-around of op-deployer design issue.
 	// We use the same deployer key for all L1 and L2 chains we deploy here.
-	deployerKey, err := wb.keys.Secret(devkeys.DeployerRole.Key(big.NewInt(0)))
+	// hack: L1PAO
+	//deployerKey, err := wb.keys.Secret(devkeys.L1ProxyAdminOwnerRole.Key(big.NewInt(6)))
+	// deployer
+
+	// deployerKey, err := wb.keys.Secret(devkeys.DeployerRole.Key(big.NewInt(0)))
+	// TOOD: remove hardcode chaindi
+	l1ChainID := eth.ChainIDFromUInt64(900)
+	deployerKey, err := wb.keys.Secret(devkeys.L1ProxyAdminOwnerRole.Key(l1ChainID.ToBig()))
+
 	wb.require.NoError(err, "need deployer key")
+
+	// proxy admin owner: 0xaEb19978185f5d2aD433F32EdD837CF6E8d070b1 when devkeys.L1ProxyAdminOwnerRole.Key(900)
+	// deployerAddress := crypto.PubkeyToAddress(deployerKey.PublicKey)
+	// panic(fmt.Sprintf(">>>SS %s", deployerAddress))
+
+	// we do not have to do below code seg
+	// {
+	// override L1PAO using deployer key
+	// wb.l2Chains is empty here. why?
+	// for _, l2ChainID := range wb.l2Chains {
+	// 	newBuilder, l2Config := wb.builder.WithL2(l2ChainID)
+	// 	l2Config.WithL1ProxyAdminOwner(deployerAddress)
+
+	// 	myIntent, err := newBuilder.Build()
+	// 	panic(fmt.Sprintf("wwwow %s %v", myIntent.Chains[0].Roles.L1ProxyAdminOwner, err))
+	// }
+	// }
 
 	intent, err := wb.builder.Build()
 	wb.require.NoError(err)
+	// panic(fmt.Sprintf("wow %s", intent.Chains[0].Roles.L1ProxyAdminOwner))
 
 	pipelineOpts := deployer.ApplyPipelineOpts{
 		DeploymentTarget:   deployer.DeploymentTargetGenesis,
@@ -330,6 +365,8 @@ func (wb *worldBuilder) Build() {
 	wb.buildL2Genesis()
 	wb.buildL2DeploymentOutputs()
 	wb.buildFullConfigSet()
+
+	// panic("third")
 }
 
 // WriteState is a callback used by deployer.ApplyPipeline to write the output

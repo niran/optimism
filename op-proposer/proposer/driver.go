@@ -382,6 +382,7 @@ func (l *L2OutputSubmitter) sendTransaction(ctx context.Context, output source.P
 			return err
 		}
 		receipt, err = l.Txmgr.Send(ctx, candidate)
+		//panic(fmt.Sprintf(">>> %w", err))
 		if err != nil {
 			return err
 		}

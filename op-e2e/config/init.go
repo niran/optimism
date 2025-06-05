@@ -308,6 +308,8 @@ func initAllocType(root string, allocType AllocType) {
 				Version: 1,
 			}
 
+			// panic("first")
+
 			if err := deployer.ApplyPipeline(
 				context.Background(),
 				deployer.ApplyPipelineOpts{

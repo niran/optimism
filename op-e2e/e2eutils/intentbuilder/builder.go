@@ -111,6 +111,8 @@ func WithDevkeyVaults(t require.TestingT, dk devkeys.Keys, configurator L2Config
 func WithDevkeyRoles(t require.TestingT, dk devkeys.Keys, configurator L2Configurator) {
 	addrFor := RoleToAddrProvider(t, dk, configurator.ChainID())
 	configurator.WithL1ProxyAdminOwner(addrFor(devkeys.L1ProxyAdminOwnerRole))
+	// panic(addrFor(devkeys.L1ProxyAdminOwnerRole))
+	// 0x263f4304434727585165AEDd8d6BcB8F9F6970AA
 	configurator.WithL2ProxyAdminOwner(addrFor(devkeys.L2ProxyAdminOwnerRole))
 	configurator.WithSystemConfigOwner(addrFor(devkeys.SystemConfigOwner))
 	configurator.WithUnsafeBlockSigner(addrFor(devkeys.SequencerP2PRole))
@@ -121,8 +123,12 @@ func WithDevkeyRoles(t require.TestingT, dk devkeys.Keys, configurator L2Configu
 
 func WithDevkeySuperRoles(t require.TestingT, dk devkeys.Keys, l1ID eth.ChainID, configurator SuperchainConfigurator) {
 	addrFor := RoleToAddrProvider(t, dk, l1ID)
-	configurator.WithGuardian(addrFor(devkeys.SuperchainConfigGuardianKey))
+	// this also must match the deployer to make the setRespectedGameType(gameType) call work
+	// configurator.WithGuardian(addrFor(devkeys.SuperchainConfigGuardianKey))
+	configurator.WithGuardian(addrFor(devkeys.L1ProxyAdminOwnerRole))
+
 	configurator.WithProtocolVersionsOwner(addrFor(devkeys.SuperchainDeployerKey))
+	// 0xaEb19978185f5d2aD433F32EdD837CF6E8d070b1
 	configurator.WithProxyAdminOwner(addrFor(devkeys.L1ProxyAdminOwnerRole))
 }
 
@@ -243,6 +249,10 @@ type l1Configurator struct {
 	builder *intentBuilder
 }
 
+func (c *l2Configurator) WithAdditionalDisputeGames(games []state.AdditionalDisputeGame) {
+	c.builder.intent.Chains[c.chainIndex].AdditionalDisputeGames = games
+}
+
 func (c *l1Configurator) WithChainID(chainID eth.ChainID) L1Configurator {
 	c.builder.intent.L1ChainID = chainID.ToBig().Uint64()
 	return c
@@ -306,10 +316,6 @@ func (c *l2Configurator) WithBlockTime(blockTime uint64) {
 
 func (c *l2Configurator) WithFinalizationPeriodSeconds(value uint64) {
 	c.builder.intent.Chains[c.chainIndex].DeployOverrides["l2FinalizationPeriodSeconds"] = value
-}
-
-func (c *l2Configurator) WithAdditionalDisputeGames(games []state.AdditionalDisputeGame) {
-	c.builder.intent.Chains[c.chainIndex].AdditionalDisputeGames = games
 }
 
 func (c *l2Configurator) WithL1StartBlockHash(hash common.Hash) {

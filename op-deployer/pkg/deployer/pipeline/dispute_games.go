@@ -32,7 +32,17 @@ func DeployAdditionalDisputeGames(
 		return nil
 	}
 
+	// debugging purpose. This address gened at op-e2e's init.go
+	if env.Deployer.Hex() != "0x90F79bf6EB2c4f870365E785982E1f101E93b906" {
+		//  0xaEb19978185f5d2aD433F32EdD837CF6E8d070b1
+		// panic(fmt.Sprintf(">>>> %s %s", thisIntent.Roles.L1ProxyAdminOwner, env.Deployer))
+	}
+
+	// Q) where is thisIntent.Roles.L1ProxyAdminOwner set?
 	if thisIntent.Roles.L1ProxyAdminOwner != env.Deployer {
+		//  0x263f4304434727585165AEDd8d6BcB8F9F6970AA 0x98e503f35D0a019cB0a251aD243a4cCFCF371F46
+		//  0xaEb19978185f5d2aD433F32EdD837CF6E8d070b1 0x98e503f35D0a019cB0a251aD243a4cCFCF371F46
+		panic(fmt.Sprintf(">>> %s %s", thisIntent.Roles.L1ProxyAdminOwner, env.Deployer))
 		return fmt.Errorf("cannot deploy additional dispute games when deployer is not L1PAO")
 	}
 
@@ -134,6 +144,11 @@ func deployDisputeGame(
 	if game.MakeRespected {
 		sdgiInput.AnchorStateRegistry = thisState.OpChainContracts.AnchorStateRegistryProxy
 	}
+	// observation: execution reverts at anchorstatereg
+	// tDisputeGameImpl                err="execution reverted" revertData=0x2e5321ac depth=0
+	// reverting at _assertOnlyGuardian() ->  revert AnchorStateRegistry_Unauthorized();
+	// if (msg.sender != systemConfig.guardian())
+
 	if err := opcm.SetDisputeGameImpl(
 		env.L1ScriptHost,
 		sdgiInput,
