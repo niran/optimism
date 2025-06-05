@@ -23,6 +23,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestReorgInitExecMsg
+// @tag: reorg L2
+// @tag: Interop messaging
 func TestReorgInitExecMsg(gt *testing.T) {
 	t := devtest.SerialT(gt)
 	ctx := t.Ctx()
