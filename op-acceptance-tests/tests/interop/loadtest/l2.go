@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/plan"
 	"github.com/ethereum-optimism/optimism/op-service/txintent"
-	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
@@ -54,11 +53,9 @@ func (l2 *L2) Unsafe() eth.BlockInfo {
 
 func (l2 *L2) SendInitiatingMsg(t devtest.T, rng *rand.Rand) (*types.Message, error) {
 	start := time.Now()
-	eoa := l2.eoas.Get()
-	tx := txintent.NewIntent[txintent.Call, *txintent.InteropOutput](eoa.Inner.Plan(), txplan.WithStaticNonce(uint64(eoa.Nonce.Add(1))-1), l2.budget.Plan())
+	tx := txintent.NewIntent[txintent.Call, *txintent.InteropOutput](l2.eoas.Plan(), l2.budget.Plan())
 	tx.Content.Set(interop.RandomInitTrigger(rng, l2.eventLogger, rng.Intn(2), rng.Intn(5)))
 	if _, err := tx.PlannedTx.Included.Eval(t.Ctx()); err != nil {
-		eoa.Nonce.Add(-1)
 		return nil, err
 	}
 	_, err := tx.PlannedTx.Success.Eval(t.Ctx())
@@ -72,8 +69,7 @@ func (l2 *L2) SendInitiatingMsg(t devtest.T, rng *rand.Rand) (*types.Message, er
 
 func (l2 *L2) SendExecutingMsg(t devtest.T, initMsg *types.Message) error {
 	start := time.Now()
-	eoa := l2.eoas.Get()
-	tx := txintent.NewIntent[*txintent.ExecTrigger, txintent.Result](eoa.Inner.Plan(), txplan.WithStaticNonce(uint64(eoa.Nonce.Add(1))-1), l2.budget.Plan())
+	tx := txintent.NewIntent[*txintent.ExecTrigger, txintent.Result](l2.eoas.Plan(), l2.budget.Plan())
 	tx.Content.Set(&txintent.ExecTrigger{
 		Executor: constants.CrossL2Inbox,
 		Msg:      *initMsg,
@@ -83,13 +79,12 @@ func (l2 *L2) SendExecutingMsg(t devtest.T, initMsg *types.Message) error {
 	// NOTE: this should be `<`, but the mempool filtering in op-geth currently uses the unsafe head's timestamp instead of
 	// the pending timestamp. See https://github.com/ethereum-optimism/op-geth/issues/603.
 	tx.PlannedTx.AgainstBlock.Wrap(func(fn plan.Fn[eth.BlockInfo]) plan.Fn[eth.BlockInfo] {
-		for l2.el.BlockRefByLabel(eth.Unsafe).Time <= initMsg.Identifier.Timestamp {
+		for l2.Unsafe().Time() <= initMsg.Identifier.Timestamp {
 			l2.el.WaitForBlock()
 		}
 		return fn
 	})
 	if _, err := tx.PlannedTx.Included.Eval(t.Ctx()); err != nil {
-		eoa.Nonce.Add(-1)
 		return err
 	}
 	_, err := tx.PlannedTx.Success.Eval(t.Ctx())

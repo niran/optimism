@@ -147,6 +147,9 @@ func setupLoadTest(t devtest.T, ctx context.Context, wg *sync.WaitGroup) (*AIMD,
 		eoas:         NewEOAPool(dsl.NewFunder(sys.Wallet, sys.FaucetB, l2ELB), budget),
 		el:           l2ELB,
 	}
+	info, err := dest.el.Escape().EthClient().InfoByLabel(ctx, eth.Unsafe)
+	t.Require().NoError(err)
+	dest.unsafe.Store(info)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

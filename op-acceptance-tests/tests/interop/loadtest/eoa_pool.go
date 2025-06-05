@@ -6,20 +6,25 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-service/txplan"
 )
 
-type SyncEOA struct {
-	Inner *dsl.EOA
-	Nonce atomic.Int64
+type syncEOA struct {
+	inner        *dsl.EOA
+	nonceManager *NonceManager
+}
+
+func (eoa *syncEOA) Plan() txplan.Option {
+	return txplan.Combine(eoa.inner.Plan(), eoa.nonceManager.Plan())
 }
 
 type EOAPool struct {
-	eoas  []*SyncEOA
+	eoas  []*syncEOA
 	index atomic.Uint64
 }
 
 func NewEOAPool(funder *dsl.Funder, total eth.ETH) *EOAPool {
-	eoas := make([]*SyncEOA, 300)
+	eoas := make([]*syncEOA, 300)
 	amountPerEOA := total.Div(uint64(len(eoas)))
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -27,8 +32,9 @@ func NewEOAPool(funder *dsl.Funder, total eth.ETH) *EOAPool {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			eoas[i] = &SyncEOA{
-				Inner: funder.NewFundedEOA(amountPerEOA),
+			eoas[i] = &syncEOA{
+				inner:        funder.NewFundedEOA(amountPerEOA),
+				nonceManager: NewNonceManager(0),
 			}
 		}()
 	}
@@ -37,7 +43,7 @@ func NewEOAPool(funder *dsl.Funder, total eth.ETH) *EOAPool {
 	}
 }
 
-func (p *EOAPool) Get() *SyncEOA {
+func (p *EOAPool) Plan() txplan.Option {
 	next := (p.index.Add(1) - 1) % uint64(len(p.eoas))
-	return p.eoas[next]
+	return p.eoas[next].Plan()
 }
