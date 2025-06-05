@@ -23,6 +23,7 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
+import { IStandardValidator } from "interfaces/L1/IStandardValidator.sol";
 
 interface IOPContractsManagerContractsContainer {
     function __constructor__(
@@ -33,6 +34,17 @@ interface IOPContractsManagerContractsContainer {
 
     function blueprints() external view returns (IOPContractsManager.Blueprints memory);
     function implementations() external view returns (IOPContractsManager.Implementations memory);
+}
+
+interface IOPContractsManagerValidator is IStandardValidator {
+    function __constructor__(
+        IStandardValidator.Implementations memory _implementations,
+        ISuperchainConfig _superchainConfig,
+        address _l1PAOMultisig,
+        address _challenger,
+        uint256 _withdrawalDelaySeconds
+    )
+        external;
 }
 
 interface IOPContractsManagerGameTypeAdder {
@@ -297,6 +309,7 @@ interface IOPContractsManager {
         IOPContractsManagerDeployer _opcmDeployer,
         IOPContractsManagerUpgrader _opcmUpgrader,
         IOPContractsManagerInteropMigrator _opcmInteropMigrator,
+        IOPContractsManagerValidator _opcmValidator,
         ISuperchainConfig _superchainConfig,
         IProtocolVersions _protocolVersions,
         IProxyAdmin _superchainProxyAdmin,
@@ -304,6 +317,14 @@ interface IOPContractsManager {
         address _upgradeController
     )
         external;
+
+    function validate(
+        IStandardValidator.ValidationInput calldata _input,
+        bool _allowFailure,
+        IStandardValidator.ValidationOverrides calldata _overrides
+    )
+        external
+        returns (string memory);
 
     function deploy(DeployInput calldata _input) external returns (DeployOutput memory);
 
@@ -340,6 +361,8 @@ interface IOPContractsManager {
     function opcmGameTypeAdder() external view returns (IOPContractsManagerGameTypeAdder);
 
     function opcmInteropMigrator() external view returns (IOPContractsManagerInteropMigrator);
+
+    function opcmValidator() external view returns (IOPContractsManagerValidator);
 
     /// @notice Returns the implementation contract addresses.
     function implementations() external view returns (Implementations memory);

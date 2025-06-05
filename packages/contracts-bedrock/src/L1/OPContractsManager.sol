@@ -32,7 +32,6 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IHasSuperchainConfig } from "interfaces/L1/IHasSuperchainConfig.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IStandardValidator } from "interfaces/L1/IStandardValidator.sol";
 import { StandardValidator } from "src/L1/StandardValidator.sol";
 
 contract OPContractsManagerContractsContainer {
@@ -1768,9 +1767,9 @@ contract OPContractsManager is ISemver {
 
     // -------- Constants and Variables --------
 
-    /// @custom:semver 2.4.0
+    /// @custom:semver 2.4.1
     function version() public pure virtual returns (string memory) {
-        return "2.4.0";
+        return "2.4.1";
     }
 
     OPContractsManagerGameTypeAdder public immutable opcmGameTypeAdder;
@@ -1901,19 +1900,8 @@ contract OPContractsManager is ISemver {
         return opcmValidator.validate(_input, _allowFailure, _overrides);
     }
 
-    function deploy(DeployInput calldata _input) external virtual returns (DeployOutput memory output_) {
-        output_ = opcmDeployer.deploy(_input, superchainConfig, msg.sender);
-
-        validate(
-            StandardValidator.ValidationInput({
-                proxyAdmin: output_.opChainProxyAdmin,
-                sysCfg: output_.systemConfigProxy,
-                absolutePrestate: Claim.unwrap(_input.disputeAbsolutePrestate),
-                l2ChainID: _input.l2ChainId
-            }),
-            true,
-            StandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
-        );
+    function deploy(DeployInput calldata _input) external virtual returns (DeployOutput memory) {
+        return opcmDeployer.deploy(_input, superchainConfig, msg.sender);
     }
 
     /// @notice Upgrades a set of chains to the latest implementation contracts
@@ -1933,19 +1921,6 @@ contract OPContractsManager is ISemver {
             OPContractsManagerUpgrader.upgrade, (superchainConfig, superchainProxyAdmin, _opChainConfigs)
         );
         _performDelegateCall(address(opcmUpgrader), data);
-
-        for (uint256 i; i < _opChainConfigs.length; i++) {
-            validate(
-                StandardValidator.ValidationInput({
-                    proxyAdmin: _opChainConfigs[i].proxyAdmin,
-                    sysCfg: _opChainConfigs[i].systemConfigProxy,
-                    absolutePrestate: Claim.unwrap(_opChainConfigs[i].absolutePrestate),
-                    l2ChainID: _opChainConfigs[i].systemConfigProxy.l2ChainId()
-                }),
-                true,
-                StandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
-            );
-        }
     }
 
     /// @notice addGameType deploys a new dispute game and links it to the DisputeGameFactory. The inputted _gameConfigs

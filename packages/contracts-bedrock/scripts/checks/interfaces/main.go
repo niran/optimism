@@ -66,7 +66,7 @@ var excludeSourceContracts = []string{
 	// - L1StandardBridge
 	"OPContractsManagerContractsContainer", "OPContractsManagerBase",
 	"OPContractsManagerGameTypeAdder", "OPContractsManagerUpgrader", "OPContractsManagerDeployer",
-	"OPContractsManagerInteropMigrator", "OPContractsManager", "OptimismPortal2",
+	"OPContractsManagerInteropMigrator", "OPContractsManagerValidator", "OPContractsManager", "OptimismPortal2",
 	"ProtocolVersions", "ProxyAdminOwnedBase", "StandardValidatorBase", "StandardValidatorV180",
 	"StandardValidatorV200", "StandardValidatorV300", "SuperchainConfig", "SystemConfig",
 
