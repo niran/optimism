@@ -108,12 +108,14 @@ contract VerifyOPCM is Script {
         fieldNameOverrides["opcmDeployer"] = "OPContractsManagerDeployer";
         fieldNameOverrides["opcmUpgrader"] = "OPContractsManagerUpgrader";
         fieldNameOverrides["opcmInteropMigrator"] = "OPContractsManagerInteropMigrator";
+        fieldNameOverrides["opcmValidator"] = "OPContractsManagerValidator";
 
         // Overrides for situations where contracts have differently named source files.
         sourceNameOverrides["OPContractsManagerGameTypeAdder"] = "OPContractsManager";
         sourceNameOverrides["OPContractsManagerDeployer"] = "OPContractsManager";
         sourceNameOverrides["OPContractsManagerUpgrader"] = "OPContractsManager";
         sourceNameOverrides["OPContractsManagerInteropMigrator"] = "OPContractsManager";
+        sourceNameOverrides["OPContractsManagerValidator"] = "OPContractsManager";
 
         // Mark as ready.
         ready = true;
