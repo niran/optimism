@@ -160,9 +160,8 @@ func (h *Handler) readPump(client *Client) {
 			return
 		default:
 			// Always read to process control frames (ping/pong/close)
-			readCtx, cancel := context.WithTimeout(client.ctx, 30*time.Second)
+			readCtx, _ := context.WithTimeout(client.ctx, 30*time.Second)
 			messageType, message, err := client.conn.Read(readCtx)
-			cancel()
 
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
@@ -189,9 +188,9 @@ func (h *Handler) readPump(client *Client) {
 // writePump pumps messages from the hub to the WebSocket connection
 func (h *Handler) writePump(client *Client) {
 	defer func() {
-		// Don't close the client here - let the hub handle it
-		// Just unregister when this pump exits
-		h.hub.unregister <- client
+		// Don't unregister here - let readPump handle it
+		// Just log that the write pump is exiting
+		h.log.Debug("WebSocket write pump exited")
 	}()
 
 	// Configure ping for connection keepalive
@@ -211,9 +210,8 @@ func (h *Handler) writePump(client *Client) {
 			}
 
 			// Write with timeout
-			writeCtx, cancel := context.WithTimeout(client.ctx, writeTimeout)
+			writeCtx, _ := context.WithTimeout(client.ctx, writeTimeout)
 			err := client.conn.Write(writeCtx, websocket.MessageText, message)
-			cancel()
 
 			if err != nil {
 				h.log.Warn("Error writing to client", "err", err)
@@ -221,9 +219,8 @@ func (h *Handler) writePump(client *Client) {
 			}
 
 		case <-pingTicker.C:
-			pingCtx, cancel := context.WithTimeout(client.ctx, pongTimeout)
+			pingCtx, _ := context.WithTimeout(client.ctx, pongTimeout)
 			err := client.conn.Ping(pingCtx)
-			cancel()
 
 			if err != nil {
 				h.log.Warn("Ping error", "err", err)

@@ -82,9 +82,8 @@ func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) boo
 		log.Info("attempting to connect to rollup boost WebSocket", "attempt", attempt, "url", cfg.RollupBoostWsURL)
 
 		// Create context with timeout for dialing
-		dialCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		dialCtx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 		conn, _, err = websocket.Dial(dialCtx, cfg.RollupBoostWsURL, nil)
-		cancel()
 
 		if err == nil {
 			log.Info("successfully connected to rollup boost WebSocket")
@@ -207,9 +206,8 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 				h.log.Info("reconnecting to rollup boost WebSocket", "url", h.cfg.RollupBoostWsURL)
 
 				// Connect with timeout
-				dialCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				dialCtx, _ := context.WithTimeout(ctx, 5*time.Second)
 				conn, _, err := websocket.Dial(dialCtx, h.cfg.RollupBoostWsURL, nil)
-				cancel()
 
 				if err != nil {
 					h.log.Warn("failed to connect to rollup boost WebSocket, will retry",
@@ -225,9 +223,8 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 			}
 
 			// Read with timeout
-			readCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			readCtx, _ := context.WithTimeout(ctx, 30*time.Second)
 			messageType, message, err := h.rollupBoostConn.Read(readCtx)
-			cancel()
 
 			if err != nil {
 				h.log.Warn("error reading from rollup boost WebSocket", "err", err)
