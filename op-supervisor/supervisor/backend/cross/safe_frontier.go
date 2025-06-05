@@ -28,6 +28,11 @@ func HazardSafeFrontierChecks(d SafeFrontierCheckDeps, inL1Source eth.BlockID, h
 				if err != nil {
 					return fmt.Errorf("failed to determine cross-safe candidate block of hazard dependency %s (chain %s): %w", hazardBlock, hazardChainID, err)
 				}
+				// if the hazard block is beyond the candidate, then we don't have sufficient information to proceed
+				if hazardBlock.Number > candidate.Derived.Number {
+					return fmt.Errorf("hazard dependency %s (chain %s) is beyond its candidate cross-safe block %s: %w",
+						hazardBlock, hazardChainID, candidate.Derived, types.ErrFuture)
+				}
 				if candidate.Derived.Number == hazardBlock.Number && candidate.Derived.ID() != hazardBlock.ID() {
 					return fmt.Errorf("expected block %s (chain %s) does not match candidate local-safe block %s: %w",
 						hazardBlock, hazardChainID, candidate.Derived, types.ErrConflict)

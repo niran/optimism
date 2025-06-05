@@ -126,6 +126,25 @@ func TestHazardSafeFrontierChecks(t *testing.T) {
 		err := HazardSafeFrontierChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
 		require.ErrorContains(t, err, "some error")
 	})
+	t.Run("Hazards Chains Candidate is Beyond Hazard", func(t *testing.T) {
+		sfcd := &mockSafeFrontierCheckDeps{}
+		sfcd.crossSourceFn = func() (types.BlockSeal, error) {
+			return types.BlockSeal{}, types.ErrFuture
+		}
+		sfcd.candidateCrossSafeFn = func() (candidate types.DerivedBlockRefPair, err error) {
+			return types.DerivedBlockRefPair{
+				Source:  eth.BlockRef{Number: 8},
+				Derived: eth.BlockRef{Number: 2},
+			}, nil
+		}
+		l1Source := eth.BlockID{Number: 8}
+		hazards := map[eth.ChainID]types.BlockSeal{eth.ChainIDFromUInt64(123): {Number: 99, Hash: common.BytesToHash([]byte{0x02})}}
+		// when the hazard chain might need to use the candidate block,
+		// but the candidate block is beyond the hazard, already
+		// the hazard block should be rejected, causing an error
+		err := HazardSafeFrontierChecks(sfcd, l1Source, NewHazardSetFromEntries(hazards))
+		require.Error(t, err)
+	})
 }
 
 type mockSafeFrontierCheckDeps struct {
