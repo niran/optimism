@@ -28,6 +28,7 @@ import (
 )
 
 // TestInitExecMsg tests basic interop messaging
+// @tag: Interop messaging
 func TestInitExecMsg(gt *testing.T) {
 	t := devtest.SerialT(gt)
 	sys := presets.NewSimpleInterop(t)
@@ -45,6 +46,7 @@ func TestInitExecMsg(gt *testing.T) {
 }
 
 // TestInitExecMsgWithDSL tests basic interop messaging with contract DSL
+// @tag: Interop messaging
 func TestInitExecMsgWithDSL(gt *testing.T) {
 	t := devtest.SerialT(gt)
 	sys := presets.NewSimpleInterop(t)

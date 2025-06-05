@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 )
 
+// TestPreNoInbox
+// @tag: Interop upgrade - pre-upgrade
 func TestPreNoInbox(gt *testing.T) {
 	t := devtest.ParallelT(gt)
 	sys := presets.NewSimpleInterop(t)

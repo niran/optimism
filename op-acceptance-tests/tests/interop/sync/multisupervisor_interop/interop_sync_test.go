@@ -11,6 +11,7 @@ import (
 
 // TestL2CLAheadOfSupervisor tests the below scenario:
 // L2CL ahead of supervisor, aka supervisor needs to reset the L2CL, to reproduce old data. Currently supervisor has only managed mode implemented, so the supervisor will ask the L2CL to reset back.
+// @tag: Interop sync testing
 func TestL2CLAheadOfSupervisor(gt *testing.T) {
 	t := devtest.SerialT(gt)
 

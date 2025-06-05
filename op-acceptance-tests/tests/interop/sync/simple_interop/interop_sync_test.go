@@ -11,6 +11,7 @@ import (
 
 // TestL2CLResync checks that unsafe head advances after restarting L2CL.
 // Resync is only possible when supervisor and L2CL reconnects.
+// @tag: Interop sync testing
 func TestL2CLResync(gt *testing.T) {
 	t := devtest.SerialT(gt)
 	sys := presets.NewSimpleInterop(t)

@@ -32,6 +32,7 @@ func TestMain(m *testing.M) {
 // The test will exit successfully after the global go test deadline or the timeout specified by the
 // NAT_STEADY_TIMEOUT environment variable elapses, whichever comes first.
 // Also see: https://github.com/golang/go/issues/48157.
+// @tag: Interop load test
 func TestSteady(gt *testing.T) {
 	t := setupT(gt)
 	var wg sync.WaitGroup
@@ -72,6 +73,7 @@ func TestSteady(gt *testing.T) {
 
 // TestBurst spams interop messages and exits successfully when the base fee is raised to one gwei.
 // This simulates adversarial behavior.
+// @tag: Interop load test
 func TestBurst(gt *testing.T) {
 	t := setupT(gt)
 	var wg sync.WaitGroup

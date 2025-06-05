@@ -14,6 +14,9 @@ import (
 )
 
 // TestReorgUnsafeHead starts an interop chain with an op-test-sequencer, which takes control over sequencing the L2 chain and introduces a reorg on the unsafe head
+// @tag: reorg L2
+// @tag: reorg L2 - LocalUnsafe
+// @tag: Sequencer equivocation
 func TestReorgUnsafeHead(gt *testing.T) {
 	t := devtest.SerialT(gt)
 	ctx := t.Ctx()

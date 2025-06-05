@@ -14,6 +14,7 @@ import (
 // TestSequencingWindowExpiry tests that the sequencing window may expire,
 // the chain reorgs because of it, and that the chain then recovers.
 // This test can take 3 minutes to run.
+// @tag: Sequencing window expiry
 func TestSequencingWindowExpiry(gt *testing.T) {
 	t := devtest.SerialT(gt)
 

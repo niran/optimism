@@ -484,6 +484,8 @@ func executeMessageInvalidAttributes(
 	}
 }
 
+// TestInteropInitAndExecMsg
+// @tag: Interop messaging
 func TestInteropInitAndExecMsg(t *testing.T) {
 	l2ChainNums := 2
 	walletGetters, totalValidators := SetupDefaultInteropSystemTest(l2ChainNums)
@@ -493,6 +495,8 @@ func TestInteropInitAndExecMsg(t *testing.T) {
 	)
 }
 
+// TestInteropInitAndExecMultipleMsg
+// @tag: Interop messaging
 func TestInteropInitAndExecMultipleMsg(t *testing.T) {
 	l2ChainNums := 2
 	walletGetters, totalValidators := SetupDefaultInteropSystemTest(l2ChainNums)

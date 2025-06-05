@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/predeploys"
 )
 
+// @tag: Interop upgrade - post-upgrade
 func TestPostInbox(gt *testing.T) {
 	t := devtest.ParallelT(gt)
 	sys := presets.NewSimpleInterop(t)
@@ -39,6 +40,9 @@ func TestPostInbox(gt *testing.T) {
 	})
 }
 
+// TestExecFromSameAddressInALoop
+// @tag: Interop upgrade - post-upgrade
+// @tag: Interop messaging
 func TestPostInteropUpgradeComprehensive(gt *testing.T) {
 	t := devtest.ParallelT(gt)
 	sys := presets.NewSimpleInterop(t)

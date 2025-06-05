@@ -17,6 +17,12 @@ import (
 
 type checksFunc func(t devtest.T, sys *presets.SimpleInterop)
 
+// TestL2ReorgAfterL1Reorg tests that the L2 chain reorgs after an L1 reorg
+// @tag: reorg L1
+// @tag: reorg L2
+// @tag: reorg L2 - LocalUnsafe
+// @tag: reorg L2 - LocalSafe
+// @tag: reorg L2 - CrossSafe
 func TestL2ReorgAfterL1Reorg(gt *testing.T) {
 	gt.Run("unsafe reorg", func(gt *testing.T) {
 		var crossSafeRef, localSafeRef, unsafeRef eth.BlockID

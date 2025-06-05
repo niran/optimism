@@ -17,6 +17,7 @@ import (
 // TestInteropHappyTx is testing that a valid init message, followed by a valid exec message are correctly
 // included in two L2 chains and that the cross-safe ref for both of them progresses as expected beyond
 // the block number where the messages were included
+// @tag: Interop messaging
 func TestInteropHappyTx(gt *testing.T) {
 	t := devtest.SerialT(gt)
 	sys := presets.NewSimpleInterop(t)
