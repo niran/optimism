@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/state"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -14,7 +16,24 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	presets.DoMain(m, presets.WithMinimal(), presets.WithFinalizationPeriodSeconds(2))
+	presets.DoMain(m, presets.WithMinimal(), presets.WithFinalizationPeriodSeconds(2), presets.WithAdditonalDisputeGames([]state.AdditionalDisputeGame{
+		{
+			ChainProofParams: state.ChainProofParams{
+				// Fast game
+				DisputeGameType:         254,
+				DisputeAbsolutePrestate: common.HexToHash("0x03c7ae758795765c6664a5d39bf63841c71ff191e9189522bad8ebff5d4eca98"),
+				DisputeMaxGameDepth:     14 + 3 + 1,
+				DisputeSplitDepth:       14,
+				DisputeClockExtension:   0,
+				DisputeMaxClockDuration: 0,
+			},
+			VMType:                       state.VMTypeAlphabet,
+			UseCustomOracle:              true,
+			OracleMinProposalSize:        10000,
+			OracleChallengePeriodSeconds: 0,
+			MakeRespected:                true,
+		},
+	}))
 }
 
 func TestL2ToL1Withdrawal(gt *testing.T) {

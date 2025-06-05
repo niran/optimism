@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/devkeys"
+	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/state"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-devstack/shim"
@@ -48,6 +49,12 @@ func WithMinimal() stack.CommonOption {
 func WithFinalizationPeriodSeconds(n uint64) stack.CommonOption {
 	return stack.MakeCommon(sysgo.WithDeployerOptions(
 		sysgo.WithFinalizationPeriodSeconds(n),
+	))
+}
+
+func WithAdditonalDisputeGames(games []state.AdditionalDisputeGame) stack.CommonOption {
+	return stack.MakeCommon(sysgo.WithDeployerOptions(
+		sysgo.WithAdditonalDisputeGames(games),
 	))
 }
 

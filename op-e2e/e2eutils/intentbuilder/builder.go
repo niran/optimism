@@ -44,6 +44,7 @@ type L2Configurator interface {
 	ChainID() eth.ChainID
 	WithBlockTime(uint64)
 	WithFinalizationPeriodSeconds(value uint64)
+	WithAdditionalDisputeGames(games []state.AdditionalDisputeGame)
 	WithL1StartBlockHash(hash common.Hash)
 	ContractsConfigurator
 	L2VaultsConfigurator
@@ -305,6 +306,10 @@ func (c *l2Configurator) WithBlockTime(blockTime uint64) {
 
 func (c *l2Configurator) WithFinalizationPeriodSeconds(value uint64) {
 	c.builder.intent.Chains[c.chainIndex].DeployOverrides["l2FinalizationPeriodSeconds"] = value
+}
+
+func (c *l2Configurator) WithAdditionalDisputeGames(games []state.AdditionalDisputeGame) {
+	c.builder.intent.Chains[c.chainIndex].AdditionalDisputeGames = games
 }
 
 func (c *l2Configurator) WithL1StartBlockHash(hash common.Hash) {
