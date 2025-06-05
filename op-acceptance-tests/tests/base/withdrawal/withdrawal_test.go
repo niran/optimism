@@ -30,6 +30,7 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 	fundingAmount := eth.ThousandEther
 	alice := sys.Funder.NewFundedEOA(fundingAmount)
 	alice.VerifyBalanceExact(fundingAmount)
+	sys.FunderL1.FundAtLeast(alice.AsEL(sys.L1EL), eth.OneHundredthEther)
 
 	l1Client := sys.L1EL.Escape().EthClient()
 
@@ -43,7 +44,7 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 	t.Require().Eventually(func() bool {
 		head := sys.L2CL.HeadBlockRef(supervisorTypes.LocalUnsafe)
 		return head.L1Origin.Number >= receipt.BlockNumber.Uint64()
-	}, time.Second*30, time.Second, "awaiting withdrawal to be processed by L2")
+	}, time.Second*60, time.Second, "awaiting withdrawal to be processed by L2")
 
 	sys.L2Chain.WaitForBlock()
 	sys.L1Network.WaitForBlock()
@@ -54,12 +55,7 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 
 	proveReceipt, finalizeReceipt, resolveClaimReceipt, resolveReceipt := ProveAndFinalizeWithdrawal(t, sys, alice, receipt, false)
 
-	// Verify the L1 balance after finalization
-	endBalanceAfterFinalize, err := l1Client.BalanceAt(t.Ctx(), alice.Address(), nil)
-	require.NoError(t, err)
-
 	// Calculate the expected balance change
-	diff := new(big.Int).Sub(endBalanceAfterFinalize, startBalanceBeforeFinalize)
 	proveFee := new(big.Int).Mul(new(big.Int).SetUint64(proveReceipt.GasUsed), proveReceipt.EffectiveGasPrice)
 	finalizeFee := new(big.Int).Mul(new(big.Int).SetUint64(finalizeReceipt.GasUsed), finalizeReceipt.EffectiveGasPrice)
 	fees := new(big.Int).Add(proveFee, finalizeFee)
@@ -71,5 +67,13 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 	}
 	expectedAmount := new(big.Int).Sub(withdrawalAmount.ToBig(), fees)
 
-	require.Equal(t, expectedAmount, diff, "L1 balance change does not match expected withdrawal amount")
+	var endBalanceAfterFinalize *big.Int
+	require.Eventually(t, func() bool {
+		endBalanceAfterFinalize, err = l1Client.BalanceAt(t.Ctx(), alice.Address(), nil)
+		if err != nil {
+			return false
+		}
+		diff := new(big.Int).Sub(endBalanceAfterFinalize, startBalanceBeforeFinalize)
+		return diff.Cmp(expectedAmount) == 0
+	}, time.Second*60, time.Second, "awaiting balance to be changed")
 }

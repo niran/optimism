@@ -124,8 +124,8 @@ func ProveWithdrawalParametersForEvent(t devtest.T, l2Client apis.EthClient, ev 
 		Data:          ev.Data,
 		OutputRootProof: bindings.TypesOutputRootProof{
 			Version:                  [32]byte{}, // Empty for version 1
-			StateRoot:                l2Header.Root(),
-			MessagePasserStorageRoot: p.StorageHash,
+			StateRoot:                eth.Bytes32(l2Header.Root()),
+			MessagePasserStorageRoot: *l2Header.WithdrawalsRoot(),
 			LatestBlockhash:          l2Header.Hash(),
 		},
 		WithdrawalProof: trieNodes,

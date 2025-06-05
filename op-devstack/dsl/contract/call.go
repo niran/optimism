@@ -40,4 +40,13 @@ func Write[O any](user *dsl.EOA, call bindings.TypedCall[O], opts ...txplan.Opti
 	return o
 }
 
+// WriteWithError makes a user to write a tx by using the planned contract bindings
+// It returns the receipt and an error if the write fails
+func WriteWithError[O any](user *dsl.EOA, call bindings.TypedCall[O], opts ...txplan.Option) (*types.Receipt, error) {
+	checkTestable(call)
+	finalOpts := txplan.Combine(user.Plan(), txplan.Combine(opts...))
+	o, err := contractio.Write(call, call.Test().Ctx(), finalOpts)
+	return o, err
+}
+
 var _ TestCallView[any] = (*bindings.TypedCall[any])(nil)

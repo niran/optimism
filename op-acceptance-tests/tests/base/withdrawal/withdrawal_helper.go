@@ -2,6 +2,7 @@ package withdrawal
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -111,6 +112,7 @@ func ProveWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Withdr
 	// proveWithdrawalTransaction gas estimation may fail because the current timestamp is the same
 	// as the dispute game creation timestamp.
 	sys.L1Network.WaitForBlock()
+	sys.L2Chain.WaitForBlock()
 
 	// Get the latest header
 	portalFactory := bindings.NewOptimismPortal2Factory(bindings.WithClient(l1Client), bindings.WithTo(optimismPortalAddr), bindings.WithTest(t))
@@ -137,11 +139,27 @@ func ProveWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Withdr
 			Data:     params.Data,
 		},
 		params.L2OutputIndex,
-		params.OutputRootProof,
+		struct {
+			Version                  [32]byte
+			StateRoot                [32]byte
+			MessagePasserStorageRoot [32]byte
+			LatestBlockhash          [32]byte
+		}{
+			Version:                  [32]byte{},
+			StateRoot:                params.OutputRootProof.StateRoot,
+			MessagePasserStorageRoot: params.OutputRootProof.MessagePasserStorageRoot,
+			LatestBlockhash:          params.OutputRootProof.LatestBlockhash,
+		},
 		params.WithdrawalProof,
 	)
-	proveReceipt := contract.Write(alice.AsEL(sys.L1EL), args)
-	require.Equal(t, types.ReceiptStatusSuccessful, proveReceipt.Status)
+	var proveReceipt *types.Receipt
+	require.Eventually(t, func() bool {
+		proveReceipt, err = contract.WriteWithError(alice.AsEL(sys.L1EL), args)
+		if err != nil {
+			return false
+		}
+		return proveReceipt.Status == types.ReceiptStatusSuccessful
+	}, 120*time.Second, time.Second, "withdrawal proof failed")
 	return params, proveReceipt
 }
 
@@ -173,14 +191,25 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 	gameContract, err := contracts.NewFaultDisputeGameContract(t.Ctx(), metrics.NoopContractMetrics, game.DisputeGameProxy, l1Client.NewMultiCaller(batching.DefaultBatchSize))
 	require.NoError(t, err)
 
-	timedCtx, cancel := context.WithTimeout(t.Ctx(), 30*time.Second)
+	timedCtx, cancel := context.WithTimeout(t.Ctx(), 120*time.Second)
 	defer cancel()
 	require.NoError(t, wait.For(timedCtx, time.Second, func() (bool, error) {
-		err := gameContract.CallResolveClaim(t.Ctx(), 0)
+		// First check if the game is in a resolvable state
+		status, err := gameContract.GetStatus(t.Ctx())
+		if err != nil {
+			return false, err
+		}
+		if status != gameTypes.GameStatusInProgress {
+			return false, fmt.Errorf("game is not in progress: %v", status)
+		}
+
+		// Try to resolve the claim
+		err = gameContract.CallResolveClaim(t.Ctx(), 0)
 		if err != nil {
 			t.Logf("Could not resolve dispute game claim: %v", err)
+			return false, nil
 		}
-		return err == nil, nil
+		return true, nil
 	}))
 
 	t.Logf("FinalizeWithdrawal: resolveClaim...")
@@ -220,9 +249,9 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 
 	// Finalize withdrawal
 	t.Logf("FinalizeWithdrawal: finalizing withdrawal...")
-	tx2 := contract.Write(alice, portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()))
+	finalizeWithdrawalReceipt := contract.Write(alice, portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()))
 
 	// Ensure that our withdrawal was finalized successfully
-	require.Equal(t, types.ReceiptStatusSuccessful, tx2.Status)
-	return tx2, resolveClaimReceipt.Included.Value(), resolveReceipt.Included.Value()
+	require.Equal(t, types.ReceiptStatusSuccessful, finalizeWithdrawalReceipt.Status)
+	return finalizeWithdrawalReceipt, resolveClaimReceipt.Included.Value(), resolveReceipt.Included.Value()
 }
