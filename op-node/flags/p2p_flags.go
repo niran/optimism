@@ -388,9 +388,10 @@ func P2PFlags(envPrefix string) []cli.Flag {
 		},
 		&cli.BoolFlag{
 			Name:     SyncReqRespName,
-			Usage:    "Enables P2P req-resp alternative sync method, on both server and client side.",
-			Value:    true,
+			Usage:    "[DEPRECATED] Enables P2P req-resp alternative sync method, on both server and client side.",
+			Value:    false,
 			Required: false,
+			Hidden:   true,
 			EnvVars:  p2pEnv(envPrefix, "SYNC_REQ_RESP"),
 			Category: P2PCategory,
 		},

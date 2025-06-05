@@ -110,7 +110,7 @@ var (
 		Usage:   fmt.Sprintf("Blockchain sync mode (options: %s)", openum.EnumString(sync.ModeStrings)),
 		EnvVars: prefixEnvVars("SYNCMODE"),
 		Value: func() *sync.Mode {
-			out := sync.CLSync
+			out := sync.ELSync
 			return &out
 		}(),
 		Category: RollupCategory,
