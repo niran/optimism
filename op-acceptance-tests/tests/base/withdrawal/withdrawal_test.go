@@ -67,6 +67,7 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 	// // first deposit 1 ETH : L1 -> L2. This fills L1 ETHlockbox
 	// mintAmount := eth.OneEther
 	// // this will fix everything
+	// or we may call portal2::migrateLiquidity to fill in lockETH
 
 	// Start L2 balance for withdrawal
 	l1Client := sys.L1EL.Escape().EthClient()
