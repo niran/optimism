@@ -98,6 +98,7 @@ abstract contract ProxyAdminOwnedBase {
         }
     }
 
+    /// @notice Reverts if the caller is not either the ProxyAdmin or ProxyAdminOwner
     function _assertOnlyProxyAdminOrProxyAdminOwner() internal view {
         if (address(proxyAdmin()) != msg.sender && proxyAdminOwner() != msg.sender) {
             revert ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner();

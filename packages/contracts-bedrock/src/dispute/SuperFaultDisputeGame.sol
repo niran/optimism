@@ -909,15 +909,6 @@ contract SuperFaultDisputeGame is Clone, ISemver {
     /// @notice Closes out the game, determines the bond distribution mode, attempts to register
     ///         the game as the anchor game, and emits an event.
     function closeGame() public {
-        // We won't close the game if the system is currently paused. Paused games are temporarily
-        // invalid which would cause the game to go into refund mode and potentially cause some
-        // confusion for honest challengers. By blocking the game from being closed while the
-        // system is paused, the game will only go into refund mode if it ends up being explicitly
-        // invalidated in the AnchorStateRegistry.
-        if (ANCHOR_STATE_REGISTRY.paused()) {
-            revert GamePaused();
-        }
-
         // If the bond distribution mode has already been determined, we can return early.
         if (bondDistributionMode == BondDistributionMode.REFUND || bondDistributionMode == BondDistributionMode.NORMAL)
         {
@@ -926,6 +917,15 @@ contract SuperFaultDisputeGame is Clone, ISemver {
         } else if (bondDistributionMode != BondDistributionMode.UNDECIDED) {
             // We shouldn't get here, but sanity check just in case.
             revert InvalidBondDistributionMode();
+        }
+
+        // We won't close the game if the system is currently paused. Paused games are temporarily
+        // invalid which would cause the game to go into refund mode and potentially cause some
+        // confusion for honest challengers. By blocking the game from being closed while the
+        // system is paused, the game will only go into refund mode if it ends up being explicitly
+        // invalidated in the AnchorStateRegistry.
+        if (ANCHOR_STATE_REGISTRY.paused()) {
+            revert GamePaused();
         }
 
         // Make sure that the game is resolved.
