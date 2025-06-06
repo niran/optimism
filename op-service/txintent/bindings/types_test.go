@@ -181,6 +181,11 @@ func TestTypeConversion(t *testing.T) {
 			want:     "(address,uint256,uint256,uint256,uint256)",
 			testName: "supervisor Identifier",
 		},
+		{
+			value:    TestGameData{},
+			want:     "(uint32,bytes32,bytes)",
+			testName: "faultdisputegame gamedata",
+		},
 	}
 
 	for _, tc := range tests {

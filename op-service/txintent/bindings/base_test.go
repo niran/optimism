@@ -2,9 +2,12 @@ package bindings
 
 import (
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
@@ -29,6 +32,12 @@ type TestGameSearchResult struct {
 type TestProvenWithdrawalsResult struct {
 	DisputeGameProxy common.Address
 	Timestamp        uint64
+}
+
+type TestGameData struct {
+	GameType  uint32
+	RootClaim [32]byte
+	Extradata []byte
 }
 
 type TestBaseContract struct {
@@ -60,6 +69,8 @@ type TestBaseContract struct {
 	FindLatestGames func(gameType uint32, start *big.Int, n *big.Int) TypedCall[[]TestGameSearchResult] `sol:"findLatestGames"`
 
 	ProvenWithdrawals func(withdrawalHash [32]byte, submitter common.Address) TypedCall[TestProvenWithdrawalsResult] `sol:"provenWithdrawals"`
+
+	GameData func() TypedCall[TestGameData] `sol:"gameData"`
 }
 
 func NewTestBaseContract(f *TestBaseCallContractFactory) *TestBaseContract {
@@ -170,4 +181,43 @@ func TestDecodeStruct(t *testing.T) {
 
 	require.Equal(t, common.HexToAddress("0x46D257cf3803b353350ec1Edc6AA106f355F3bd2"), result.DisputeGameProxy)
 	require.Equal(t, uint64(1749020377), result.Timestamp)
+
+	data = hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000fec0ced67668cc6e8e63517245aa7e34053a1332eb4303f3169b6051810e277036000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015")
+
+	a, _ := abi.NewType("uint32", "", nil)
+	b, _ := abi.NewType("bytes32", "", nil)
+	c, _ := abi.NewType("bytes", "", nil)
+	args := abi.Arguments{
+		{Type: a},
+		{Type: b},
+		{Type: c},
+	}
+	decoded, err := args.Unpack(data)
+	if err != nil {
+		panic(err)
+	}
+
+	// val := ABIValueToCustomValue[TestGameData](reflect.TypeOf(TestGameData{}), decoded[0])
+	// datttt, _ := json.Marshal(val)
+	// fmt.Println(string(datttt))
+
+	gameData := TestGameData{
+		GameType:  decoded[0].(uint32),
+		RootClaim: decoded[1].([32]byte),
+		Extradata: decoded[2].([]byte),
+	}
+
+	dattt, _ := json.Marshal(gameData)
+	fmt.Println(string(dattt))
+
+	call2 := testBaseContract.GameData()
+	result2, err := call2.DecodeOutput(data)
+	require.NoError(t, err)
+
+	datttt, _ := json.Marshal(result2)
+	fmt.Println(string(datttt))
+
+	require.Equal(t, uint32(254), result2.GameType)
+	require.Equal(t, *(*[32]byte)(hexutil.MustDecode("0xc0ced67668cc6e8e63517245aa7e34053a1332eb4303f3169b6051810e277036")), result2.RootClaim)
+	require.Equal(t, hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000015"), result2.Extradata)
 }

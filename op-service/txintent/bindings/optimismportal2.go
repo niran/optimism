@@ -23,6 +23,9 @@ type ProvenWithdrawalsResult struct {
 type OptimismPortal2 struct {
 	OptimismPortal2CallFactory
 
+	AnchorStateRegistryAddr func() TypedCall[common.Address] `sol:"anchorStateRegistry"`
+	ETHLockboxAddr          func() TypedCall[common.Address] `sol:"ethLockbox"`
+
 	// Read-only functions
 	CheckWithdrawal                 func(withdrawalHash [32]byte, proofSubmitter common.Address) TypedCall[any] `sol:"checkWithdrawal"`
 	DisputeGameBlacklist            func(disputeGame common.Address) TypedCall[bool]                            `sol:"disputeGameBlacklist"`

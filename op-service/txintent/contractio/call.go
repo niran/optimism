@@ -23,6 +23,19 @@ func Write[O any](call bindings.TypedCall[O], ctx context.Context, opts ...txpla
 	return receipt, nil
 }
 
+func Write2[O any](call bindings.TypedCall[O], ctx context.Context, opts ...txplan.Option) (*types.Receipt, *txplan.PlannedTx, error) {
+	plan, err := Plan(call)
+	if err != nil {
+		return nil, nil, err
+	}
+	tx := txplan.NewPlannedTx(plan, txplan.Combine(opts...))
+	receipt, err := tx.Included.Eval(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return receipt, tx, nil
+}
+
 // Read receives a TypedCall and uses to plan transaction, and attempts to read.
 func Read[O any](view bindings.TypedCall[O], ctx context.Context, opts ...txplan.Option) (O, error) {
 	plan, err := Plan(view)

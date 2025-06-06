@@ -78,6 +78,7 @@ func RunWithdrawalsTest(t *testing.T, sys CommonSystem) {
 	startBalanceBeforeWithdrawal, err := l2Seq.BalanceAt(ctx, fromAddr, nil)
 	require.NoError(t, err)
 
+	// withdrawal start
 	withdrawAmount := big.NewInt(500_000_000_000)
 	t.Logf("WithdrawalsTest: sending L2 withdrawal for %v...", withdrawAmount)
 	tx, receipt := helpers.SendWithdrawal(t, cfg, l2Seq, ethPrivKey, func(opts *helpers.WithdrawalTxOpts) {

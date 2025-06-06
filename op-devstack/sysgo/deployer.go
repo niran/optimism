@@ -247,6 +247,24 @@ func WithSequencingWindow(n uint64) DeployerOption {
 	}
 }
 
+func WithProofMaturity(n uint64) DeployerOption {
+	return func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {
+		builder.WithGlobalOverride("proofMaturityDelaySeconds", uint64(n))
+	}
+}
+
+func WithFaultGameAbsolutePrestate(state common.Hash) DeployerOption {
+	return func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {
+		builder.WithGlobalOverride("faultGameAbsolutePrestate", state.Hex())
+	}
+}
+
+func WithDisputeGameFinalityDelaySeconds(seconds uint64) DeployerOption {
+	return func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {
+		builder.WithGlobalOverride("disputeGameFinalityDelaySeconds", seconds)
+	}
+}
+
 func (wb *worldBuilder) buildL1Genesis() {
 	wb.require.NotNil(wb.output.L1DevGenesis, "must have L1 genesis outer config")
 	wb.require.NotNil(wb.output.L1StateDump, "must have L1 genesis alloc")
@@ -339,6 +357,8 @@ func (wb *worldBuilder) Build() {
 	// }
 
 	intent, err := wb.builder.Build()
+
+	intent.GlobalDeployOverrides["proofMaturityDelaySeconds"] = 12
 	wb.require.NoError(err)
 	// panic(fmt.Sprintf("wow %s", intent.Chains[0].Roles.L1ProxyAdminOwner))
 

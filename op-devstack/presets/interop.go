@@ -1,6 +1,7 @@
 package presets
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/devkeys"
@@ -149,6 +150,66 @@ func WithSequencingWindow(suggestedSequencingWindow uint64, maxSequencingWindow 
 				l2Net.T().Gate().LessOrEqual(cfg.SeqWindowSize, maxSequencingWindow,
 					"sequencing window of chain %s must fit in max sequencing window size", l2Net.ChainID())
 			}
+		}),
+	)
+}
+
+func WithProofMaturity(seconds uint64) stack.CommonOption {
+	return stack.Combine(
+		stack.MakeCommon(sysgo.WithDeployerOptions(
+			sysgo.WithProofMaturity(seconds),
+		)),
+
+		// copypasta from WithSequencingWindow
+		// We can't configure sysext sequencing window, so we go with whatever is configured.
+		// The post-hydrate function will check that the sequencing window is within expected bounds.
+		stack.PostHydrate[stack.Orchestrator](func(sys stack.System) {
+			// TODO: do something
+			// for _, l2Net := range sys.L2Networks() {
+			// 	cfg := l2Net.RollupConfig()
+			// 	l2Net.T().Gate().LessOrEqual(cfg., maxSequencingWindow,
+			// 		"sequencing window of chain %s must fit in max sequencing window size", l2Net.ChainID())
+			// }
+		}),
+	)
+}
+
+func WithFaultGameAbsolutePrestate(state common.Hash) stack.CommonOption {
+	return stack.Combine(
+		stack.MakeCommon(sysgo.WithDeployerOptions(
+			sysgo.WithFaultGameAbsolutePrestate(state),
+		)),
+
+		// copypasta from WithSequencingWindow
+		// We can't configure sysext sequencing window, so we go with whatever is configured.
+		// The post-hydrate function will check that the sequencing window is within expected bounds.
+		stack.PostHydrate[stack.Orchestrator](func(sys stack.System) {
+			// TODO: do something
+			// for _, l2Net := range sys.L2Networks() {
+			// 	cfg := l2Net.RollupConfig()
+			// 	l2Net.T().Gate().LessOrEqual(cfg., maxSequencingWindow,
+			// 		"sequencing window of chain %s must fit in max sequencing window size", l2Net.ChainID())
+			// }
+		}),
+	)
+}
+
+func WithDisputeGameFinalityDelaySeconds(seconds uint64) stack.CommonOption {
+	return stack.Combine(
+		stack.MakeCommon(sysgo.WithDeployerOptions(
+			sysgo.WithDisputeGameFinalityDelaySeconds(seconds),
+		)),
+
+		// copypasta from WithSequencingWindow
+		// We can't configure sysext sequencing window, so we go with whatever is configured.
+		// The post-hydrate function will check that the sequencing window is within expected bounds.
+		stack.PostHydrate[stack.Orchestrator](func(sys stack.System) {
+			// TODO: do something
+			// for _, l2Net := range sys.L2Networks() {
+			// 	cfg := l2Net.RollupConfig()
+			// 	l2Net.T().Gate().LessOrEqual(cfg., maxSequencingWindow,
+			// 		"sequencing window of chain %s must fit in max sequencing window size", l2Net.ChainID())
+			// }
 		}),
 	)
 }

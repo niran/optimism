@@ -58,6 +58,8 @@ func ForWithdrawalCheck(t devtest.T, alice *dsl.EOA, withdrawal crossdomain.With
 					err = fmt.Errorf("withdrawal check failed: %v", r)
 				}
 			}()
+			// 0xb4caa4e5  OptimismPortal_InvalidProofTimestamp
+			// 0x332a57f8  OptimismPortal_InvalidRootClaim
 			contract.Read(portal.CheckWithdrawal(wdHash, proofSubmitter))
 		}()
 		return err == nil

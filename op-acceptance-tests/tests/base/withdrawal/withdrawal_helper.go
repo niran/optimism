@@ -30,7 +30,7 @@ import (
 
 const SolErrClaimAlreadyResolved = "0xf1a94581"
 
-func SendWithdrawal(t devtest.T, alice *dsl.EOA, applyOpts WithdrawalTxOptsFn) *types.Receipt {
+func SendWithdrawal(t devtest.T, alice *dsl.EOA, applyOpts WithdrawalTxOptsFn) (*types.Receipt, *txplan.PlannedTx) {
 	opts := defaultWithdrawalTxOpts()
 	applyOpts(opts)
 
@@ -48,17 +48,19 @@ func SendWithdrawal(t devtest.T, alice *dsl.EOA, applyOpts WithdrawalTxOptsFn) *
 
 	// Create the withdrawal transaction
 	args := l2withdrawer.InitiateWithdrawal(alice.Address(), big.NewInt(int64(opts.Gas)), opts.Data)
-	tx := contract.Write(alice, args, txplan.WithValue(opts.Value))
+	receipt, tx := contract.Write2(alice, args, txplan.WithValue(opts.Value))
 
-	require.Equal(t, uint64(1), tx.Status, "withdrawal tx failed")
+	require.Equal(t, uint64(1), receipt.Status, "withdrawal tx failed")
 
 	for i, client := range opts.VerifyClients {
-		t.Logf("Waiting for tx %v on verification client %d", tx.TxHash, i)
-		receiptVerif, err := client.TransactionReceipt(t.Ctx(), tx.TxHash)
+		t.Logf("Waiting for tx %v on verification client %d", receipt.TxHash, i)
+		receiptVerif, err := client.TransactionReceipt(t.Ctx(), receipt.TxHash)
 		require.Nilf(t, err, "Waiting for L2 tx on verification client %d", i)
-		require.Equalf(t, tx, receiptVerif, "Receipts should be the same on sequencer and verification client %d", i)
+		require.Equalf(t, receipt, receiptVerif, "Receipts should be the same on sequencer and verification client %d", i)
+		// harden
+		require.Equal(t, 1, len(receiptVerif.Logs))
 	}
-	return tx
+	return receipt, tx
 }
 
 type WithdrawalTxOptsFn func(opts *WithdrawalTxOpts)
@@ -119,6 +121,9 @@ func ProveWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Withdr
 	portal := bindings.NewOptimismPortal2(portalFactory)
 
 	params, err := ProveWithdrawalParameters(t, sys.L2Chain, l1Client, l2Client, l2WithdrawalReceipt)
+	// b, _ := json.Marshal(params)
+	// panic(string(b))
+
 	require.NoError(t, err)
 
 	// Prove withdrawal
@@ -160,6 +165,12 @@ func ProveWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Withdr
 		}
 		return proveReceipt.Status == types.ReceiptStatusSuccessful
 	}, 120*time.Second, time.Second, "withdrawal proof failed")
+
+	require.Equal(t, 2, len(proveReceipt.Logs))
+
+	// b, _ := json.Marshal(proveReceipt)
+	// panic(string(b))
+
 	return params, proveReceipt
 }
 
@@ -186,6 +197,21 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 	require.NoError(t, err)
 
 	game := contract.Read(portal.ProvenWithdrawals(wdHash, alice.Address()))
+	// basic sanity check
+	require.Greater(t, game.Timestamp, uint64(1700000000))
+
+	fdgf := bindings.NewFaultDisputeGameFactory(bindings.WithClient(l1Client), bindings.WithTo(game.DisputeGameProxy), bindings.WithTest(t))
+	fdg := bindings.NewFaultDisputeGame(fdgf)
+
+	gameData := contract.Read(fdg.GameData())
+	require.Equal(t, uint32(254), gameData.GameType)
+
+	// 6abfe88c84df81b51d5483025ef7696c1cdb61eaa9ca5b655170683d7e8264a8, 0000000000000000000000000000000000000000000000000000000000000017, 254
+	// gametype, root, extradataa(blocknumber)
+	// l := fmt.Sprintf(">wow> %s, %s, %d", hex.EncodeToString(gameData.RootClaim[:]), hex.EncodeToString(gameData.ExtraData[:]), gameData.GameType)
+
+	// game.DisputeGameProxy
+
 	require.NotNil(t, game, "withdrawal should be proven")
 
 	gameContract, err := contracts.NewFaultDisputeGameContract(t.Ctx(), metrics.NoopContractMetrics, game.DisputeGameProxy, l1Client.NewMultiCaller(batching.DefaultBatchSize))
@@ -215,24 +241,34 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 	t.Logf("FinalizeWithdrawal: resolveClaim...")
 	tx, err := gameContract.ResolveClaimTx(0)
 	require.NoError(t, err)
-	resolveClaimReceipt := alice.Transact(
-		alice.Plan(),
+	resolveClaimReceipt := alice.AsEL(sys.L1EL).Transact(
+		alice.AsEL(sys.L1EL).Plan(),
+		txplan.WithTo(tx.To),
+		txplan.WithValue(tx.Value),
+		txplan.WithGasLimit(tx.GasLimit),
+		txplan.WithData(tx.TxData),
+	)
+	// rcr := resolveClaimReceipt.Included.Value()
+	// b, _ := json.Marshal(rcr)
+	// panic(string(b))
+
+	t.Logf("FinalizeWithdrawal: resolve...")
+	tx, err = gameContract.ResolveTx()
+	require.NoError(t, err)
+
+	// "resolve"
+	resolveReceipt := alice.AsEL(sys.L1EL).Transact(
+		alice.AsEL(sys.L1EL).Plan(),
 		txplan.WithTo(tx.To),
 		txplan.WithValue(tx.Value),
 		txplan.WithGasLimit(tx.GasLimit),
 		txplan.WithData(tx.TxData),
 	)
 
-	t.Logf("FinalizeWithdrawal: resolve...")
-	tx, err = gameContract.ResolveTx()
-	require.NoError(t, err)
-	resolveReceipt := alice.Transact(
-		alice.Plan(),
-		txplan.WithTo(tx.To),
-		txplan.WithValue(tx.Value),
-		txplan.WithGasLimit(tx.GasLimit),
-		txplan.WithData(tx.TxData),
-	)
+	receipt := resolveReceipt.Included.Value()
+	// bb, _ := json.Marshal(receipt)
+
+	require.Equal(t, 1, len(receipt.Logs))
 
 	if resolveReceipt.Included.Value().Status == types.ReceiptStatusFailed {
 		t.Logf("resolve failed (tx: %s)! But game may have resolved already. Checking now...", resolveReceipt.Included.Value().TxHash)
@@ -243,14 +279,47 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 		t.Logf("resolve was not needed, the game was already resolved")
 	}
 
+	// must send to L1
 	t.Logf("FinalizeWithdrawal: waiting for successful withdrawal check...")
-	err = ForWithdrawalCheck(t, alice, wd, optimismPortalAddr, alice.Address())
-	require.NoError(t, err)
+	// err = ForWithdrawalCheck(t, alice.AsEL(sys.L1EL), wd, optimismPortalAddr, alice.Address())
+	// err = ForWithdrawalCheck(t, alice, wd, optimismPortalAddr, alice.Address())
+	// require.NoError(t, err)
 
 	// Finalize withdrawal
 	t.Logf("FinalizeWithdrawal: finalizing withdrawal...")
-	finalizeWithdrawalReceipt := contract.Write(alice, portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()))
+	// 0xd9bc01be -> OptimismPortal_ProofNotOldEnough()
+	time.Sleep(15 * time.Second) // set maturity and do this
+	// 0x332a57f8 -> FinalizeWithdrawalTransaction -> checkWithdrawal-> anchorstatereg::isGameClaimValid -> OptimismPortal_InvalidRootClaim()
 
+	anchorStateRegistryAddr := contract.Read(portal.AnchorStateRegistryAddr())
+	asrf := bindings.NewAnchorStateRegistryFactory(bindings.WithClient(l1Client), bindings.WithTo(anchorStateRegistryAddr), bindings.WithTest(t))
+	asr := bindings.NewAnchorStateRegistry(asrf)
+
+	a := contract.Read(asr.IsGameClaimValid(game.DisputeGameProxy))
+	b := contract.Read(asr.IsGameProper(game.DisputeGameProxy))
+	c := contract.Read(asr.IsGameRespected(game.DisputeGameProxy))
+	d := contract.Read(asr.IsGameFinalized(game.DisputeGameProxy))
+	e := contract.Read(asr.IsGameResolved(game.DisputeGameProxy))
+
+	delaySec := contract.Read(asr.DisputeGameFinalityDelaySeconds())
+	//  true true true true true 6(overridden)
+	st := fmt.Sprintf("%t %t %t %t %t %s", a, b, c, d, e, delaySec)
+	fmt.Println(st)
+
+	contract.Read(portal.CheckWithdrawal(wdHash, alice.Address()))
+
+	// 0xe1ba9227 -> what is this? likely came from ethLockbox
+	// it was ETHLockbox_InsufficientBalance() error!
+	// fund the ETHLockbox by depositing
+
+	// calldata, _ := portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()).EncodeInputLambda()
+	// panic
+
+	panic(contract.Read(portal.ETHLockboxAddr()))
+
+	finalizeWithdrawalReceipt := contract.Write(alice.AsEL(sys.L1EL), portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()))
+
+	require.Equal(t, 1, len(finalizeWithdrawalReceipt.Logs))
 	// Ensure that our withdrawal was finalized successfully
 	require.Equal(t, types.ReceiptStatusSuccessful, finalizeWithdrawalReceipt.Status)
 	return finalizeWithdrawalReceipt, resolveClaimReceipt.Included.Value(), resolveReceipt.Included.Value()

@@ -46,6 +46,10 @@ type ReceiptsFetcher interface {
 	FetchReceipts(ctx context.Context, blockHash common.Hash) (eth.BlockInfo, types.Receipts, error)
 }
 
+type TxFetcher interface {
+	TransactionByHash(ctx context.Context, txHash common.Hash)
+}
+
 type ReceiptFetcher interface {
 	// TransactionReceipt returns a receipt associated with transaction.
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)

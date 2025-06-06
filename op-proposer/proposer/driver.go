@@ -148,6 +148,7 @@ func newDGFSubmitter(ctx context.Context, cancel context.CancelFunc, setup Drive
 		cancel()
 		return nil, err
 	}
+	// floating log
 	log.Info("Connected to DisputeGameFactory", "address", setup.Cfg.DisputeGameFactoryAddr, "version", version)
 
 	return &L2OutputSubmitter{
@@ -267,7 +268,7 @@ func (l *L2OutputSubmitter) FetchDGFOutput(ctx context.Context) (source.Proposal
 	}
 
 	if proposedRecently {
-		l.Log.Debug("Duration since last game not past proposal interval", "duration", time.Since(proposalTime))
+		log.Debug("Duration since last game not past proposal interval", "duration", time.Since(proposalTime))
 		return source.Proposal{}, false, nil
 	}
 
@@ -278,7 +279,7 @@ func (l *L2OutputSubmitter) FetchDGFOutput(ctx context.Context) (source.Proposal
 	}
 
 	if currentBlockNumber == 0 {
-		l.Log.Info("Skipping proposal for genesis block")
+		log.Info("Skipping proposal for genesis block")
 		return source.Proposal{}, false, nil
 	}
 
@@ -374,7 +375,7 @@ func (l *L2OutputSubmitter) waitForL1Head(ctx context.Context, blockNum uint64) 
 
 // sendTransaction creates & sends transactions through the underlying transaction manager.
 func (l *L2OutputSubmitter) sendTransaction(ctx context.Context, output source.Proposal) error {
-	l.Log.Info("Proposing output root", "output", output.Root, "block", output.SequenceNum)
+	log.Info("Proposing output root", "output", output.Root, "block", output.SequenceNum)
 	var receipt *types.Receipt
 	if l.Cfg.DisputeGameFactoryAddr != nil {
 		candidate, err := l.ProposeL2OutputDGFTxCandidate(ctx, output)

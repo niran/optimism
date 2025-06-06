@@ -2,6 +2,7 @@ package bindings
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -307,15 +308,39 @@ func (c *TypedCall[ReturnType]) DecodeOutput(data []byte) (ReturnType, error) {
 	}
 
 	abiTargetType := CustomTypeToGoType(retTyp)
-	abiType, _, err := goTypeToABIType(abiTargetType)
+	abiType, components, err := goTypeToABIType(abiTargetType)
 	if err != nil {
 		return zero, fmt.Errorf("failed to convert type to ABI type: %w", err)
 	}
 
 	outputs := abi.Arguments{{Type: abiType}}
+	b, _ := json.Marshal(components)
+	fmt.Println("type: ", abiType.T, abiType.GetType())
+	fmt.Println(string(b))
+
 	decoded, err := outputs.Unpack(data)
 	if err != nil {
-		return zero, fmt.Errorf("failed to unpack data: %w", err)
+		// try to unpack using UnpackIntoInterface, mimicing the logic
+		args := abi.Arguments{}
+		for _, component := range components {
+			t, err := abi.NewType(component.Type, "", component.Components)
+			if err != nil {
+				panic(fmt.Sprintf("failed to create type: %v", err))
+			}
+			args = append(args, abi.Argument{Type: t, Name: component.Name})
+		}
+		unpacked, err := args.Unpack(data)
+		if err != nil {
+			panic("failed to unpack")
+		}
+		var val ReturnType
+		err = args.Copy(&val, unpacked)
+		if err != nil {
+			panic(fmt.Sprintf("failed to copy: %v", err))
+		}
+		return val, nil
+
+		// return zero, fmt.Errorf("failed to unpack data: %w", err)
 	}
 
 	val := ABIValueToCustomValue[ReturnType](retTyp, decoded[0])
