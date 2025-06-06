@@ -1,4 +1,4 @@
-package sync
+package proofs
 
 import (
 	"testing"
@@ -7,5 +7,5 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	presets.DoMain(m, presets.WithRedundantInterop())
+	presets.DoMain(m, presets.WithSuperInterop())
 }

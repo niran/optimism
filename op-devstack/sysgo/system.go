@@ -59,14 +59,14 @@ func DefaultMinimalSystem(dest *DefaultMinimalSystemIDs) stack.Option[*Orchestra
 	opt.Add(WithL1Nodes(ids.L1EL, ids.L1CL))
 
 	opt.Add(WithL2ELNode(ids.L2EL, nil))
-	opt.Add(WithL2CLNode(ids.L2CL, true, ids.L1CL, ids.L1EL, ids.L2EL))
+	opt.Add(WithL2CLNode(ids.L2CL, true, false, ids.L1CL, ids.L1EL, ids.L2EL))
 
 	opt.Add(WithBatcher(ids.L2Batcher, ids.L1EL, ids.L2CL, ids.L2EL))
 	opt.Add(WithProposer(ids.L2Proposer, ids.L1EL, &ids.L2CL, nil))
 
 	opt.Add(WithFaucets([]stack.L1ELNodeID{ids.L1EL}, []stack.L2ELNodeID{ids.L2EL}))
 
-	opt.Add(WithTestSequencer(ids.TestSequencer, ids.L2CL, ids.L1EL, ids.L2EL))
+	opt.Add(WithTestSequencer(ids.TestSequencer, ids.L1CL, ids.L2CL, ids.L1EL, ids.L2EL))
 
 	opt.Add(stack.Finally(func(orch *Orchestrator) {
 		*dest = ids
@@ -160,10 +160,10 @@ func DefaultInteropSystem(dest *DefaultInteropSystemIDs) stack.Option[*Orchestra
 	opt.Add(WithL2ELNode(ids.L2AEL, &ids.Supervisor))
 	opt.Add(WithL2ELNode(ids.L2BEL, &ids.Supervisor))
 
-	opt.Add(WithL2CLNode(ids.L2ACL, true, ids.L1CL, ids.L1EL, ids.L2AEL))
-	opt.Add(WithL2CLNode(ids.L2BCL, true, ids.L1CL, ids.L1EL, ids.L2BEL))
+	opt.Add(WithL2CLNode(ids.L2ACL, true, true, ids.L1CL, ids.L1EL, ids.L2AEL))
+	opt.Add(WithL2CLNode(ids.L2BCL, true, true, ids.L1CL, ids.L1EL, ids.L2BEL))
 
-	opt.Add(WithTestSequencer(ids.TestSequencer, ids.L2ACL, ids.L1EL, ids.L2AEL))
+	opt.Add(WithTestSequencer(ids.TestSequencer, ids.L1CL, ids.L2ACL, ids.L1EL, ids.L2AEL))
 
 	opt.Add(WithBatcher(ids.L2ABatcher, ids.L1EL, ids.L2ACL, ids.L2AEL))
 	opt.Add(WithBatcher(ids.L2BBatcher, ids.L1EL, ids.L2BCL, ids.L2BEL))
@@ -171,15 +171,17 @@ func DefaultInteropSystem(dest *DefaultInteropSystemIDs) stack.Option[*Orchestra
 	opt.Add(WithManagedBySupervisor(ids.L2ACL, ids.Supervisor))
 	opt.Add(WithManagedBySupervisor(ids.L2BCL, ids.Supervisor))
 
-	opt.Add(WithProposer(ids.L2AProposer, ids.L1EL, nil, &ids.Supervisor))
-	opt.Add(WithProposer(ids.L2BProposer, ids.L1EL, nil, &ids.Supervisor))
+	// Note: we provide L2 CL nodes still, even though they are not used post-interop.
+	// Since we may create an interop infra-setup, before interop is even scheduled to run.
+	opt.Add(WithProposer(ids.L2AProposer, ids.L1EL, &ids.L2ACL, &ids.Supervisor))
+	opt.Add(WithProposer(ids.L2BProposer, ids.L1EL, &ids.L2BCL, &ids.Supervisor))
 
 	// Deploy separate challengers for each chain.  Can be reduced to a single challenger when the DisputeGameFactory
 	// is actually shared.
-	opt.Add(WithL2Challenger(ids.L2ChallengerA, ids.L1EL, ids.L1CL, &ids.Supervisor, &ids.Cluster, nil, []stack.L2ELNodeID{
+	opt.Add(WithL2Challenger(ids.L2ChallengerA, ids.L1EL, ids.L1CL, &ids.Supervisor, &ids.Cluster, &ids.L2ACL, []stack.L2ELNodeID{
 		ids.L2AEL, ids.L2BEL,
 	}))
-	opt.Add(WithL2Challenger(ids.L2ChallengerB, ids.L1EL, ids.L1CL, &ids.Supervisor, &ids.Cluster, nil, []stack.L2ELNodeID{
+	opt.Add(WithL2Challenger(ids.L2ChallengerB, ids.L1EL, ids.L1CL, &ids.Supervisor, &ids.Cluster, &ids.L2BCL, []stack.L2ELNodeID{
 		ids.L2BEL, ids.L2AEL,
 	}))
 
@@ -194,36 +196,56 @@ func DefaultInteropSystem(dest *DefaultInteropSystemIDs) stack.Option[*Orchestra
 	return opt
 }
 
-type RedundantInteropSystemIDs struct {
-	DefaultInteropSystemIDs
-
-	L2A2CL stack.L2CLNodeID
-	L2A2EL stack.L2ELNodeID
-}
-
-func RedundantInteropSystem(dest *RedundantInteropSystemIDs) stack.Option[*Orchestrator] {
+func DefaultInteropProofsSystem(dest *DefaultInteropSystemIDs) stack.Option[*Orchestrator] {
 	l1ID := eth.ChainIDFromUInt64(900)
 	l2AID := eth.ChainIDFromUInt64(901)
 	l2BID := eth.ChainIDFromUInt64(902)
-	ids := RedundantInteropSystemIDs{
-		DefaultInteropSystemIDs: NewDefaultInteropSystemIDs(l1ID, l2AID, l2BID),
-		L2A2CL:                  stack.NewL2CLNodeID("verifier", l2AID),
-		L2A2EL:                  stack.NewL2ELNodeID("verifier", l2AID),
-	}
+	ids := NewDefaultInteropSystemIDs(l1ID, l2AID, l2BID)
 
-	// start with default interop system
-	var parentIds DefaultInteropSystemIDs
 	opt := stack.Combine[*Orchestrator]()
-	opt.Add(DefaultInteropSystem(&parentIds))
+	opt.Add(stack.BeforeDeploy(func(o *Orchestrator) {
+		o.P().Logger().Info("Setting up")
+	}))
 
-	opt.Add(WithL2ELNode(ids.L2A2EL, &ids.Supervisor))
-	opt.Add(WithL2CLNode(ids.L2A2CL, false, ids.L1CL, ids.L1EL, ids.L2A2EL))
+	opt.Add(WithMnemonicKeys(devkeys.TestMnemonic))
 
-	// verifier must be also managed or it cannot advance
-	opt.Add(WithManagedBySupervisor(ids.L2A2CL, ids.Supervisor))
+	opt.Add(WithDeployer(),
+		WithDeployerOptions(
+			WithLocalContractSources(),
+			WithCommons(ids.L1.ChainID()),
+			WithPrefundedL2(ids.L2A.ChainID()),
+			WithPrefundedL2(ids.L2B.ChainID()),
+			WithInteropAtGenesis(), // this can be overridden by later options
+		),
+	)
 
-	// P2P connect L2CL nodes
-	opt.Add(WithL2CLP2PConnection(ids.L2ACL, ids.L2A2CL))
+	opt.Add(WithL1Nodes(ids.L1EL, ids.L1CL))
+
+	opt.Add(WithSupervisor(ids.Supervisor, ids.Cluster, ids.L1EL))
+
+	opt.Add(WithL2ELNode(ids.L2AEL, &ids.Supervisor))
+	opt.Add(WithL2ELNode(ids.L2BEL, &ids.Supervisor))
+
+	opt.Add(WithL2CLNode(ids.L2ACL, true, true, ids.L1CL, ids.L1EL, ids.L2AEL))
+	opt.Add(WithL2CLNode(ids.L2BCL, true, true, ids.L1CL, ids.L1EL, ids.L2BEL))
+
+	opt.Add(WithTestSequencer(ids.TestSequencer, ids.L1CL, ids.L2ACL, ids.L1EL, ids.L2AEL))
+
+	opt.Add(WithBatcher(ids.L2ABatcher, ids.L1EL, ids.L2ACL, ids.L2AEL))
+	opt.Add(WithBatcher(ids.L2BBatcher, ids.L1EL, ids.L2BCL, ids.L2BEL))
+
+	opt.Add(WithManagedBySupervisor(ids.L2ACL, ids.Supervisor))
+	opt.Add(WithManagedBySupervisor(ids.L2BCL, ids.Supervisor))
+
+	opt.Add(WithFaucets([]stack.L1ELNodeID{ids.L1EL}, []stack.L2ELNodeID{ids.L2AEL, ids.L2BEL}))
+
+	opt.Add(WithSuperRoots(ids.L1.ChainID(), ids.L1EL, ids.L2ACL, ids.Supervisor))
+
+	opt.Add(WithSuperProposer(ids.L2AProposer, ids.L1EL, &ids.Supervisor))
+
+	opt.Add(WithSuperL2Challenger(ids.L2ChallengerA, ids.L1EL, ids.L1CL, &ids.Supervisor, &ids.Cluster, []stack.L2ELNodeID{
+		ids.L2BEL, ids.L2AEL,
+	}))
 
 	// Upon evaluation of the option, export the contents we created.
 	// Ids here are static, but other things may be exported too.
@@ -235,10 +257,13 @@ func RedundantInteropSystem(dest *RedundantInteropSystemIDs) stack.Option[*Orche
 }
 
 type MultiSupervisorInteropSystemIDs struct {
-	RedundantInteropSystemIDs
+	DefaultInteropSystemIDs
 
+	// Supervisor does not support multinode so need a additional supervisor for verifier nodes
 	SupervisorSecondary stack.SupervisorID
 
+	L2A2CL stack.L2CLNodeID
+	L2A2EL stack.L2ELNodeID
 	L2B2CL stack.L2CLNodeID
 	L2B2EL stack.L2ELNodeID
 }
@@ -248,14 +273,12 @@ func MultiSupervisorInteropSystem(dest *MultiSupervisorInteropSystemIDs) stack.O
 	l2AID := eth.ChainIDFromUInt64(901)
 	l2BID := eth.ChainIDFromUInt64(902)
 	ids := MultiSupervisorInteropSystemIDs{
-		RedundantInteropSystemIDs: RedundantInteropSystemIDs{
-			DefaultInteropSystemIDs: NewDefaultInteropSystemIDs(l1ID, l2AID, l2BID),
-			L2A2CL:                  stack.NewL2CLNodeID("verifier", l2AID),
-			L2A2EL:                  stack.NewL2ELNodeID("verifier", l2AID),
-		},
-		SupervisorSecondary: "2-secondary", // prefix with number for ordering of supervisors
-		L2B2CL:              stack.NewL2CLNodeID("verifier", l2BID),
-		L2B2EL:              stack.NewL2ELNodeID("verifier", l2BID),
+		DefaultInteropSystemIDs: NewDefaultInteropSystemIDs(l1ID, l2AID, l2BID),
+		SupervisorSecondary:     "2-secondary", // prefix with number for ordering of supervisors
+		L2A2CL:                  stack.NewL2CLNodeID("verifier", l2AID),
+		L2A2EL:                  stack.NewL2ELNodeID("verifier", l2AID),
+		L2B2CL:                  stack.NewL2CLNodeID("verifier", l2BID),
+		L2B2EL:                  stack.NewL2ELNodeID("verifier", l2BID),
 	}
 
 	// start with default interop system
@@ -267,10 +290,10 @@ func MultiSupervisorInteropSystem(dest *MultiSupervisorInteropSystemIDs) stack.O
 	opt.Add(WithSupervisor(ids.SupervisorSecondary, ids.Cluster, ids.L1EL))
 
 	opt.Add(WithL2ELNode(ids.L2A2EL, &ids.SupervisorSecondary))
-	opt.Add(WithL2CLNode(ids.L2A2CL, false, ids.L1CL, ids.L1EL, ids.L2A2EL))
+	opt.Add(WithL2CLNode(ids.L2A2CL, false, true, ids.L1CL, ids.L1EL, ids.L2A2EL))
 
 	opt.Add(WithL2ELNode(ids.L2B2EL, &ids.SupervisorSecondary))
-	opt.Add(WithL2CLNode(ids.L2B2CL, false, ids.L1CL, ids.L1EL, ids.L2B2EL))
+	opt.Add(WithL2CLNode(ids.L2B2CL, false, true, ids.L1CL, ids.L1EL, ids.L2B2EL))
 
 	// verifier must be also managed or it cannot advance
 	// we attach verifier L2CL with backup supervisor

@@ -60,6 +60,29 @@ func WithSimpleInterop() stack.CommonOption {
 	return stack.MakeCommon(sysgo.DefaultInteropSystem(&sysgo.DefaultInteropSystemIDs{}))
 }
 
+// WithSuperInterop specifies a super root system that meets the SimpleInterop criteria.
+func WithSuperInterop() stack.CommonOption {
+	return stack.MakeCommon(sysgo.DefaultInteropProofsSystem(&sysgo.DefaultInteropSystemIDs{}))
+}
+
+// WithUnscheduledInterop adds a test-gate to not run the test if the interop upgrade is scheduled.
+// If the backend is sysgo, it will disable the interop configuration
+func WithUnscheduledInterop() stack.CommonOption {
+	return stack.Combine(
+		stack.MakeCommon(sysgo.WithDeployerOptions(func(p devtest.P, keys devkeys.Keys, builder intentbuilder.Builder) {
+			for _, l2 := range builder.L2s() {
+				l2.WithForkAtOffset(rollup.Interop, nil)
+			}
+		})),
+		stack.PostHydrate[stack.Orchestrator](func(sys stack.System) {
+			for _, l2Net := range sys.L2Networks() {
+				sys.T().Gate().Nil(l2Net.ChainConfig().InteropTime, "L2 (%s) must not have scheduled interop in chain config", l2Net.ID())
+				sys.T().Gate().Nil(l2Net.RollupConfig().InteropTime, "L2 (%s) must not have scheduled interop in rollup config", l2Net.ID())
+			}
+		}),
+	)
+}
+
 func NewSimpleInterop(t devtest.T) *SimpleInterop {
 	system := shim.NewSystem(t)
 	orch := Orchestrator()
@@ -147,34 +170,14 @@ func WithInteropNotAtGenesis() stack.CommonOption {
 	})
 }
 
-type RedundantInterop struct {
+type MultiSupervisorInterop struct {
 	SimpleInterop
+
+	// Supervisor does not support multinode so need a additional supervisor for verifier nodes
+	SupervisorSecondary *dsl.Supervisor
 
 	L2ELA2 *dsl.L2ELNode
 	L2CLA2 *dsl.L2CLNode
-}
-
-func WithRedundantInterop() stack.CommonOption {
-	return stack.MakeCommon(sysgo.RedundantInteropSystem(&sysgo.RedundantInteropSystemIDs{}))
-}
-
-func NewRedundantInterop(t devtest.T) *RedundantInterop {
-	simpleInterop := NewSimpleInterop(t)
-	orch := Orchestrator()
-	l2A := simpleInterop.system.L2Network(match.Assume(t, match.L2ChainA))
-	out := &RedundantInterop{
-		SimpleInterop: *simpleInterop,
-		L2ELA2:        dsl.NewL2ELNode(l2A.L2ELNode(match.Assume(t, match.SecondL2EL))),
-		L2CLA2:        dsl.NewL2CLNode(l2A.L2CLNode(match.Assume(t, match.SecondL2CL)), orch.ControlPlane()),
-	}
-	return out
-}
-
-type MultiSupervisorInterop struct {
-	RedundantInterop
-
-	SupervisorSecondary *dsl.Supervisor
-
 	L2ELB2 *dsl.L2ELNode
 	L2CLB2 *dsl.L2CLNode
 }
@@ -183,14 +186,22 @@ func WithMultiSupervisorInterop() stack.CommonOption {
 	return stack.MakeCommon(sysgo.MultiSupervisorInteropSystem(&sysgo.MultiSupervisorInteropSystemIDs{}))
 }
 
+// NewMultiSupervisorInterop initializes below scenario:
+// Two supervisor initialized, each managing two L2CLs per chains.
+// Primary supervisor manages sequencer L2CLs for chain A, B.
+// Secondary supervisor manages verifier L2CLs for chain A, B.
+// Each L2CLs per chain is connected via P2P.
 func NewMultiSupervisorInterop(t devtest.T) *MultiSupervisorInterop {
-	redundancyInterop := NewRedundantInterop(t)
+	simpleInterop := NewSimpleInterop(t)
 	orch := Orchestrator()
 
-	l2B := redundancyInterop.system.L2Network(match.Assume(t, match.L2ChainB))
+	l2A := simpleInterop.system.L2Network(match.Assume(t, match.L2ChainA))
+	l2B := simpleInterop.system.L2Network(match.Assume(t, match.L2ChainB))
 	out := &MultiSupervisorInterop{
-		RedundantInterop:    *redundancyInterop,
-		SupervisorSecondary: dsl.NewSupervisor(redundancyInterop.system.Supervisor(match.Assume(t, match.SecondSupervisor)), orch.ControlPlane()),
+		SimpleInterop:       *simpleInterop,
+		SupervisorSecondary: dsl.NewSupervisor(simpleInterop.system.Supervisor(match.Assume(t, match.SecondSupervisor)), orch.ControlPlane()),
+		L2ELA2:              dsl.NewL2ELNode(l2A.L2ELNode(match.Assume(t, match.SecondL2EL))),
+		L2CLA2:              dsl.NewL2CLNode(l2A.L2CLNode(match.Assume(t, match.SecondL2CL)), orch.ControlPlane()),
 		L2ELB2:              dsl.NewL2ELNode(l2B.L2ELNode(match.Assume(t, match.SecondL2EL))),
 		L2CLB2:              dsl.NewL2CLNode(l2B.L2CLNode(match.Assume(t, match.SecondL2CL)), orch.ControlPlane()),
 	}
