@@ -222,7 +222,7 @@ contract StandardValidator_TestInit is CommonTest {
     /// @notice Runs the StandardValidator.validate function.
     /// @param _allowFailure Whether to allow failure.
     /// @return The error message(s) from the validate function.
-    function _validate(
+    function _validateWithOverrides(
         bool _allowFailure,
         IStandardValidator.ValidationOverrides memory _overrides
     )
@@ -230,7 +230,7 @@ contract StandardValidator_TestInit is CommonTest {
         view
         returns (string memory)
     {
-        return validator.validate(
+        return validator.validateWithOverrides(
             IStandardValidator.ValidationInput({
                 proxyAdmin: proxyAdmin,
                 sysCfg: systemConfig,
@@ -276,7 +276,7 @@ contract StandardValidator_GeneralOverride_Test is StandardValidator_TestInit {
         overrides.challenger = address(0xbad);
         assertEq(
             "OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER,PROXYA-10,DF-30,PDDG-DWETH-30,PDDG-130,PLDG-DWETH-30",
-            _validate(true, overrides)
+            _validateWithOverrides(true, overrides)
         );
     }
 
@@ -296,7 +296,7 @@ contract StandardValidator_GeneralOverride_Test is StandardValidator_TestInit {
             address(pdg), abi.encodeCall(IPermissionedDisputeGame.challenger, ()), abi.encode(overrides.challenger)
         );
 
-        assertEq("OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER", _validate(true, overrides));
+        assertEq("OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER", _validateWithOverrides(true, overrides));
     }
 
     /// @notice Tests that the validate function (with overrides) and allow failure set to false,
@@ -310,7 +310,7 @@ contract StandardValidator_GeneralOverride_Test is StandardValidator_TestInit {
                 "StandardValidator: OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER,PROXYA-10,DF-30,PDDG-DWETH-30,PDDG-130,PLDG-DWETH-30"
             )
         );
-        _validate(false, overrides);
+        _validateWithOverrides(false, overrides);
     }
 }
 /// @title StandardValidator_SuperchainConfig_Test
@@ -350,7 +350,7 @@ contract StandardValidator_ProxyAdmin_Test is StandardValidator_TestInit {
             abi.encodeCall(IDisputeGameFactory.owner, ()),
             abi.encode(overrides.l1PAOMultisig)
         );
-        assertEq("OVERRIDES-L1PAOMULTISIG", _validate(true, overrides));
+        assertEq("OVERRIDES-L1PAOMULTISIG", _validateWithOverrides(true, overrides));
     }
 
     /// @notice Tests that the validate function (with an overridden ProxyAdmin owner) successfully
@@ -358,7 +358,10 @@ contract StandardValidator_ProxyAdmin_Test is StandardValidator_TestInit {
     function test_validateOverrideL1PAOMultisig_invalidProxyAdminOwner_succeeds() public view {
         IStandardValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
         overrides.l1PAOMultisig = address(0xbad);
-        assertEq("OVERRIDES-L1PAOMULTISIG,PROXYA-10,DF-30,PDDG-DWETH-30,PLDG-DWETH-30", _validate(true, overrides));
+        assertEq(
+            "OVERRIDES-L1PAOMULTISIG,PROXYA-10,DF-30,PDDG-DWETH-30,PLDG-DWETH-30",
+            _validateWithOverrides(true, overrides)
+        );
     }
 }
 
@@ -946,7 +949,7 @@ contract StandardValidator_PermissionedDisputeGame_Test is StandardValidator_Tes
         IStandardValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
         overrides.challenger = address(0xbad);
         vm.mockCall(address(pdg), abi.encodeCall(IPermissionedDisputeGame.challenger, ()), abi.encode(address(0xbad)));
-        assertEq("OVERRIDES-CHALLENGER", _validate(true, overrides));
+        assertEq("OVERRIDES-CHALLENGER", _validateWithOverrides(true, overrides));
     }
 
     /// @notice Tests that the validate function (with an overridden PermissionedDisputeGame challenger) successfully
@@ -954,7 +957,7 @@ contract StandardValidator_PermissionedDisputeGame_Test is StandardValidator_Tes
     function test_validateOverridesChallenger_permissionedDisputeGameInvalidChallenger_succeeds() public view {
         IStandardValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
         overrides.challenger = address(0xbad);
-        assertEq("OVERRIDES-CHALLENGER,PDDG-130", _validate(true, overrides));
+        assertEq("OVERRIDES-CHALLENGER,PDDG-130", _validateWithOverrides(true, overrides));
     }
 }
 

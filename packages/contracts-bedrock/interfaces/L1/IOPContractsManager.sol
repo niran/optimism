@@ -318,10 +318,17 @@ interface IOPContractsManager {
     )
         external;
 
-    function validate(
+    function validateWithOverrides(
         IStandardValidator.ValidationInput calldata _input,
         bool _allowFailure,
         IStandardValidator.ValidationOverrides calldata _overrides
+    )
+        external
+        returns (string memory);
+
+    function validate(
+        IStandardValidator.ValidationInput calldata _input,
+        bool _allowFailure
     )
         external
         returns (string memory);

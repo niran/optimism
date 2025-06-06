@@ -90,7 +90,7 @@ Please read this section carefully if you're planning to fork or make frequent P
 ### Production Releases
 
 Production releases are always tags, versioned as `<component-name>/v<semver>`.
-For example, an `op-node` release might be versioned as `op-node/v1.1.2`, and  smart contract releases might be versioned as `op-contracts/v1.0.0`.
+For example, an `op-node` release might be versioned as `op-node/v1.1.2`, and smart contract releases might be versioned as `op-contracts/v1.0.0`.
 Release candidates are versioned in the format `op-node/v1.1.2-rc.1`.
 We always start with `rc.1` rather than `rc`.
 

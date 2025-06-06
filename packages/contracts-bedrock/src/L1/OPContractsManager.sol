@@ -1890,6 +1890,17 @@ contract OPContractsManager is ISemver {
 
     function validate(
         StandardValidator.ValidationInput memory _input,
+        bool _allowFailure
+    )
+        public
+        view
+        returns (string memory)
+    {
+        return opcmValidator.validate(_input, _allowFailure);
+    }
+
+    function validateWithOverrides(
+        StandardValidator.ValidationInput memory _input,
         bool _allowFailure,
         StandardValidator.ValidationOverrides memory _overrides
     )
@@ -1897,7 +1908,7 @@ contract OPContractsManager is ISemver {
         view
         returns (string memory)
     {
-        return opcmValidator.validate(_input, _allowFailure, _overrides);
+        return opcmValidator.validateWithOverrides(_input, _allowFailure, _overrides);
     }
 
     function deploy(DeployInput calldata _input) external virtual returns (DeployOutput memory) {
