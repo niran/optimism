@@ -25,7 +25,7 @@ type testHub struct {
 
 func newTestHub() *testHub {
 	return &testHub{
-		Hub:                newHub(),
+		Hub:                newHub(metrics.NoopMetrics),
 		clientRegistered:   make(chan *Client, 10),
 		clientUnregistered: make(chan *Client, 10),
 		shutdownComplete:   make(chan struct{}),
@@ -277,7 +277,7 @@ func TestServerInitiatedPing(t *testing.T) {
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), pingInterval+(5*time.Second))
 	defer cancel()
 
 	// Create test client
@@ -293,7 +293,7 @@ func TestServerInitiatedPing(t *testing.T) {
 	// Wait for server to send a ping (server sends pings every 15 seconds in real code)
 	// For testing, we might need to adjust the ping interval or trigger it manually
 	select {
-	case <-time.After(17 * time.Second): // Wait a bit longer than ping interval
+	case <-time.After(pingInterval + (2 * time.Second)): // Wait a bit longer than ping interval
 		t.Error("Timeout waiting for server ping")
 	case <-client.pingsReceived:
 		t.Log("Client received ping from server")
@@ -388,7 +388,7 @@ func TestMultipleClientsBroadcast(t *testing.T) {
 
 		// Verify message content
 		for j, expected := range testMessages {
-			if j >= len(receivedMessages) || receivedMessages[j] != expected {
+			if receivedMessages[j] != expected {
 				t.Errorf("Client %d: message %d mismatch, expected %q, got %q", i, j, expected, receivedMessages[j])
 			}
 		}

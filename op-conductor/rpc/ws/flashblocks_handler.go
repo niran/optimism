@@ -10,6 +10,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/ethereum-optimism/optimism/op-conductor/metrics"
+	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -75,34 +76,15 @@ func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) boo
 
 	// Try to establish initial connection to rollup boost WebSocket
 	maxConnectionAttempts := 5
-	var conn *websocket.Conn
 	var err error
-
-	for attempt := 1; attempt <= maxConnectionAttempts; attempt++ {
-		log.Info("attempting to connect to rollup boost WebSocket", "attempt", attempt, "url", cfg.RollupBoostWsURL)
-
-		// Create context with timeout for dialing
+	handler.rollupBoostConn, err = retry.Do(context.Background(), maxConnectionAttempts, retry.Fixed(reconnectDelay), func() (*websocket.Conn, error) {
+		log.Info("attempting to connect to rollup boost WebSocket", "url", cfg.RollupBoostWsURL)
 		dialCtx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-		conn, _, err = websocket.Dial(dialCtx, cfg.RollupBoostWsURL, nil)
+		conn, _, err := websocket.Dial(dialCtx, cfg.RollupBoostWsURL, nil)
+		return conn, err
+	})
 
-		if err == nil {
-			log.Info("successfully connected to rollup boost WebSocket")
-			handler.rollupBoostConn = conn
-			break
-		}
-
-		log.Warn("failed to connect to rollup boost WebSocket",
-			"attempt", attempt, "maxAttempts", maxConnectionAttempts, "err", err)
-
-		if attempt < maxConnectionAttempts {
-			time.Sleep(reconnectDelay)
-		}
-	}
-
-	// Still couldn't connect after all attempts
 	if err != nil {
-		log.Error("failed to connect to rollup boost WebSocket after multiple attempts",
-			"attempts", maxConnectionAttempts, "err", err)
 		return nil, fmt.Errorf("failed to connect to rollup boost WebSocket: %w", err)
 	}
 
@@ -166,7 +148,7 @@ func (h *Handler) startWebSocketServer(_ context.Context) error {
 		return fmt.Errorf("WebSocket server port not configured or invalid: %d", h.cfg.WebsocketServerPort)
 	}
 
-	h.hub = newHub()
+	h.hub = newHub(h.metrics)
 	go h.hub.run()
 
 	// Create HTTP server with WebSocket endpoint
@@ -213,18 +195,19 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 					h.log.Warn("failed to connect to rollup boost WebSocket, will retry",
 						"err", err, "retryIn", reconnectDelay)
 					// add a metric for the number of times we've tried to connect
-					h.metrics.RecordRollupBoostConnectionAttempts(false)
+					h.metrics.RecordRollupBoostConnectionAttempts(false, h.cfg.RollupBoostWsURL)
 					time.Sleep(reconnectDelay)
 					continue
 				}
 
 				h.rollupBoostConn = conn
 				h.log.Info("successfully connected to rollup boost WebSocket")
+				h.metrics.RecordRollupBoostConnectionAttempts(true, h.cfg.RollupBoostWsURL)
 			}
 
 			// Read with timeout
 			readCtx, _ := context.WithTimeout(ctx, 30*time.Second)
-			messageType, message, err := h.rollupBoostConn.Read(readCtx)
+			_, message, err := h.rollupBoostConn.Read(readCtx)
 
 			if err != nil {
 				h.log.Warn("error reading from rollup boost WebSocket", "err", err)
@@ -234,10 +217,7 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 				continue
 			}
 
-			// Only process valid message types
-			if messageType == websocket.MessageText || messageType == websocket.MessageBinary {
-				h.handleRollupBoostMessage(ctx, message)
-			}
+			h.handleRollupBoostMessage(ctx, message)
 		}
 	}
 }

@@ -78,10 +78,11 @@ type Config struct {
 	// RPCEnableProxy is true if the sequencer RPC proxy should be enabled.
 	RPCEnableProxy bool
 
+	// The following fields are used to configure the websocket server that op-conductor exposes to get flashblocks from rollup boost and send them to clients.
 	// RollupBoostWsURL is the URL of the rollup boost websocket proxy.
 	RollupBoostWsURL string
 
-	// WebsocketServerPort is the port of the websocket server.
+	// WebsocketServerPort is the port at which op-conductor exposes its websocket server from which clients can read streams sourced from rollupBoostWsUrl.
 	WebsocketServerPort int
 
 	LogConfig     oplog.CLIConfig

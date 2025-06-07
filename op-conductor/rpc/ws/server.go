@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/ethereum-optimism/optimism/op-conductor/metrics"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -30,10 +31,13 @@ type Hub struct {
 
 	// Logger
 	log log.Logger
+
+	// Metrics
+	metrics metrics.Metricer
 }
 
 // newHub creates a new hub
-func newHub() *Hub {
+func newHub(m metrics.Metricer) *Hub {
 	return &Hub{
 		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
@@ -41,6 +45,26 @@ func newHub() *Hub {
 		clients:    make(map[*Client]bool),
 		done:       make(chan struct{}),
 		log:        log.New("component", "websocket-hub"),
+		metrics:    m,
+	}
+}
+
+// registerClient adds a client to the hub and updates metrics
+func (h *Hub) registerClient(client *Client) {
+	h.clients[client] = true
+	clientCount := len(h.clients)
+	h.log.Info("Client registered with hub", "totalClients", clientCount)
+	h.metrics.RecordWebSocketClientCount(clientCount)
+}
+
+// unregisterClient removes a client from the hub, closes it, and updates metrics
+func (h *Hub) unregisterClient(client *Client) {
+	if _, ok := h.clients[client]; ok {
+		delete(h.clients, client)
+		client.Close()
+		clientCount := len(h.clients)
+		h.log.Info("Client unregistered from hub", "totalClients", clientCount)
+		h.metrics.RecordWebSocketClientCount(clientCount)
 	}
 }
 
@@ -51,19 +75,14 @@ func (h *Hub) run() {
 		case <-h.done:
 			// Close all remaining client connections
 			for client := range h.clients {
-				client.Close()
-				delete(h.clients, client)
+				h.unregisterClient(client)
 			}
+			h.metrics.RecordWebSocketClientCount(0)
 			return
 		case client := <-h.register:
-			h.clients[client] = true
-			clientCount := len(h.clients)
-			h.log.Info("Client registered with hub", "totalClients", clientCount)
+			h.registerClient(client)
 		case client := <-h.unregister:
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				client.Close()
-			}
+			h.unregisterClient(client)
 		case message := <-h.broadcast:
 			successCount := 0
 			dropCount := 0
@@ -161,7 +180,7 @@ func (h *Handler) readPump(client *Client) {
 		default:
 			// Always read to process control frames (ping/pong/close)
 			readCtx, _ := context.WithTimeout(client.ctx, 30*time.Second)
-			messageType, message, err := client.conn.Read(readCtx)
+			_, message, err := client.conn.Read(readCtx)
 
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
@@ -178,9 +197,7 @@ func (h *Handler) readPump(client *Client) {
 			}
 
 			// Handle any data messages from clients if needed
-			if messageType == websocket.MessageText || messageType == websocket.MessageBinary {
-				h.log.Debug("Received message from client", "message", string(message))
-			}
+			h.log.Debug("Received message from client", "message", string(message))
 		}
 	}
 }

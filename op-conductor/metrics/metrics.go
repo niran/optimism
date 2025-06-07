@@ -19,7 +19,8 @@ type Metricer interface {
 	RecordStopSequencer(success bool)
 	RecordHealthCheck(success bool, err error)
 	RecordLoopExecutionTime(duration float64)
-	RecordRollupBoostConnectionAttempts(success bool)
+	RecordRollupBoostConnectionAttempts(success bool, source string)
+	RecordWebSocketClientCount(count int)
 	opmetrics.RPCMetricer
 }
 
@@ -44,6 +45,7 @@ type Metrics struct {
 	rollupBoostConnectionAttempts *prometheus.CounterVec
 
 	loopExecutionTime prometheus.Histogram
+	webSocketClients  prometheus.Gauge
 }
 
 func (m *Metrics) Registry() *prometheus.Registry {
@@ -114,7 +116,12 @@ func NewMetrics() *Metrics {
 			Namespace: Namespace,
 			Name:      "rollup_boost_connection_attempts_count",
 			Help:      "Number of rollup boost connection attempts",
-		}, []string{"success"}),
+		}, []string{"success", "source"}),
+		webSocketClients: factory.NewGauge(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Name:      "websocket_clients_connected",
+			Help:      "Number of WebSocket clients currently connected to the hub",
+		}),
 	}
 }
 
@@ -168,6 +175,11 @@ func (m *Metrics) RecordLoopExecutionTime(duration float64) {
 }
 
 // RecordRollupBoostConnectionAttempts increments the rollupBoostConnectionAttempts counter.
-func (m *Metrics) RecordRollupBoostConnectionAttempts(success bool) {
-	m.rollupBoostConnectionAttempts.WithLabelValues(strconv.FormatBool(success)).Inc()
+func (m *Metrics) RecordRollupBoostConnectionAttempts(success bool, source string) {
+	m.rollupBoostConnectionAttempts.WithLabelValues(strconv.FormatBool(success), source).Inc()
+}
+
+// RecordWebSocketClientCount sets the current number of WebSocket clients connected.
+func (m *Metrics) RecordWebSocketClientCount(count int) {
+	m.webSocketClients.Set(float64(count))
 }
