@@ -358,6 +358,8 @@ func (wb *worldBuilder) Build() {
 
 	intent, err := wb.builder.Build()
 
+	intent.GlobalDeployOverrides["proofMaturityDelaySeconds"] = 12
+
 	// intent.GlobalDeployOverrides["proofMaturityDelaySeconds"] = 12
 	// ^ don't do this. nil panic
 

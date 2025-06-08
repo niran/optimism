@@ -59,6 +59,7 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 	fundingAmount := eth.ThousandEther
 	alice := sys.Funder.NewFundedEOA(fundingAmount)
 	alice.VerifyBalanceExact(fundingAmount)
+	// fund Alice at L1: 10 ETH
 	sys.FunderL1.FundAtLeast(alice.AsEL(sys.L1EL), eth.TenEther)
 
 	// Alice L1: 10 ETH, L2: 1000 ETH
@@ -85,8 +86,8 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 
 	t.Logf("WithdrawalsTest: sending L2 withdrawal for %v...", withdrawalAmount.String())
 	receipt, tx := SendWithdrawal(t, alice, func(opts *WithdrawalTxOpts) {
-		// opts.Gas = 500_000
-		// opts.Data = []byte{}
+		opts.Gas = 500_000
+		opts.Data = []byte{}
 		opts.Value = withdrawalAmount.ToBig()
 	})
 
@@ -122,8 +123,8 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 	// Get the L1 balance before finalization
 	startBalanceBeforeFinalize, err := l1Client.BalanceAt(t.Ctx(), alice.Address(), nil)
 	require.NoError(t, err)
-	// still 0.01 ETH at L1
-	require.True(t, startBalanceBeforeFinalize.Cmp(eth.OneHundredthEther.ToBig()) == 0)
+	// still 10 ETH at L1
+	require.True(t, startBalanceBeforeFinalize.Cmp(eth.TenEther.ToBig()) == 0, startBalanceBeforeFinalize.String())
 
 	proveReceipt, finalizeReceipt, resolveClaimReceipt, resolveReceipt := ProveAndFinalizeWithdrawal(t, sys, alice, receipt, false)
 

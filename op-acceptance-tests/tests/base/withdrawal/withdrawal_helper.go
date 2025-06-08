@@ -315,7 +315,7 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 	// calldata, _ := portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()).EncodeInputLambda()
 	// panic
 
-	panic(contract.Read(portal.ETHLockboxAddr()))
+	// panic(contract.Read(portal.ETHLockboxAddr()))
 
 	finalizeWithdrawalReceipt := contract.Write(alice.AsEL(sys.L1EL), portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()))
 
