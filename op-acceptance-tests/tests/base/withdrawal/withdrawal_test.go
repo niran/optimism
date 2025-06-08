@@ -1,19 +1,26 @@
 package withdrawal
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
 
+	supervisorTypes "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum-optimism/optimism/op-deployer/pkg/deployer/state"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
+	"github.com/ethereum-optimism/optimism/op-devstack/dsl/contract"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-e2e/system/helpers"
+
+	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	supervisorTypes "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
+	"github.com/ethereum-optimism/optimism/op-service/txintent/bindings"
+	"github.com/ethereum-optimism/optimism/op-service/txplan"
 )
 
 // bypass DeployOPChain -> assertValidPermissionedDisputeGame()
@@ -64,25 +71,80 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 
 	// Alice L1: 10 ETH, L2: 1000 ETH
 
-	// FIXME
-	// // first deposit 1 ETH : L1 -> L2. This fills L1 ETHlockbox
-	// mintAmount := eth.OneEther
-	// // this will fix everything
-	// or we may call portal2::migrateLiquidity to fill in lockETH
-
-	// Start L2 balance for withdrawal
 	l1Client := sys.L1EL.Escape().EthClient()
-	startBalanceBeforeWithdrawal, err := sys.L2EL.Escape().EthClient().BalanceAt(t.Ctx(), alice.Address(), nil)
-	require.True(t, startBalanceBeforeWithdrawal.Cmp(fundingAmount.ToBig()) == 0)
+	l2Client := sys.L2EL.Escape().EthClient()
+
+	// first deposit 1 ETH : L1 -> L2. This fills L1 ETHlockbox
+	mintAmount := eth.OneEther
+
+	deposit := true
+	var l1Receipt *types.Receipt
+	if deposit {
+		rollupConfig := sys.L2Chain.Escape().RollupConfig()
+		optimismPortalAddr := rollupConfig.DepositContractAddress
+		portalFactory := bindings.NewOptimismPortal2Factory(bindings.WithClient(l1Client), bindings.WithTo(optimismPortalAddr), bindings.WithTest(t))
+		portal := bindings.NewOptimismPortal2(portalFactory)
+
+		l1Receipt = contract.Write(
+			alice.AsEL(sys.L1EL),
+			portal.DepositTransaction(alice.Address(), mintAmount, 1_000_000, false, []byte{}),
+			txplan.WithValue(mintAmount.ToBig()),
+		)
+		require.Equal(t, uint64(1), l1Receipt.Status)
+		idx := len(l1Receipt.Logs) - 1
+		reconstructedDep, err := derive.UnmarshalDepositLogEvent(l1Receipt.Logs[idx])
+		require.NoError(t, err, "Could not reconstruct L2 Deposit")
+		tx := types.NewTx(reconstructedDep)
+
+		time.Sleep(12 * time.Second) // TODO: fix this
+
+		l2Receipt, err := l2Client.TransactionReceipt(t.Ctx(), tx.Hash())
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), l2Receipt.Status)
+		t.Logf("SendDepositTx: arrived on L2")
+
+		// check ETH lockbox fund is mintAmount
+		ethlockboxaddr := contract.Read(portal.ETHLockboxAddr())
+		// ethlockboxFactory := bindings.NewETHLockBoxFactory(bindings.WithClient(l1Client), bindings.WithTo(ethlockboxaddr), bindings.WithTest(t))
+		// ethlockbox := bindings.NewETHLockBox(ethlockboxFactory)
+
+		ethlockboxbal, err := l1Client.BalanceAt(t.Ctx(), ethlockboxaddr, nil)
+		require.NoError(t, err)
+		require.True(t, ethlockboxbal.Cmp(mintAmount.ToBig()) == 0, ethlockboxbal.String())
+	}
+
+	var startBalanceBeforeWithdrawal *big.Int
+	var err error
+
+	if deposit {
+		require.Eventually(
+			t,
+			func() bool {
+				startBalanceBeforeWithdrawal, err = l2Client.BalanceAt(t.Ctx(), alice.Address(), nil)
+				if err != nil {
+					return false
+				}
+				return startBalanceBeforeWithdrawal.Cmp(fundingAmount.ToBig()) != 0
+			},
+			time.Second*60,
+			time.Second,
+		)
+		// Start L2 balance for withdrawal
+		target := new(big.Int).Add(fundingAmount.ToBig(), mintAmount.ToBig())
+		require.True(t, startBalanceBeforeWithdrawal.Cmp(target) == 0, startBalanceBeforeWithdrawal.String())
+	} else {
+		startBalanceBeforeWithdrawal, err = l2Client.BalanceAt(t.Ctx(), alice.Address(), nil)
+		require.NoError(t, err)
+		require.True(t, startBalanceBeforeWithdrawal.Cmp(fundingAmount.ToBig()) == 0, startBalanceBeforeWithdrawal.String())
+	}
 
 	// Alice withdraws 1 ETH from L2 to L1
 	// spends some ETH at L2 for withdrawal transactions
 
+	//////// FIX ME //////////
 	// withdrawalAmount := eth.OneEther
-
-	//////// FIXE ME //////////
-	withdrawalAmount := eth.ZeroWei
-	//////// FIXE ME //////////
+	withdrawalAmount := eth.OneEther
+	//////// FIX ME //////////
 
 	t.Logf("WithdrawalsTest: sending L2 withdrawal for %v...", withdrawalAmount.String())
 	receipt, tx := SendWithdrawal(t, alice, func(opts *WithdrawalTxOpts) {
@@ -93,8 +155,9 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 
 	t.Require().Eventually(func() bool {
 		head := sys.L2CL.HeadBlockRef(supervisorTypes.LocalUnsafe)
+		fmt.Printf("wowowow %d %d\n", receipt.BlockNumber.Uint64(), head.L1Origin.Number)
 		return head.L1Origin.Number >= receipt.BlockNumber.Uint64()
-	}, time.Second*60, time.Second, "awaiting withdrawal to be processed by L2")
+	}, time.Second*120, time.Second, "awaiting withdrawal to be processed by L2")
 
 	sys.L2Chain.WaitForBlock()
 	sys.L1Network.WaitForBlock()
@@ -123,8 +186,14 @@ func TestL2ToL1Withdrawal(gt *testing.T) {
 	// Get the L1 balance before finalization
 	startBalanceBeforeFinalize, err := l1Client.BalanceAt(t.Ctx(), alice.Address(), nil)
 	require.NoError(t, err)
-	// still 10 ETH at L1
-	require.True(t, startBalanceBeforeFinalize.Cmp(eth.TenEther.ToBig()) == 0, startBalanceBeforeFinalize.String())
+	// L1 balance = 10 ETH - deposit amount - gas fee
+	if l1Receipt != nil {
+		depositGasFee := new(big.Int).Mul(big.NewInt(int64(l1Receipt.GasUsed)), l1Receipt.EffectiveGasPrice)
+		target2 := new(big.Int).Sub(new(big.Int).Sub(eth.TenEther.ToBig(), mintAmount.ToBig()), depositGasFee)
+		require.True(t, startBalanceBeforeFinalize.Cmp(target2) == 0, startBalanceBeforeFinalize.String())
+	} else {
+		require.True(t, startBalanceBeforeFinalize.Cmp(eth.TenEther.ToBig()) == 0, startBalanceBeforeFinalize.String())
+	}
 
 	proveReceipt, finalizeReceipt, resolveClaimReceipt, resolveReceipt := ProveAndFinalizeWithdrawal(t, sys, alice, receipt, false)
 

@@ -319,7 +319,14 @@ func FinalizeWithdrawal(t devtest.T, sys *presets.Minimal, alice *dsl.EOA, l2Wit
 
 	finalizeWithdrawalReceipt := contract.Write(alice.AsEL(sys.L1EL), portal.FinalizeWithdrawalTransaction(wd.WithdrawalTransaction()))
 
-	require.Equal(t, 1, len(finalizeWithdrawalReceipt.Logs))
+	if params.Value.Cmp(common.Big0) == 0 {
+		// WithdrawalFinalized
+		require.Equal(t, 1, len(finalizeWithdrawalReceipt.Logs))
+	} else {
+		// ETHUnlocked, WithdrawalFinalized
+		require.Equal(t, 2, len(finalizeWithdrawalReceipt.Logs))
+	}
+
 	// Ensure that our withdrawal was finalized successfully
 	require.Equal(t, types.ReceiptStatusSuccessful, finalizeWithdrawalReceipt.Status)
 	return finalizeWithdrawalReceipt, resolveClaimReceipt.Included.Value(), resolveReceipt.Included.Value()
