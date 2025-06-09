@@ -11,17 +11,18 @@ import (
 	"github.com/ethereum-optimism/optimism/op-chain-ops/genesis"
 )
 
-// BuildValidOverrideKeys dynamically extracts all field names from a DeployConfig struct
+// buildValidOverrideKeys dynamically extracts all field names from a DeployConfig struct
 func buildValidOverrideKeys() map[string]struct{} {
 	validKeys := make(map[string]struct{})
-	extractFieldNames(reflect.TypeOf(genesis.DeployConfig{}), "", validKeys)
-	extractFieldNames(reflect.TypeOf(SuperchainProofParams{}), "", validKeys)
-	extractFieldNames(reflect.TypeOf(ChainProofParams{}), "", validKeys)
+	extractFieldNames(reflect.TypeOf(genesis.DeployConfig{}), validKeys)
+	extractFieldNames(reflect.TypeOf(SuperchainProofParams{}), validKeys)
+	extractFieldNames(reflect.TypeOf(ChainProofParams{}), validKeys)
 	return validKeys
 }
 
 // extractFieldNames recursively extracts JSON field names from a struct type
-func extractFieldNames(t reflect.Type, prefix string, result map[string]struct{}) {
+// and adds them to the result map as flat keys
+func extractFieldNames(t reflect.Type, result map[string]struct{}) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
@@ -36,7 +37,7 @@ func extractFieldNames(t reflect.Type, prefix string, result map[string]struct{}
 		// Handle embedded structs (fields without names)
 		if field.Anonymous {
 			// Recursively extract fields from the embedded struct
-			extractFieldNames(field.Type, prefix, result)
+			extractFieldNames(field.Type, result)
 			continue
 		}
 
@@ -48,14 +49,8 @@ func extractFieldNames(t reflect.Type, prefix string, result map[string]struct{}
 
 		fieldName := strings.Split(jsonTag, ",")[0]
 
-		// Add simple field name to support current usage pattern
+		// Add field name to the result map
 		result[fieldName] = struct{}{}
-
-		// Also add fully qualified name if we have a prefix
-		if prefix != "" {
-			fullPath := prefix + "." + fieldName
-			result[fullPath] = struct{}{}
-		}
 
 		// Recursively process nested structs
 		fieldType := field.Type
@@ -64,11 +59,7 @@ func extractFieldNames(t reflect.Type, prefix string, result map[string]struct{}
 		}
 
 		if fieldType.Kind() == reflect.Struct {
-			newPrefix := fieldName
-			if prefix != "" {
-				newPrefix = prefix + "." + fieldName
-			}
-			extractFieldNames(fieldType, newPrefix, result)
+			extractFieldNames(fieldType, result)
 		}
 	}
 }

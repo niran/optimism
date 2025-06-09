@@ -89,7 +89,11 @@ func makeDCI(intent *state.Intent, thisIntent *state.ChainIntent, chainID common
 		return opcm.DeployOPChainInput{}, fmt.Errorf("error merging proof params from overrides: %w", err)
 	}
 
-	cfg, err := state.CombineDeployConfig(intent, thisIntent, st, nil)
+	chainState, err := st.Chain(thisIntent.ID)
+	if err != nil {
+		return opcm.DeployOPChainInput{}, fmt.Errorf("error getting chain state: %w", err)
+	}
+	cfg, err := state.CombineDeployConfig(intent, thisIntent, st, chainState)
 	if err != nil {
 		return opcm.DeployOPChainInput{}, fmt.Errorf("error combining deploy config: %w", err)
 	}
