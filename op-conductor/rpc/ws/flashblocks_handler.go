@@ -218,8 +218,10 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 			if err != nil {
 				h.log.Warn("error reading from rollup boost WebSocket", "err", err)
 				// Close and reset for reconnection
-				h.rollupBoostConn.Close(websocket.StatusInternalError, "read error")
-				h.rollupBoostConn = nil
+				if h.rollupBoostConn != nil {
+					h.rollupBoostConn.Close(websocket.StatusInternalError, "read error")
+					h.rollupBoostConn = nil
+				}
 				continue
 			}
 
