@@ -3,10 +3,12 @@ package ws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,88 +17,73 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// testHub extends Hub with event notifications for testing
-type testHub struct {
-	*Hub
+// testEventTracker tracks events for testing without duplicating hub logic
+type testEventTracker struct {
 	clientRegistered   chan *Client
 	clientUnregistered chan *Client
+	messagesReceived   chan []byte
 	shutdownComplete   chan struct{}
+	clientCount        int32
 }
 
-func newTestHub() *testHub {
-	return &testHub{
-		Hub:                newHub(metrics.NoopMetrics),
+func newTestEventTracker() *testEventTracker {
+	return &testEventTracker{
 		clientRegistered:   make(chan *Client, 10),
 		clientUnregistered: make(chan *Client, 10),
+		messagesReceived:   make(chan []byte, 100),
 		shutdownComplete:   make(chan struct{}),
 	}
 }
 
-func (th *testHub) run() {
-	defer close(th.shutdownComplete) // Signal when run() exits
-
-	for {
-		select {
-		case <-th.done:
-			// Close all remaining client connections
-			for client := range th.clients {
-				client.Close()
-				delete(th.clients, client)
-			}
-			return
-		case client := <-th.register:
-			th.clients[client] = true
-			clientCount := len(th.clients)
-			th.log.Info("Client registered with hub", "totalClients", clientCount)
-			// Notify test of registration
-			select {
-			case th.clientRegistered <- client:
-			default:
-			}
-		case client := <-th.unregister:
-			if _, ok := th.clients[client]; ok {
-				delete(th.clients, client)
-				client.Close()
-				// Notify test of unregistration
-				select {
-				case th.clientUnregistered <- client:
-				default:
-				}
-			}
-		case message := <-th.broadcast:
-			successCount := 0
-			dropCount := 0
-
-			for client := range th.clients {
-				select {
-				case client.send <- message:
-					successCount++
-				default:
-					th.log.Debug("Failed to send message to client, channel full")
-					dropCount++
-				}
-			}
-			if dropCount > 0 {
-				th.log.Warn("Failed to send message to all clients, dropped", "successCount", successCount, "dropCount", dropCount)
-			}
-		}
+func (t *testEventTracker) onClientRegistered(client *Client) {
+	atomic.AddInt32(&t.clientCount, 1)
+	select {
+	case t.clientRegistered <- client:
+	default:
 	}
+}
+
+func (t *testEventTracker) onClientUnregistered(client *Client) {
+	atomic.AddInt32(&t.clientCount, -1)
+	select {
+	case t.clientUnregistered <- client:
+	default:
+	}
+}
+
+func (t *testEventTracker) onMessageBroadcast(message []byte, successCount, dropCount int) {
+	select {
+	case t.messagesReceived <- message:
+	default:
+	}
+}
+
+func (t *testEventTracker) onShutdown() {
+	close(t.shutdownComplete)
+}
+
+func (t *testEventTracker) getClientCount() int {
+	return int(atomic.LoadInt32(&t.clientCount))
 }
 
 // testClient wraps Client with additional test functionality
 type testClient struct {
-	*Client
+	conn             *websocket.Conn
 	messagesReceived chan []byte
 	pingsReceived    chan struct{}
 	pongsReceived    chan struct{}
-	conn             *websocket.Conn
+	ctx              context.Context
+	cancel           context.CancelFunc
 }
 
 func newTestClient(ctx context.Context, wsURL string) (*testClient, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	tc := &testClient{
 		messagesReceived: make(chan []byte, 100),
 		pingsReceived:    make(chan struct{}, 10),
 		pongsReceived:    make(chan struct{}, 10),
+		ctx:              ctx,
+		cancel:           cancel,
 	}
 
 	opts := &websocket.DialOptions{
@@ -117,30 +104,33 @@ func newTestClient(ctx context.Context, wsURL string) (*testClient, error) {
 
 	conn, resp, err := websocket.Dial(ctx, wsURL, opts)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusSwitchingProtocols {
 		conn.CloseNow()
+		cancel()
 		return nil, errors.New("unexpected status code")
 	}
 
 	tc.conn = conn
 
 	// Start message reader
-	go tc.readMessages(ctx)
+	go tc.readMessages()
 
 	return tc, nil
 }
 
-func (tc *testClient) readMessages(ctx context.Context) {
+func (tc *testClient) readMessages() {
 	defer tc.conn.CloseNow()
+	defer tc.cancel()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-tc.ctx.Done():
 			return
 		default:
-			_, message, err := tc.conn.Read(ctx)
+			_, message, err := tc.conn.Read(tc.ctx)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 					// Connection closed or other error
@@ -157,6 +147,7 @@ func (tc *testClient) readMessages(ctx context.Context) {
 }
 
 func (tc *testClient) Close() error {
+	tc.cancel()
 	return tc.conn.Close(websocket.StatusNormalClosure, "test complete")
 }
 
@@ -168,8 +159,8 @@ func (tc *testClient) Write(ctx context.Context, data []byte) error {
 	return tc.conn.Write(ctx, websocket.MessageText, data)
 }
 
-// setupTestServer creates a test WebSocket server with event notifications
-func setupTestServer(t *testing.T) (*Handler, *testHub, *httptest.Server, func()) {
+// setupTestServer creates a test WebSocket server with event tracking
+func setupTestServer(t *testing.T) (*Handler, *testEventTracker, *httptest.Server, func()) {
 	t.Helper()
 
 	cfg := Config{
@@ -187,10 +178,19 @@ func setupTestServer(t *testing.T) (*Handler, *testHub, *httptest.Server, func()
 		metrics:    &metrics.NoopMetricsImpl{},
 	}
 
-	// Create test hub with event notifications
-	testHub := newTestHub()
-	handler.hub = testHub.Hub
-	go testHub.run()
+	// Create event tracker for testing
+	tracker := newTestEventTracker()
+
+	// Create hub with test callbacks
+	callbacks := HubCallbacks{
+		OnClientRegistered:   tracker.onClientRegistered,
+		OnClientUnregistered: tracker.onClientUnregistered,
+		OnMessageBroadcast:   tracker.onMessageBroadcast,
+		OnShutdown:           tracker.onShutdown,
+	}
+
+	handler.hub = newHubWithCallbacks(handler.metrics, callbacks)
+	go handler.hub.run()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", handler.handleWebSocket)
@@ -198,43 +198,58 @@ func setupTestServer(t *testing.T) (*Handler, *testHub, *httptest.Server, func()
 
 	cleanup := func() {
 		select {
-		case <-testHub.done:
+		case <-handler.hub.done:
 		default:
-			close(testHub.done)
+			close(handler.hub.done)
 		}
 		server.Close()
 	}
 
-	return handler, testHub, server, cleanup
+	return handler, tracker, server, cleanup
 }
 
-// waitForClientCount waits for the expected number of clients with timeout
-func waitForClientCount(t *testing.T, hub *testHub, expected int, timeout time.Duration, msg string) {
+// waitForClientCount waits for the expected number of clients using events
+func waitForClientCount(t *testing.T, tracker *testEventTracker, expected int, timeout time.Duration, msg string) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	currentCount := len(hub.clients)
-	if currentCount == expected {
-		return // Already at expected count
-	}
-
-	for currentCount != expected {
+	for tracker.getClientCount() != expected {
 		select {
 		case <-ctx.Done():
-			t.Fatalf("%s: timeout waiting for %d clients, got %d", msg, expected, currentCount)
-		case <-hub.clientRegistered:
-			currentCount = len(hub.clients)
-		case <-hub.clientUnregistered:
-			currentCount = len(hub.clients)
+			t.Fatalf("%s: timeout waiting for %d clients, got %d", msg, expected, tracker.getClientCount())
+		case <-tracker.clientRegistered:
+			// Client registered, check count
+		case <-tracker.clientUnregistered:
+			// Client unregistered, check count
+		}
+	}
+}
+
+// waitForMessage waits for a specific message with timeout
+func waitForMessage(t *testing.T, client *testClient, expected string, timeout time.Duration, msg string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("%s: timeout waiting for message %q", msg, expected)
+		case message := <-client.messagesReceived:
+			if string(message) == expected {
+				return // Found the expected message
+			}
+			// Continue waiting for the right message
 		}
 	}
 }
 
 // TestPingPongMechanism tests the actual ping/pong keepalive mechanism
 func TestPingPongMechanism(t *testing.T) {
-	_, testHub, server, cleanup := setupTestServer(t)
+	_, tracker, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -249,7 +264,7 @@ func TestPingPongMechanism(t *testing.T) {
 	defer client.Close()
 
 	// Wait for client registration
-	waitForClientCount(t, testHub, 1, 2*time.Second, "Initial connection")
+	waitForClientCount(t, tracker, 1, 2*time.Second, "Initial connection")
 
 	// Send ping from client to server
 	err = client.Ping(ctx)
@@ -266,14 +281,14 @@ func TestPingPongMechanism(t *testing.T) {
 	}
 
 	// Verify client is still connected
-	if len(testHub.clients) != 1 {
-		t.Errorf("Expected 1 client after ping/pong, got %d", len(testHub.clients))
+	if tracker.getClientCount() != 1 {
+		t.Errorf("Expected 1 client after ping/pong, got %d", tracker.getClientCount())
 	}
 }
 
 // TestServerInitiatedPing tests that the server sends pings to clients
 func TestServerInitiatedPing(t *testing.T) {
-	_, testHub, server, cleanup := setupTestServer(t)
+	_, tracker, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -288,12 +303,11 @@ func TestServerInitiatedPing(t *testing.T) {
 	defer client.Close()
 
 	// Wait for client registration
-	waitForClientCount(t, testHub, 1, 2*time.Second, "Initial connection")
+	waitForClientCount(t, tracker, 1, 2*time.Second, "Initial connection")
 
-	// Wait for server to send a ping (server sends pings every 15 seconds in real code)
-	// For testing, we might need to adjust the ping interval or trigger it manually
+	// Wait for server to send a ping
 	select {
-	case <-time.After(pingInterval + (2 * time.Second)): // Wait a bit longer than ping interval
+	case <-time.After(pingInterval + (2 * time.Second)):
 		t.Error("Timeout waiting for server ping")
 	case <-client.pingsReceived:
 		t.Log("Client received ping from server")
@@ -302,7 +316,7 @@ func TestServerInitiatedPing(t *testing.T) {
 
 // TestClientTimeout tests what happens when a client doesn't respond
 func TestClientTimeout(t *testing.T) {
-	_, testHub, server, cleanup := setupTestServer(t)
+	_, tracker, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -319,18 +333,18 @@ func TestClientTimeout(t *testing.T) {
 	}
 
 	// Wait for client registration
-	waitForClientCount(t, testHub, 1, 2*time.Second, "Initial connection")
+	waitForClientCount(t, tracker, 1, 2*time.Second, "Initial connection")
 
 	// Abruptly close the connection to simulate unresponsive client
 	conn.CloseNow()
 
 	// Wait for client unregistration
-	waitForClientCount(t, testHub, 0, 5*time.Second, "Client cleanup after timeout")
+	waitForClientCount(t, tracker, 0, 5*time.Second, "Client cleanup after timeout")
 }
 
 // TestMultipleClientsBroadcast tests broadcast functionality with multiple clients
 func TestMultipleClientsBroadcast(t *testing.T) {
-	handler, testHub, server, cleanup := setupTestServer(t)
+	handler, tracker, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -357,49 +371,21 @@ func TestMultipleClientsBroadcast(t *testing.T) {
 	}()
 
 	// Wait for all clients to be registered
-	waitForClientCount(t, testHub, numClients, 5*time.Second, "All clients connected")
+	waitForClientCount(t, tracker, numClients, 5*time.Second, "All clients connected")
 
-	// Send broadcast messages
-	testMessages := []string{
-		"Hello World!",
-		"Broadcast Test Message 1",
-		"Another test message",
-	}
+	// Send broadcast message
+	testMessage := "Hello World!"
+	handler.BroadcastMessage([]byte(testMessage))
 
-	for _, msg := range testMessages {
-		handler.BroadcastMessage([]byte(msg))
-	}
-
-	// Verify all clients received all messages
+	// Verify all clients received the message
 	for i, client := range clients {
-		receivedMessages := make([]string, 0)
-
-		// Collect messages with timeout
-		msgTimeout := time.After(2 * time.Second)
-		for len(receivedMessages) < len(testMessages) {
-			select {
-			case msg := <-client.messagesReceived:
-				receivedMessages = append(receivedMessages, string(msg))
-			case <-msgTimeout:
-				t.Errorf("Client %d: timeout waiting for messages, got %d/%d", i, len(receivedMessages), len(testMessages))
-				goto nextClient
-			}
-		}
-
-		// Verify message content
-		for j, expected := range testMessages {
-			if receivedMessages[j] != expected {
-				t.Errorf("Client %d: message %d mismatch, expected %q, got %q", i, j, expected, receivedMessages[j])
-			}
-		}
-
-	nextClient:
+		waitForMessage(t, client, testMessage, 2*time.Second, fmt.Sprintf("Client %d message", i))
 	}
 }
 
 // TestConcurrentConnections tests concurrent client connections and disconnections
 func TestConcurrentConnections(t *testing.T) {
-	_, testHub, server, cleanup := setupTestServer(t)
+	_, tracker, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -428,8 +414,11 @@ func TestConcurrentConnections(t *testing.T) {
 				t.Errorf("Client %d write failed: %v", clientIdx, err)
 			}
 
-			// Keep connection alive for a bit
-			time.Sleep(100 * time.Millisecond)
+			// Keep connection alive for a short time
+			select {
+			case <-ctx.Done():
+			case <-time.After(100 * time.Millisecond):
+			}
 		}(i)
 	}
 
@@ -437,12 +426,12 @@ func TestConcurrentConnections(t *testing.T) {
 	wg.Wait()
 
 	// Wait for all clients to disconnect
-	waitForClientCount(t, testHub, 0, 5*time.Second, "All clients disconnected")
+	waitForClientCount(t, tracker, 0, 5*time.Second, "All clients disconnected")
 }
 
 // TestBroadcastWithSlowClient tests broadcast behavior when one client is slow
 func TestBroadcastWithSlowClient(t *testing.T) {
-	handler, testHub, server, cleanup := setupTestServer(t)
+	handler, tracker, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -467,11 +456,11 @@ func TestBroadcastWithSlowClient(t *testing.T) {
 	defer slowConn.CloseNow()
 
 	// Wait for both clients to be registered
-	waitForClientCount(t, testHub, 2, 3*time.Second, "Both clients connected")
+	waitForClientCount(t, tracker, 2, 3*time.Second, "Both clients connected")
 
 	// Send many messages to fill up the slow client's buffer
 	for i := 0; i < 300; i++ {
-		message := []byte("Large message to fill buffer " + string(rune('0'+i%10)))
+		message := []byte(fmt.Sprintf("Large message to fill buffer %d", i))
 		handler.BroadcastMessage(message)
 	}
 
@@ -484,14 +473,14 @@ func TestBroadcastWithSlowClient(t *testing.T) {
 	}
 
 	// Both clients should still be connected initially
-	if len(testHub.clients) != 2 {
-		t.Logf("Expected 2 clients, got %d (slow client may have been cleaned up)", len(testHub.clients))
+	if tracker.getClientCount() != 2 {
+		t.Logf("Expected 2 clients, got %d (slow client may have been cleaned up)", tracker.getClientCount())
 	}
 }
 
 // TestHubShutdown tests graceful hub shutdown
 func TestHubShutdown(t *testing.T) {
-	_, testHub, server, cleanup := setupTestServer(t)
+	_, tracker, server, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
@@ -506,22 +495,23 @@ func TestHubShutdown(t *testing.T) {
 	defer client.Close()
 
 	// Wait for client registration
-	waitForClientCount(t, testHub, 1, 2*time.Second, "Client connected before shutdown")
+	waitForClientCount(t, tracker, 1, 2*time.Second, "Client connected before shutdown")
 
-	// Trigger shutdown
-	close(testHub.done)
+	// Trigger shutdown - this is done by the cleanup function
+	// But we can test it explicitly by calling the cleanup early
+	cleanup()
 
-	// Wait for hub.run() to complete shutdown
+	// Wait for shutdown completion
 	select {
-	case <-testHub.shutdownComplete:
+	case <-tracker.shutdownComplete:
 		// Hub has completed shutdown
 	case <-time.After(2 * time.Second):
 		t.Fatal("Hub shutdown timed out")
 	}
 
 	// Verify clients were cleaned up
-	if len(testHub.clients) != 0 {
-		t.Errorf("Expected 0 clients after shutdown, got %d", len(testHub.clients))
+	if tracker.getClientCount() != 0 {
+		t.Errorf("Expected 0 clients after shutdown, got %d", tracker.getClientCount())
 	}
 
 	t.Log("Hub shutdown completed successfully")

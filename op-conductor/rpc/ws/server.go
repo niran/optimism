@@ -34,6 +34,9 @@ type Hub struct {
 
 	// Metrics
 	metrics metrics.Metricer
+
+	// Callbacks for testing and monitoring
+	callbacks HubCallbacks
 }
 
 // newHub creates a new hub
@@ -55,6 +58,10 @@ func (h *Hub) registerClient(client *Client) {
 	clientCount := len(h.clients)
 	h.log.Info("Client registered with hub", "totalClients", clientCount)
 	h.metrics.RecordWebSocketClientCount(clientCount)
+
+	if h.callbacks.OnClientRegistered != nil {
+		h.callbacks.OnClientRegistered(client)
+	}
 }
 
 // unregisterClient removes a client from the hub, closes it, and updates metrics
@@ -65,6 +72,10 @@ func (h *Hub) unregisterClient(client *Client) {
 		clientCount := len(h.clients)
 		h.log.Info("Client unregistered from hub", "totalClients", clientCount)
 		h.metrics.RecordWebSocketClientCount(clientCount)
+
+		if h.callbacks.OnClientUnregistered != nil {
+			h.callbacks.OnClientUnregistered(client)
+		}
 	}
 }
 
@@ -78,6 +89,10 @@ func (h *Hub) run() {
 				h.unregisterClient(client)
 			}
 			h.metrics.RecordWebSocketClientCount(0)
+
+			if h.callbacks.OnShutdown != nil {
+				h.callbacks.OnShutdown()
+			}
 			return
 		case client := <-h.register:
 			h.registerClient(client)
@@ -101,6 +116,10 @@ func (h *Hub) run() {
 			}
 			if dropCount > 0 {
 				h.log.Warn("Failed to send message to all clients, dropped", "successCount", successCount, "dropCount", dropCount)
+			}
+
+			if h.callbacks.OnMessageBroadcast != nil {
+				h.callbacks.OnMessageBroadcast(message, successCount, dropCount)
 			}
 		}
 	}
