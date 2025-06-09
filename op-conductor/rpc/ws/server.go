@@ -198,8 +198,9 @@ func (h *Handler) readPump(client *Client) {
 			return
 		default:
 			// Always read to process control frames (ping/pong/close)
-			readCtx, _ := context.WithTimeout(client.ctx, 30*time.Second)
+			readCtx, cancel := context.WithTimeout(client.ctx, 30*time.Second)
 			_, message, err := client.conn.Read(readCtx)
+			cancel()
 
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
@@ -246,8 +247,9 @@ func (h *Handler) writePump(client *Client) {
 			}
 
 			// Write with timeout
-			writeCtx, _ := context.WithTimeout(client.ctx, writeTimeout)
+			writeCtx, cancel := context.WithTimeout(client.ctx, writeTimeout)
 			err := client.conn.Write(writeCtx, websocket.MessageText, message)
+			cancel()
 
 			if err != nil {
 				h.log.Warn("Error writing to client", "err", err)
@@ -255,8 +257,9 @@ func (h *Handler) writePump(client *Client) {
 			}
 
 		case <-pingTicker.C:
-			pingCtx, _ := context.WithTimeout(client.ctx, pongTimeout)
+			pingCtx, cancel := context.WithTimeout(client.ctx, pongTimeout)
 			err := client.conn.Ping(pingCtx)
+			cancel()
 
 			if err != nil {
 				h.log.Warn("Ping error", "err", err)

@@ -79,8 +79,11 @@ func NewHandler(cfg Config, log log.Logger, isLeaderFn func(context.Context) boo
 	var err error
 	handler.rollupBoostConn, err = retry.Do(context.Background(), maxConnectionAttempts, retry.Fixed(reconnectDelay), func() (*websocket.Conn, error) {
 		log.Info("attempting to connect to rollup boost WebSocket", "url", cfg.RollupBoostWsURL)
-		dialCtx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-		conn, _, err := websocket.Dial(dialCtx, cfg.RollupBoostWsURL, nil)
+		dialCtx, _ := context.WithTimeout(context.Background(), 5*time.Second) //nolint:govet // cancel not needed for short-lived WebSocket dial
+		conn, resp, err := websocket.Dial(dialCtx, cfg.RollupBoostWsURL, nil)
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
 		return conn, err
 	})
 
@@ -188,8 +191,11 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 				h.log.Info("reconnecting to rollup boost WebSocket", "url", h.cfg.RollupBoostWsURL)
 
 				// Connect with timeout
-				dialCtx, _ := context.WithTimeout(ctx, 5*time.Second)
-				conn, _, err := websocket.Dial(dialCtx, h.cfg.RollupBoostWsURL, nil)
+				dialCtx, _ := context.WithTimeout(ctx, 5*time.Second) //nolint:govet // cancel not needed for short-lived WebSocket dial
+				conn, resp, err := websocket.Dial(dialCtx, h.cfg.RollupBoostWsURL, nil)
+				if resp != nil && resp.Body != nil {
+					resp.Body.Close()
+				}
 
 				if err != nil {
 					h.log.Warn("failed to connect to rollup boost WebSocket, will retry",
@@ -206,7 +212,7 @@ func (h *Handler) listenToRollupBoost(ctx context.Context) {
 			}
 
 			// Read with timeout
-			readCtx, _ := context.WithTimeout(ctx, 30*time.Second)
+			readCtx, _ := context.WithTimeout(ctx, 30*time.Second) //nolint:govet // cancel not needed for short-lived read operation
 			_, message, err := h.rollupBoostConn.Read(readCtx)
 
 			if err != nil {

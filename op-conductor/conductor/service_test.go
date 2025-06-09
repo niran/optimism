@@ -1015,6 +1015,9 @@ func (s *OpConductorTestSuite) TestFlashblocksHandlerIntegration() {
 			s.Fail("Failed to connect to WebSocket server within timeout")
 		default:
 			client, resp, err = websocket.Dial(connCtx, wsURL, nil)
+			if resp != nil && resp.Body != nil {
+				resp.Body.Close()
+			}
 			if err == nil && resp.StatusCode == http.StatusSwitchingProtocols {
 				goto connected
 			}

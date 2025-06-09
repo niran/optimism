@@ -103,12 +103,15 @@ func newTestClient(ctx context.Context, wsURL string) (*testClient, error) {
 	}
 
 	conn, resp, err := websocket.Dial(ctx, wsURL, opts)
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
 	if err != nil {
 		cancel()
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusSwitchingProtocols {
-		conn.CloseNow()
+		_ = conn.CloseNow()
 		cancel()
 		return nil, errors.New("unexpected status code")
 	}
@@ -122,7 +125,9 @@ func newTestClient(ctx context.Context, wsURL string) (*testClient, error) {
 }
 
 func (tc *testClient) readMessages() {
-	defer tc.conn.CloseNow()
+	defer func() {
+		_ = tc.conn.CloseNow()
+	}()
 	defer tc.cancel()
 
 	for {
@@ -132,9 +137,7 @@ func (tc *testClient) readMessages() {
 		default:
 			_, message, err := tc.conn.Read(tc.ctx)
 			if err != nil {
-				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-					// Connection closed or other error
-				}
+				// Connection closed or other error - return immediately
 				return
 			}
 			select {
@@ -325,6 +328,9 @@ func TestClientTimeout(t *testing.T) {
 
 	// Create client connection but don't process messages
 	conn, resp, err := websocket.Dial(ctx, wsURL, nil)
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
 	if err != nil {
 		t.Fatalf("Failed to create test client: %v", err)
 	}
@@ -336,7 +342,7 @@ func TestClientTimeout(t *testing.T) {
 	waitForClientCount(t, tracker, 1, 2*time.Second, "Initial connection")
 
 	// Abruptly close the connection to simulate unresponsive client
-	conn.CloseNow()
+	_ = conn.CloseNow()
 
 	// Wait for client unregistration
 	waitForClientCount(t, tracker, 0, 5*time.Second, "Client cleanup after timeout")
@@ -447,13 +453,18 @@ func TestBroadcastWithSlowClient(t *testing.T) {
 
 	// Create slow client (don't read messages)
 	slowConn, resp, err := websocket.Dial(ctx, wsURL, nil)
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
 	if err != nil {
 		t.Fatalf("Failed to create slow client: %v", err)
 	}
 	if resp.StatusCode != http.StatusSwitchingProtocols {
 		t.Fatalf("Expected status code %d, got %d", http.StatusSwitchingProtocols, resp.StatusCode)
 	}
-	defer slowConn.CloseNow()
+	defer func() {
+		_ = slowConn.CloseNow()
+	}()
 
 	// Wait for both clients to be registered
 	waitForClientCount(t, tracker, 2, 3*time.Second, "Both clients connected")
