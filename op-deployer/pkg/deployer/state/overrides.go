@@ -16,13 +16,8 @@ var ValidOverrideKeys = map[string]struct{}{
 	"finalizationPeriodSeconds": {},
 	"maxSequencerDrift":         {},
 	"sequencerWindowSize":       {},
-	"channelTimeoutBedrock":     {},
 
 	// Fee vault parameters
-	"baseFeeVaultRecipient":                    {},
-	"l1FeeVaultRecipient":                      {},
-	"sequencerFeeVaultRecipient":               {},
-	"baseFeeVaultMinimumWithdrawalAmount":      {},
 	"l1FeeVaultMinimumWithdrawalAmount":        {},
 	"sequencerFeeVaultMinimumWithdrawalAmount": {},
 	"baseFeeVaultWithdrawalNetwork":            {},
@@ -34,18 +29,22 @@ var ValidOverrideKeys = map[string]struct{}{
 	"gasPriceOracleBlobBaseFeeScalar":   {},
 	"gasPriceOracleOperatorFeeScalar":   {},
 	"gasPriceOracleOperatorFeeConstant": {},
-	"eip1559Denominator":                {},
-	"eip1559DenominatorCanyon":          {},
-	"eip1559Elasticity":                 {},
 
 	// Fault proof parameters
-	"useFaultProofs":                  {},
-	"faultGameWithdrawalDelay":        {},
-	"preimageOracleMinProposalSize":   {},
-	"preimageOracleChallengePeriod":   {},
-	"proofMaturityDelaySeconds":       {},
-	"disputeGameFinalityDelaySeconds": {},
-	"mipsVersion":                     {},
+	"useFaultProofs":                          {},
+	"faultGameWithdrawalDelay":                {},
+	"preimageOracleMinProposalSize":           {},
+	"preimageOracleChallengePeriod":           {},
+	"proofMaturityDelaySeconds":               {},
+	"disputeGameFinalityDelaySeconds":         {},
+	"mipsVersion":                             {},
+	"respectedGameType":                       {},
+	"faultGameAbsolutePrestate":               {},
+	"faultGameMaxDepth":                       {},
+	"faultGameSplitDepth":                     {},
+	"faultGameClockExtension":                 {},
+	"faultGameMaxClockDuration":               {},
+	"dangerouslyAllowCustomDisputeParameters": {},
 
 	// Hardfork timing parameters
 	"l2GenesisRegolithTimeOffset":           {},
@@ -59,15 +58,6 @@ var ValidOverrideKeys = map[string]struct{}{
 	"l2GenesisInteropTimeOffset":            {},
 	"l2GenesisJovianTimeOffset":             {},
 	"l2GenesisPectraBlobScheduleTimeOffset": {},
-
-	// Alt DA parameters
-	"useAltDA":          {},
-	"daChallengeWindow": {},
-	"daResolveWindow":   {},
-	"daCommitmentType":  {},
-
-	// Dev parameters
-	"fundDevAccounts": {},
 }
 
 // ValidateOverrides checks if all keys in the overrides map are valid override keys
