@@ -1596,9 +1596,10 @@ contract OPContractsManagerInteropMigrator is OPContractsManagerBase {
                 )
             );
 
+            bytes memory implArgs = abi.encodePacked(_input.opChainConfigs[0].absolutePrestate,_input.opChainConfigs[0].absolutePrestate , newAnchorStateRegistry);
             // Register the new SuperPermissionedDisputeGame.
             newDisputeGameFactory.setImplementation(
-                GameTypes.SUPER_PERMISSIONED_CANNON, IDisputeGame(address(newSuperPDG)), "" // TODO: snevins - validate correct parameters later
+                GameTypes.SUPER_PERMISSIONED_CANNON, IDisputeGame(address(newSuperPDG)), implArgs // TODO: snevins - validate correct parameters later
             );
             newDisputeGameFactory.setInitBond(GameTypes.SUPER_PERMISSIONED_CANNON, _input.gameParameters.initBond);
         }
@@ -1645,8 +1646,9 @@ contract OPContractsManagerInteropMigrator is OPContractsManagerBase {
                 )
             );
 
+            bytes memory implArgs = abi.encodePacked(_input.opChainConfigs[0].absolutePrestate,_input.opChainConfigs[0].absolutePrestate , newAnchorStateRegistry);
             // Register the new SuperFaultDisputeGame.
-            newDisputeGameFactory.setImplementation(GameTypes.SUPER_CANNON, IDisputeGame(address(newSuperFDG)), ""); // TODO: snevins - validate correct parameters later
+            newDisputeGameFactory.setImplementation(GameTypes.SUPER_CANNON, IDisputeGame(address(newSuperFDG)), implArgs); // TODO: snevins - validate correct parameters later
             newDisputeGameFactory.setInitBond(GameTypes.SUPER_CANNON, _input.gameParameters.initBond);
         }
     }
