@@ -88,7 +88,7 @@ contract DisputeGameFactory_Init is CommonTest {
 
     function _setGame(address _gameImpl, GameType _gameType, Claim _absolutePrestate, AlphabetVM _vm) internal {
         bytes memory implArgs = abi.encodePacked(_absolutePrestate, _vm, anchorStateRegistry);
-        
+
         vm.startPrank(disputeGameFactory.owner());
         disputeGameFactory.setImplementation(_gameType, IDisputeGame(_gameImpl), implArgs);
         disputeGameFactory.setInitBond(_gameType, 0.08 ether);
