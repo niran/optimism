@@ -86,14 +86,6 @@ func ValidateOverrides(overrides map[string]any) error {
 
 	if len(invalidKeys) > 0 {
 		sort.Strings(invalidKeys)
-
-		// Get valid keys for error message
-		validKeysList := make([]string, 0, len(validKeys))
-		for key := range validKeys {
-			validKeysList = append(validKeysList, key)
-		}
-		sort.Strings(validKeysList)
-
 		return fmt.Errorf("invalid override keys:\n%s", strings.Join(invalidKeys, ", "))
 	}
 
