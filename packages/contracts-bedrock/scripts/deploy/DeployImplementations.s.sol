@@ -34,7 +34,7 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IStandardValidator } from "interfaces/L1/IStandardValidator.sol";
+import { IOPCMValidator } from "interfaces/L1/IOPCMValidator.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 
@@ -144,7 +144,7 @@ contract DeployImplementations is Script {
         deployOPCMDeployer(_input, _output);
         deployOPCMUpgrader(_output);
         deployOPCMInteropMigrator(_output);
-        deployOPCMValidator(_input, _output);
+        deployOPCMValidator(_input, _output, implementations);
 
         // Semgrep rule will fail because the arguments are encoded inside of a separate function.
         opcm_ = IOPContractsManager(
@@ -531,13 +531,26 @@ contract DeployImplementations is Script {
         _output.opcmInteropMigrator = impl;
     }
 
-    function deployOPCMValidator(Input memory _input, Output memory _output) private {
-        IOPContractsManager.Implementations memory __opcmImplementations =
-            _output.opcmContractsContainer.implementations();
-        IStandardValidator.Implementations memory opcmImplementations;
-        assembly {
-            opcmImplementations := __opcmImplementations
-        }
+    function deployOPCMValidator(
+        Input memory _input,
+        Output memory _output,
+        IOPContractsManager.Implementations memory _implementations
+    )
+        private
+    {
+        IOPCMValidator.Implementations memory opcmImplementations;
+        opcmImplementations.l1ERC721BridgeImpl = _implementations.l1ERC721BridgeImpl;
+        opcmImplementations.optimismPortalImpl = _implementations.optimismPortalImpl;
+        opcmImplementations.ethLockboxImpl = _implementations.ethLockboxImpl;
+        opcmImplementations.systemConfigImpl = _implementations.systemConfigImpl;
+        opcmImplementations.optimismMintableERC20FactoryImpl = _implementations.optimismMintableERC20FactoryImpl;
+        opcmImplementations.l1CrossDomainMessengerImpl = _implementations.l1CrossDomainMessengerImpl;
+        opcmImplementations.l1StandardBridgeImpl = _implementations.l1StandardBridgeImpl;
+        opcmImplementations.disputeGameFactoryImpl = _implementations.disputeGameFactoryImpl;
+        opcmImplementations.anchorStateRegistryImpl = _implementations.anchorStateRegistryImpl;
+        opcmImplementations.delayedWETHImpl = _implementations.delayedWETHImpl;
+        opcmImplementations.mipsImpl = _implementations.mipsImpl;
+
         IOPContractsManagerValidator impl = IOPContractsManagerValidator(
             DeployUtils.createDeterministic({
                 _name: "OPContractsManager.sol:OPContractsManagerValidator",
@@ -547,7 +560,7 @@ contract DeployImplementations is Script {
                         (
                             opcmImplementations,
                             _input.superchainConfigProxy,
-                            address(_input.superchainProxyAdmin),
+                            _input.upgradeController, // Proxy admin owner
                             _input.challenger,
                             _input.withdrawalDelaySeconds
                         )

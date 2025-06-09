@@ -23,7 +23,7 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IStandardValidator } from "interfaces/L1/IStandardValidator.sol";
+import { IOPCMValidator } from "interfaces/L1/IOPCMValidator.sol";
 
 interface IOPContractsManagerContractsContainer {
     function __constructor__(
@@ -36,9 +36,9 @@ interface IOPContractsManagerContractsContainer {
     function implementations() external view returns (IOPContractsManager.Implementations memory);
 }
 
-interface IOPContractsManagerValidator is IStandardValidator {
+interface IOPContractsManagerValidator is IOPCMValidator {
     function __constructor__(
-        IStandardValidator.Implementations memory _implementations,
+        IOPCMValidator.Implementations memory _implementations,
         ISuperchainConfig _superchainConfig,
         address _l1PAOMultisig,
         address _challenger,
@@ -319,18 +319,20 @@ interface IOPContractsManager {
         external;
 
     function validateWithOverrides(
-        IStandardValidator.ValidationInput calldata _input,
+        IOPCMValidator.ValidationInput calldata _input,
         bool _allowFailure,
-        IStandardValidator.ValidationOverrides calldata _overrides
+        IOPCMValidator.ValidationOverrides calldata _overrides
     )
         external
+        view
         returns (string memory);
 
     function validate(
-        IStandardValidator.ValidationInput calldata _input,
+        IOPCMValidator.ValidationInput calldata _input,
         bool _allowFailure
     )
         external
+        view
         returns (string memory);
 
     function deploy(DeployInput calldata _input) external returns (DeployOutput memory);

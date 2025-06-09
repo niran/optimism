@@ -28,13 +28,13 @@ import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
 import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 
-/// @title StandardValidator
+/// @title OPCMValidator
 /// @notice This contract is used to validate the configuration of the L1 contracts of an OP Stack chain.
 /// It is a stateless contract that can be used to ensure that the L1 contracts are configured correctly.
 /// It is intended to be used by the L1 PAO multisig to validate the configuration of the L1 contracts
 /// before and after an upgrade.
-contract StandardValidator is ISemver {
-    /// @notice The semantic version of the StandardValidator contract.
+contract OPCMValidator is ISemver {
+    /// @notice The semantic version of the OPCMValidator contract.
     /// @custom:semver 1.2.0
     string public constant version = "1.2.0";
 
@@ -114,7 +114,7 @@ contract StandardValidator is ISemver {
         address challenger;
     }
 
-    /// @notice Constructor for the StandardValidator contract.
+    /// @notice Constructor for the OPCMValidator contract.
     constructor(
         Implementations memory _implementations,
         ISuperchainConfig _superchainConfig,
@@ -778,7 +778,7 @@ contract StandardValidator is ISemver {
 
         // Handle validation failure
         if (bytes(_errors).length > 0 && !_allowFailure) {
-            revert(string.concat("StandardValidator: ", finalErrors));
+            revert(string.concat("OPCMValidator: ", finalErrors));
         }
 
         return finalErrors;

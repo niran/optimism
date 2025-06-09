@@ -19,9 +19,13 @@
     "initCodeHash": "0x11e28569436e16691f03820e0fd5252492706f5855b350439f695c7e4cd331c3",
     "sourceCodeHash": "0x11b35ee81f797b30ee834e2ffad52686d2100d7ee139db4299b7d854dba25550"
   },
+  "src/L1/OPCMValidator.sol:OPCMValidator": {
+    "initCodeHash": "0xe2351f57183ad2b6ceb7494c7a03473b9c98f64db6a23794f1ee182e59221278",
+    "sourceCodeHash": "0x9ae95f75f8dca15ff6193dfe7c7a23216101e001b1713c0d1d2e52d3a01db16f"
+  },
   "src/L1/OPContractsManager.sol:OPContractsManager": {
     "initCodeHash": "0x6b306dc2918e84b6ab137cf26c9bfe2ead1cdf46120dc72b458168efc2f1bfa8",
-    "sourceCodeHash": "0x7b0555fb7699d9b42b9f46f9a4195bfbd2afa9e35c00f2ecdd44b4baf64e8a39"
+    "sourceCodeHash": "0xf2dfb4b7b42fe937e2ccb1363a2b51e223ea3783ec83117808731b38d4491a32"
   },
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
     "initCodeHash": "0x785b09610b2da65d248b49150fafc85b8369c921ddae95b0ea45608b1ce5cbc6",
@@ -30,10 +34,6 @@
   "src/L1/ProtocolVersions.sol:ProtocolVersions": {
     "initCodeHash": "0x5a76c8530cb24cf23d3baacc6eefaac226382af13f1e2a35535d2ec2b0573b29",
     "sourceCodeHash": "0xb3e32b18c95d4940980333e1e99b4dcf42d8a8bfce78139db4dc3fb06e9349d0"
-  },
-  "src/L1/StandardValidator.sol:StandardValidator": {
-    "initCodeHash": "0xbaecc0361950b7ca01fa887045e9da75a73c7de7fbdee1ce6e95d30d75b91cfe",
-    "sourceCodeHash": "0x078d1ba80c02f4331104467e26cfd4aea6731a4c8e7f5f11674e4ce27db73b2e"
   },
   "src/L1/SuperchainConfig.sol:SuperchainConfig": {
     "initCodeHash": "0x0ea921059d71fd19ac9c6e29c05b9724ad584eb27f74231de6df9551e9b13084",

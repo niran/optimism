@@ -869,7 +869,7 @@
             "type": "uint256"
           }
         ],
-        "internalType": "struct StandardValidator.ValidationInput",
+        "internalType": "struct OPCMValidator.ValidationInput",
         "name": "_input",
         "type": "tuple"
       },
@@ -915,7 +915,7 @@
             "type": "uint256"
           }
         ],
-        "internalType": "struct StandardValidator.ValidationInput",
+        "internalType": "struct OPCMValidator.ValidationInput",
         "name": "_input",
         "type": "tuple"
       },
@@ -937,7 +937,7 @@
             "type": "address"
           }
         ],
-        "internalType": "struct StandardValidator.ValidationOverrides",
+        "internalType": "struct OPCMValidator.ValidationOverrides",
         "name": "_overrides",
         "type": "tuple"
       }

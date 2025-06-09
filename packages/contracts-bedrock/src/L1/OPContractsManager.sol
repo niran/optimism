@@ -32,7 +32,7 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IHasSuperchainConfig } from "interfaces/L1/IHasSuperchainConfig.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { StandardValidator } from "src/L1/StandardValidator.sol";
+import { OPCMValidator } from "src/L1/OPCMValidator.sol";
 
 contract OPContractsManagerContractsContainer {
     /// @notice Addresses of the Blueprint contracts.
@@ -60,7 +60,7 @@ contract OPContractsManagerContractsContainer {
     }
 }
 
-contract OPContractsManagerValidator is StandardValidator {
+contract OPContractsManagerValidator is OPCMValidator {
     constructor(
         Implementations memory _implementations,
         ISuperchainConfig _superchainConfig,
@@ -68,7 +68,7 @@ contract OPContractsManagerValidator is StandardValidator {
         address _challenger,
         uint256 _withdrawalDelaySeconds
     )
-        StandardValidator(_implementations, _superchainConfig, _l1PAOMultisig, _challenger, _withdrawalDelaySeconds)
+        OPCMValidator(_implementations, _superchainConfig, _l1PAOMultisig, _challenger, _withdrawalDelaySeconds)
     { }
 }
 
@@ -1889,7 +1889,7 @@ contract OPContractsManager is ISemver {
     }
 
     function validate(
-        StandardValidator.ValidationInput memory _input,
+        OPCMValidator.ValidationInput memory _input,
         bool _allowFailure
     )
         public
@@ -1900,9 +1900,9 @@ contract OPContractsManager is ISemver {
     }
 
     function validateWithOverrides(
-        StandardValidator.ValidationInput memory _input,
+        OPCMValidator.ValidationInput memory _input,
         bool _allowFailure,
-        StandardValidator.ValidationOverrides memory _overrides
+        OPCMValidator.ValidationOverrides memory _overrides
     )
         public
         view

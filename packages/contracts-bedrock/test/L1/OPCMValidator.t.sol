@@ -31,16 +31,16 @@ import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
-import { IStandardValidator } from "interfaces/L1/IStandardValidator.sol";
+import { IOPCMValidator } from "interfaces/L1/IOPCMValidator.sol";
 import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 
 /// @title BadDisputeGameFactoryReturner
-/// @notice Used to return a bad DisputeGameFactory address to the StandardValidator. Far easier
+/// @notice Used to return a bad DisputeGameFactory address to the OPCMValidator. Far easier
 ///         than the alternative ways of mocking this value since the normal vm.mockCall will cause
 ///         the validation function to revert.
 contract BadDisputeGameFactoryReturner {
-    /// @notice Address of the StandardValidator instance.
-    IStandardValidator public immutable validator;
+    /// @notice Address of the OPCMValidator instance.
+    IOPCMValidator public immutable validator;
 
     /// @notice Address of the real DisputeGameFactory instance.
     IDisputeGameFactory public immutable realDisputeGameFactory;
@@ -48,11 +48,11 @@ contract BadDisputeGameFactoryReturner {
     /// @notice Address of the fake DisputeGameFactory instance.
     IDisputeGameFactory public immutable fakeDisputeGameFactory;
 
-    /// @param _validator The StandardValidator instance.
+    /// @param _validator The OPCMValidator instance.
     /// @param _realDisputeGameFactory The real DisputeGameFactory instance.
     /// @param _fakeDisputeGameFactory The fake DisputeGameFactory instance.
     constructor(
-        IStandardValidator _validator,
+        IOPCMValidator _validator,
         IDisputeGameFactory _realDisputeGameFactory,
         IDisputeGameFactory _fakeDisputeGameFactory
     ) {
@@ -71,11 +71,11 @@ contract BadDisputeGameFactoryReturner {
     }
 }
 
-/// @title StandardValidator_TestInit
-/// @notice Base contract for `StandardValidator` tests, handles common setup.
-contract StandardValidator_TestInit is CommonTest {
-    /// @notice StandardValidator instance, used for testing.
-    IStandardValidator validator;
+/// @title OPCMValidator_TestInit
+/// @notice Base contract for `OPCMValidator` tests, handles common setup.
+contract OPCMValidator_TestInit is CommonTest {
+    // /// @notice OPCMValidator instance, used for testing.
+    // IOPCMValidator validator;
 
     /// @notice Deploy input that was used to deploy the contracts being tested.
     IOPContractsManager.DeployInput deployInput;
@@ -105,9 +105,6 @@ contract StandardValidator_TestInit is CommonTest {
     function setUp() public virtual override {
         super.setUp();
 
-        // Get the OPContractsManager and its implementations struct
-        IOPContractsManager.Implementations memory impls = opcm.implementations();
-
         // Grab the deploy input for later use.
         deployInput = deploy.getDeployInput();
 
@@ -131,40 +128,10 @@ contract StandardValidator_TestInit is CommonTest {
             challenger = deployInput.roles.challenger;
         }
 
-        // Deploy the validator.
-        validator = IStandardValidator(
-            DeployUtils.create1({
-                _name: "StandardValidator",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IStandardValidator.__constructor__,
-                        (
-                            IStandardValidator.Implementations({
-                                systemConfigImpl: impls.systemConfigImpl,
-                                optimismPortalImpl: impls.optimismPortalImpl,
-                                ethLockboxImpl: impls.ethLockboxImpl,
-                                l1CrossDomainMessengerImpl: impls.l1CrossDomainMessengerImpl,
-                                l1StandardBridgeImpl: impls.l1StandardBridgeImpl,
-                                l1ERC721BridgeImpl: impls.l1ERC721BridgeImpl,
-                                optimismMintableERC20FactoryImpl: impls.optimismMintableERC20FactoryImpl,
-                                disputeGameFactoryImpl: impls.disputeGameFactoryImpl,
-                                mipsImpl: impls.mipsImpl,
-                                anchorStateRegistryImpl: impls.anchorStateRegistryImpl,
-                                delayedWETHImpl: impls.delayedWETHImpl
-                            }),
-                            superchainConfig,
-                            proxyAdminOwner,
-                            challenger,
-                            302400
-                        )
-                    )
-                )
-            })
-        );
-
         // Deploy the BadDisputeGameFactoryReturner once.
-        badDisputeGameFactoryReturner =
-            new BadDisputeGameFactoryReturner(validator, disputeGameFactory, IDisputeGameFactory(address(0xbad)));
+        badDisputeGameFactoryReturner = new BadDisputeGameFactoryReturner(
+            opcm.opcmValidator(), disputeGameFactory, IDisputeGameFactory(address(0xbad))
+        );
 
         // If this is not a fork test then we will also need to add the permissionless game to the
         // DisputeGameFactory. Local tests don't create this game by default.
@@ -204,12 +171,12 @@ contract StandardValidator_TestInit is CommonTest {
         }
     }
 
-    /// @notice Runs the StandardValidator.validate function.
+    /// @notice Runs the OPCMValidator.validate function.
     /// @param _allowFailure Whether to allow failure.
     /// @return The error message(s) from the validate function.
     function _validate(bool _allowFailure) internal view returns (string memory) {
-        return validator.validate(
-            IStandardValidator.ValidationInput({
+        return opcm.validate(
+            IOPCMValidator.ValidationInput({
                 proxyAdmin: proxyAdmin,
                 sysCfg: systemConfig,
                 absolutePrestate: absolutePrestate.raw(),
@@ -219,19 +186,19 @@ contract StandardValidator_TestInit is CommonTest {
         );
     }
 
-    /// @notice Runs the StandardValidator.validate function.
+    /// @notice Runs the OPCMValidator.validate function.
     /// @param _allowFailure Whether to allow failure.
     /// @return The error message(s) from the validate function.
     function _validateWithOverrides(
         bool _allowFailure,
-        IStandardValidator.ValidationOverrides memory _overrides
+        IOPCMValidator.ValidationOverrides memory _overrides
     )
         internal
         view
         returns (string memory)
     {
-        return validator.validateWithOverrides(
-            IStandardValidator.ValidationInput({
+        return opcm.validateWithOverrides(
+            IOPCMValidator.ValidationInput({
                 proxyAdmin: proxyAdmin,
                 sysCfg: systemConfig,
                 absolutePrestate: absolutePrestate.raw(),
@@ -242,14 +209,14 @@ contract StandardValidator_TestInit is CommonTest {
         );
     }
 
-    function _defaultValidationOverrides() internal pure returns (IStandardValidator.ValidationOverrides memory) {
-        return IStandardValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) });
+    function _defaultValidationOverrides() internal pure returns (IOPCMValidator.ValidationOverrides memory) {
+        return IOPCMValidator.ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) });
     }
 }
 
-/// @title StandardValidator_CoreValidation_Test
+/// @title OPCMValidator_CoreValidation_Test
 /// @notice Tests the basic functionality of the `validate` function when all parameters are valid
-contract StandardValidator_CoreValidation_Test is StandardValidator_TestInit {
+contract OPCMValidator_CoreValidation_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function succeeds when all parameters are valid.
     function test_validate_succeeds() public view {
         string memory errors = _validate(false);
@@ -264,14 +231,14 @@ contract StandardValidator_CoreValidation_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_GeneralOverride_Test
+/// @title OPCMValidator_GeneralOverride_Test
 /// @notice Tests behavior of validation overrides when multiple parameters are overridden
 ///         simultaneously
-contract StandardValidator_GeneralOverride_Test is StandardValidator_TestInit {
+contract OPCMValidator_GeneralOverride_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function (with the L1PAOMultisig and Challenger overridden)
     ///         successfully returns the right error when both are invalid.
     function test_validateL1PAOMultisigAndChallengerOverrides_succeeds() public view {
-        IStandardValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
+        IOPCMValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
         overrides.l1PAOMultisig = address(0xace);
         overrides.challenger = address(0xbad);
         assertEq(
@@ -284,8 +251,8 @@ contract StandardValidator_GeneralOverride_Test is StandardValidator_TestInit {
     ///         successfully returns no error when there is none. That is, it never returns the
     ///         overridden strings alone.
     function test_validateOverrides_noErrors_succeeds() public {
-        IStandardValidator.ValidationOverrides memory overrides =
-            IStandardValidator.ValidationOverrides({ l1PAOMultisig: address(0xbad), challenger: address(0xc0ffee) });
+        IOPCMValidator.ValidationOverrides memory overrides =
+            IOPCMValidator.ValidationOverrides({ l1PAOMultisig: address(0xbad), challenger: address(0xc0ffee) });
         vm.mockCall(address(proxyAdmin), abi.encodeCall(IProxyAdmin.owner, ()), abi.encode(overrides.l1PAOMultisig));
         vm.mockCall(
             address(disputeGameFactory),
@@ -302,21 +269,21 @@ contract StandardValidator_GeneralOverride_Test is StandardValidator_TestInit {
     /// @notice Tests that the validate function (with overrides) and allow failure set to false,
     ///         returns the errors with the overrides prepended.
     function test_validateOverrides_notAllowFailurePrependsOverrides_succeeds() public {
-        IStandardValidator.ValidationOverrides memory overrides =
-            IStandardValidator.ValidationOverrides({ l1PAOMultisig: address(0xbad), challenger: address(0xc0ffee) });
+        IOPCMValidator.ValidationOverrides memory overrides =
+            IOPCMValidator.ValidationOverrides({ l1PAOMultisig: address(0xbad), challenger: address(0xc0ffee) });
 
         vm.expectRevert(
             bytes(
-                "StandardValidator: OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER,PROXYA-10,DF-30,PDDG-DWETH-30,PDDG-130,PLDG-DWETH-30"
+                "OPCMValidator: OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER,PROXYA-10,DF-30,PDDG-DWETH-30,PDDG-130,PLDG-DWETH-30"
             )
         );
         _validateWithOverrides(false, overrides);
     }
 }
-/// @title StandardValidator_SuperchainConfig_Test
+/// @title OPCMValidator_SuperchainConfig_Test
 /// @notice Tests validation of `SuperchainConfig` contract configuration
 
-contract StandardValidator_SuperchainConfig_Test is StandardValidator_TestInit {
+contract OPCMValidator_SuperchainConfig_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         SuperchainConfig contract is paused.
     function test_validate_superchainConfigPaused_succeeds() public {
@@ -329,9 +296,9 @@ contract StandardValidator_SuperchainConfig_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_ProxyAdmin_Test
+/// @title OPCMValidator_ProxyAdmin_Test
 /// @notice Tests validation of `ProxyAdmin` configuration
-contract StandardValidator_ProxyAdmin_Test is StandardValidator_TestInit {
+contract OPCMValidator_ProxyAdmin_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         ProxyAdmin owner is not correct.
     function test_validate_invalidProxyAdminOwner_succeeds() public {
@@ -342,7 +309,7 @@ contract StandardValidator_ProxyAdmin_Test is StandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right overrides error
     ///         when the ProxyAdmin owner is overridden but is correct.
     function test_validate_overridenProxyAdminOwner_succeeds() public {
-        IStandardValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
+        IOPCMValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
         overrides.l1PAOMultisig = address(0xbad);
         vm.mockCall(address(proxyAdmin), abi.encodeCall(IProxyAdmin.owner, ()), abi.encode(address(0xbad)));
         vm.mockCall(
@@ -356,7 +323,7 @@ contract StandardValidator_ProxyAdmin_Test is StandardValidator_TestInit {
     /// @notice Tests that the validate function (with an overridden ProxyAdmin owner) successfully
     ///         returns the right error when the ProxyAdmin owner is not correct.
     function test_validateOverrideL1PAOMultisig_invalidProxyAdminOwner_succeeds() public view {
-        IStandardValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
+        IOPCMValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
         overrides.l1PAOMultisig = address(0xbad);
         assertEq(
             "OVERRIDES-L1PAOMULTISIG,PROXYA-10,DF-30,PDDG-DWETH-30,PLDG-DWETH-30",
@@ -365,9 +332,9 @@ contract StandardValidator_ProxyAdmin_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_SystemConfig_Test
+/// @title OPCMValidator_SystemConfig_Test
 /// @notice Tests validation of `SystemConfig` configuration
-contract StandardValidator_SystemConfig_Test is StandardValidator_TestInit {
+contract OPCMValidator_SystemConfig_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         SystemConfig version is invalid.
     function test_validate_systemConfigInvalidVersion_succeeds() public {
@@ -487,9 +454,9 @@ contract StandardValidator_SystemConfig_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_L1CrossDomainMessenger_Test
+/// @title OPCMValidator_L1CrossDomainMessenger_Test
 /// @notice Tests validation of `L1CrossDomainMessenger` configuration
-contract StandardValidator_L1CrossDomainMessenger_Test is StandardValidator_TestInit {
+contract OPCMValidator_L1CrossDomainMessenger_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         L1CrossDomainMessenger version is invalid.
     function test_validate_l1CrossDomainMessengerInvalidVersion_succeeds() public {
@@ -575,9 +542,9 @@ contract StandardValidator_L1CrossDomainMessenger_Test is StandardValidator_Test
     }
 }
 
-/// @title StandardValidator_OptimismMintableERC20Factory_Test
+/// @title OPCMValidator_OptimismMintableERC20Factory_Test
 /// @notice Tests validation of `OptimismMintableERC20Factory` configuration
-contract StandardValidator_OptimismMintableERC20Factory_Test is StandardValidator_TestInit {
+contract OPCMValidator_OptimismMintableERC20Factory_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         OptimismMintableERC20Factory version is invalid.
     function test_validate_optimismMintableERC20FactoryInvalidVersion_succeeds() public {
@@ -619,9 +586,9 @@ contract StandardValidator_OptimismMintableERC20Factory_Test is StandardValidato
     }
 }
 
-/// @title StandardValidator_L1ERC721Bridge_Test
+/// @title OPCMValidator_L1ERC721Bridge_Test
 /// @notice Tests validation of `L1ERC721Bridge` configuration
-contract StandardValidator_L1ERC721Bridge_Test is StandardValidator_TestInit {
+contract OPCMValidator_L1ERC721Bridge_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         L1ERC721Bridge version is invalid.
     function test_validate_l1ERC721BridgeInvalidVersion_succeeds() public {
@@ -687,9 +654,9 @@ contract StandardValidator_L1ERC721Bridge_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_OptimismPortal_Test
+/// @title OPCMValidator_OptimismPortal_Test
 /// @notice Tests validation of `OptimismPortal` configuration
-contract StandardValidator_OptimismPortal_Test is StandardValidator_TestInit {
+contract OPCMValidator_OptimismPortal_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         OptimismPortal version is invalid.
     function test_validate_optimismPortalInvalidVersion_succeeds() public {
@@ -745,9 +712,9 @@ contract StandardValidator_OptimismPortal_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_ETHLockbox_Test
+/// @title OPCMValidator_ETHLockbox_Test
 /// @notice Tests validation of `ETHLockbox` configuration
-contract StandardValidator_ETHLockbox_Test is StandardValidator_TestInit {
+contract OPCMValidator_ETHLockbox_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         ETHLockbox version is invalid.
     function test_validate_ethLockboxInvalidVersion_succeeds() public {
@@ -792,9 +759,9 @@ contract StandardValidator_ETHLockbox_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_DisputeGameFactory_Test
+/// @title OPCMValidator_DisputeGameFactory_Test
 /// @notice Tests validation of `DisputeGameFactory` configuration
-contract StandardValidator_DisputeGameFactory_Test is StandardValidator_TestInit {
+contract OPCMValidator_DisputeGameFactory_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         DisputeGameFactory version is invalid.
     function test_validate_disputeGameFactoryInvalidVersion_succeeds() public {
@@ -823,9 +790,9 @@ contract StandardValidator_DisputeGameFactory_Test is StandardValidator_TestInit
     }
 }
 
-/// @title StandardValidator_PermissionedDisputeGame_Test
+/// @title OPCMValidator_PermissionedDisputeGame_Test
 /// @notice Tests validation of `PermissionedDisputeGame` configuration
-contract StandardValidator_PermissionedDisputeGame_Test is StandardValidator_TestInit {
+contract OPCMValidator_PermissionedDisputeGame_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         PermissionedDisputeGame implementation is null.
     function test_validate_permissionedDisputeGameNullImplementation_succeeds() public {
@@ -946,7 +913,7 @@ contract StandardValidator_PermissionedDisputeGame_Test is StandardValidator_Tes
     /// @notice Tests that the validate function successfully returns the right overrides error when the
     ///         PermissionedDisputeGame challenger is overridden but is correct.
     function test_validate_overridenPermissionedDisputeGameChallenger_succeeds() public {
-        IStandardValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
+        IOPCMValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
         overrides.challenger = address(0xbad);
         vm.mockCall(address(pdg), abi.encodeCall(IPermissionedDisputeGame.challenger, ()), abi.encode(address(0xbad)));
         assertEq("OVERRIDES-CHALLENGER", _validateWithOverrides(true, overrides));
@@ -955,15 +922,15 @@ contract StandardValidator_PermissionedDisputeGame_Test is StandardValidator_Tes
     /// @notice Tests that the validate function (with an overridden PermissionedDisputeGame challenger) successfully
     ///         returns the right error when the PermissionedDisputeGame challenger is invalid.
     function test_validateOverridesChallenger_permissionedDisputeGameInvalidChallenger_succeeds() public view {
-        IStandardValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
+        IOPCMValidator.ValidationOverrides memory overrides = _defaultValidationOverrides();
         overrides.challenger = address(0xbad);
         assertEq("OVERRIDES-CHALLENGER,PDDG-130", _validateWithOverrides(true, overrides));
     }
 }
 
-/// @title StandardValidator_AnchorStateRegistry_Test
+/// @title OPCMValidator_AnchorStateRegistry_Test
 /// @notice Tests validation of `AnchorStateRegistry` configuration
-contract StandardValidator_AnchorStateRegistry_Test is StandardValidator_TestInit {
+contract OPCMValidator_AnchorStateRegistry_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         AnchorStateRegistry version is invalid.
     function test_validate_anchorStateRegistryInvalidVersion_succeeds() public {
@@ -1025,9 +992,9 @@ contract StandardValidator_AnchorStateRegistry_Test is StandardValidator_TestIni
     }
 }
 
-/// @title StandardValidator_DelayedWETH_Test
+/// @title OPCMValidator_DelayedWETH_Test
 /// @notice Tests validation of `DelayedWETH` configuration
-contract StandardValidator_DelayedWETH_Test is StandardValidator_TestInit {
+contract OPCMValidator_DelayedWETH_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         DelayedWETH version is invalid.
     function test_validate_delayedWETHInvalidVersion_succeeds() public {
@@ -1112,9 +1079,9 @@ contract StandardValidator_DelayedWETH_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_PreimageOracle_Test
+/// @title OPCMValidator_PreimageOracle_Test
 /// @notice Tests validation of `PreimageOracle` configuration
-contract StandardValidator_PreimageOracle_Test is StandardValidator_TestInit {
+contract OPCMValidator_PreimageOracle_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         PreimageOracle version is invalid.
     function test_validate_preimageOracleInvalidVersion_succeeds() public {
@@ -1137,9 +1104,9 @@ contract StandardValidator_PreimageOracle_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_FaultDisputeGame_Test
+/// @title OPCMValidator_FaultDisputeGame_Test
 /// @notice Tests validation of `FaultDisputeGame` configuration
-contract StandardValidator_FaultDisputeGame_Test is StandardValidator_TestInit {
+contract OPCMValidator_FaultDisputeGame_Test is OPCMValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         FaultDisputeGame (permissionless) implementation is null.
     function test_validate_faultDisputeGameNullImplementation_succeeds() public {
@@ -1238,9 +1205,9 @@ contract StandardValidator_FaultDisputeGame_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_L1StandardBridge_Test
+/// @title OPCMValidator_L1StandardBridge_Test
 /// @notice Tests validation of `L1StandardBridge` configuration
-contract StandardValidator_L1StandardBridge_Test is StandardValidator_TestInit {
+contract OPCMValidator_L1StandardBridge_Test is OPCMValidator_TestInit {
     // L1StandardBridge Tests
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         L1StandardBridge version is invalid.
@@ -1304,27 +1271,37 @@ contract StandardValidator_L1StandardBridge_Test is StandardValidator_TestInit {
     }
 }
 
-/// @title StandardValidator_Versions_Test
-/// @notice Tests the `version` functions on `StandardValidator`.
-contract StandardValidator_Versions_Test is StandardValidator_TestInit {
-    /// @notice Tests that the version getter functions on `StandardValidator` return non-empty
+/// @title OPCMValidator_Versions_Test
+/// @notice Tests the `version` functions on `OPCMValidator`.
+contract OPCMValidator_Versions_Test is OPCMValidator_TestInit {
+    /// @notice Tests that the version getter functions on `OPCMValidator` return non-empty
     ///         strings.
     function test_versions_succeeds() public view {
-        assertTrue(bytes(validator.systemConfigVersion()).length > 0, "systemConfigVersion empty");
-        assertTrue(bytes(validator.optimismPortalVersion()).length > 0, "optimismPortalVersion empty");
-        assertTrue(bytes(validator.l1CrossDomainMessengerVersion()).length > 0, "l1CrossDomainMessengerVersion empty");
-        assertTrue(bytes(validator.l1ERC721BridgeVersion()).length > 0, "l1ERC721BridgeVersion empty");
-        assertTrue(bytes(validator.l1StandardBridgeVersion()).length > 0, "l1StandardBridgeVersion empty");
-        assertTrue(bytes(validator.mipsVersion()).length > 0, "mipsVersion empty");
+        assertTrue(bytes(opcm.opcmValidator().systemConfigVersion()).length > 0, "systemConfigVersion empty");
+        assertTrue(bytes(opcm.opcmValidator().optimismPortalVersion()).length > 0, "optimismPortalVersion empty");
         assertTrue(
-            bytes(validator.optimismMintableERC20FactoryVersion()).length > 0,
+            bytes(opcm.opcmValidator().l1CrossDomainMessengerVersion()).length > 0,
+            "l1CrossDomainMessengerVersion empty"
+        );
+        assertTrue(bytes(opcm.opcmValidator().l1ERC721BridgeVersion()).length > 0, "l1ERC721BridgeVersion empty");
+        assertTrue(bytes(opcm.opcmValidator().l1StandardBridgeVersion()).length > 0, "l1StandardBridgeVersion empty");
+        assertTrue(bytes(opcm.opcmValidator().mipsVersion()).length > 0, "mipsVersion empty");
+        assertTrue(
+            bytes(opcm.opcmValidator().optimismMintableERC20FactoryVersion()).length > 0,
             "optimismMintableERC20FactoryVersion empty"
         );
-        assertTrue(bytes(validator.disputeGameFactoryVersion()).length > 0, "disputeGameFactoryVersion empty");
-        assertTrue(bytes(validator.anchorStateRegistryVersion()).length > 0, "anchorStateRegistryVersion empty");
-        assertTrue(bytes(validator.delayedWETHVersion()).length > 0, "delayedWETHVersion empty");
-        assertTrue(bytes(validator.permissionedDisputeGameVersion()).length > 0, "permissionedDisputeGameVersion empty");
-        assertTrue(bytes(validator.preimageOracleVersion()).length > 0, "preimageOracleVersion empty");
-        assertTrue(bytes(validator.ethLockboxVersion()).length > 0, "ethLockboxVersion empty");
+        assertTrue(
+            bytes(opcm.opcmValidator().disputeGameFactoryVersion()).length > 0, "disputeGameFactoryVersion empty"
+        );
+        assertTrue(
+            bytes(opcm.opcmValidator().anchorStateRegistryVersion()).length > 0, "anchorStateRegistryVersion empty"
+        );
+        assertTrue(bytes(opcm.opcmValidator().delayedWETHVersion()).length > 0, "delayedWETHVersion empty");
+        assertTrue(
+            bytes(opcm.opcmValidator().permissionedDisputeGameVersion()).length > 0,
+            "permissionedDisputeGameVersion empty"
+        );
+        assertTrue(bytes(opcm.opcmValidator().preimageOracleVersion()).length > 0, "preimageOracleVersion empty");
+        assertTrue(bytes(opcm.opcmValidator().ethLockboxVersion()).length > 0, "ethLockboxVersion empty");
     }
 }
