@@ -32,6 +32,12 @@ safer.
 
 [style-guide]: ./contributing/style-guide.md
 
+### PR Review Policy
+
+OP Stack smart contract PRs should be reviewed according to the [PR review policy][pr-policy].
+
+[pr-policy]: ./policies/pr-review.md
+
 ### Contract Interfaces
 
 OP Stack smart contracts use contract interfaces in a relatively unique way. Please refer to the [interfaces guide]
