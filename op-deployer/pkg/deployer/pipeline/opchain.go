@@ -89,6 +89,11 @@ func makeDCI(intent *state.Intent, thisIntent *state.ChainIntent, chainID common
 		return opcm.DeployOPChainInput{}, fmt.Errorf("error merging proof params from overrides: %w", err)
 	}
 
+	cfg, err := state.CombineDeployConfig(intent, thisIntent, st, nil)
+	if err != nil {
+		return opcm.DeployOPChainInput{}, fmt.Errorf("error combining deploy config: %w", err)
+	}
+
 	return opcm.DeployOPChainInput{
 		OpChainProxyAdminOwner:       thisIntent.Roles.L1ProxyAdminOwner,
 		SystemConfigOwner:            thisIntent.Roles.SystemConfigOwner,
@@ -96,12 +101,12 @@ func makeDCI(intent *state.Intent, thisIntent *state.ChainIntent, chainID common
 		UnsafeBlockSigner:            thisIntent.Roles.UnsafeBlockSigner,
 		Proposer:                     thisIntent.Roles.Proposer,
 		Challenger:                   thisIntent.Roles.Challenger,
-		BasefeeScalar:                standard.BasefeeScalar,
-		BlobBaseFeeScalar:            standard.BlobBaseFeeScalar,
+		BasefeeScalar:                cfg.L2InitializationConfig.GasPriceOracleDeployConfig.GasPriceOracleBaseFeeScalar,
+		BlobBaseFeeScalar:            cfg.L2InitializationConfig.GasPriceOracleDeployConfig.GasPriceOracleBlobBaseFeeScalar,
 		L2ChainId:                    chainID.Big(),
 		Opcm:                         st.ImplementationsDeployment.OpcmImpl,
 		SaltMixer:                    st.Create2Salt.String(), // passing through salt generated at state initialization
-		GasLimit:                     standard.GasLimit,
+		GasLimit:                     uint64(cfg.L2InitializationConfig.L2GenesisBlockDeployConfig.L2GenesisBlockGasLimit),
 		DisputeGameType:              proofParams.DisputeGameType,
 		DisputeAbsolutePrestate:      proofParams.DisputeAbsolutePrestate,
 		DisputeMaxGameDepth:          proofParams.DisputeMaxGameDepth,

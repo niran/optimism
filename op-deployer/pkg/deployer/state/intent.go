@@ -25,8 +25,10 @@ const (
 	IntentTypeStandardOverrides IntentType = "standard-overrides"
 )
 
-var emptyAddress common.Address
-var emptyHash common.Hash
+var (
+	emptyAddress common.Address
+	emptyHash    common.Hash
+)
 
 type SuperchainProofParams struct {
 	WithdrawalDelaySeconds          uint64 `json:"faultGameWithdrawalDelay" toml:"faultGameWithdrawalDelay"`
@@ -76,8 +78,10 @@ type Intent struct {
 	L1DevGenesisParams *L1DevGenesisParams `json:"l1DevGenesisParams"`
 }
 
-var ErrL1ContractsLocatorUndefined = errors.New("L1ContractsLocator undefined")
-var ErrL2ContractsLocatorUndefined = errors.New("L2ContractsLocator undefined")
+var (
+	ErrL1ContractsLocatorUndefined = errors.New("L1ContractsLocator undefined")
+	ErrL2ContractsLocatorUndefined = errors.New("L2ContractsLocator undefined")
+)
 
 func (c *Intent) L1ChainIDBig() *big.Int {
 	return big.NewInt(int64(c.L1ChainID))
@@ -211,6 +215,10 @@ func (c *Intent) Check() error {
 		return ErrL2ContractsLocatorUndefined
 	}
 
+	if err := c.validateOverrides(); err != nil {
+		return err
+	}
+
 	var err error
 	switch c.ConfigType {
 	case IntentTypeStandard:
@@ -224,6 +232,20 @@ func (c *Intent) Check() error {
 	}
 	if err != nil {
 		return fmt.Errorf("failed to validate intent-type=%s: %w", c.ConfigType, err)
+	}
+
+	return nil
+}
+
+func (c *Intent) validateOverrides() error {
+	if err := ValidateOverrides(c.GlobalDeployOverrides); err != nil {
+		return fmt.Errorf("invalid global deploy overrides: %w", err)
+	}
+
+	for _, chain := range c.Chains {
+		if err := ValidateOverrides(chain.DeployOverrides); err != nil {
+			return fmt.Errorf("invalid chain deploy overrides: %w", err)
+		}
 	}
 
 	return nil
