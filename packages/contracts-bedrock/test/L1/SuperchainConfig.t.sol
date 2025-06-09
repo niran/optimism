@@ -225,25 +225,27 @@ contract SuperchainConfig_Paused_Test is SuperchainConfig_TestInit {
 /// @notice Test contract for SuperchainConfig `pause` function.
 contract SuperchainConfig_Pause_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `pause` successfully pauses when called by the guardian.
-    function test_pause_succeeds() external {
-        assertFalse(superchainConfig.paused(address(this)));
+    /// @param _identifier The identifier to pause.
+    function testFuzz_pause_succeeds(address _identifier) external {
+        assertFalse(superchainConfig.paused(_identifier));
 
         vm.expectEmit(address(superchainConfig));
-        emit Paused(address(this));
+        emit Paused(_identifier);
 
         vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(this));
+        superchainConfig.pause(_identifier);
 
-        assertTrue(superchainConfig.paused(address(this)));
+        assertTrue(superchainConfig.paused(_identifier));
     }
 
     /// @notice Tests that `pause` reverts when called by a non-guardian.
-    function test_pause_notGuardian_reverts() external {
-        assertFalse(superchainConfig.paused(address(this)));
+    /// @param _caller The address of the unauthorized caller.
+    function testFuzz_pause_notGuardian_reverts(address _caller) external {
+        // Use vm.assume to exclude the actual guardian
+        vm.assume(_caller != superchainConfig.guardian());
 
-        assertTrue(superchainConfig.guardian() != alice);
         vm.expectRevert(ISuperchainConfig.SuperchainConfig_OnlyGuardian.selector);
-        vm.prank(alice);
+        vm.prank(_caller);
         superchainConfig.pause(address(this));
 
         assertFalse(superchainConfig.paused(address(this)));
@@ -266,27 +268,31 @@ contract SuperchainConfig_Pause_Test is SuperchainConfig_TestInit {
 /// @notice Test contract for SuperchainConfig `unpause` function.
 contract SuperchainConfig_Unpause_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `unpause` successfully unpauses when called by the guardian.
-    function test_unpause_succeeds() external {
+    /// @param _identifier The identifier to unpause.
+    function testFuzz_unpause_succeeds(address _identifier) external {
         vm.startPrank(superchainConfig.guardian());
-        superchainConfig.pause(address(this));
-        assertTrue(superchainConfig.paused(address(this)));
+        superchainConfig.pause(_identifier);
+        assertTrue(superchainConfig.paused(_identifier));
 
         vm.expectEmit(address(superchainConfig));
-        emit Unpaused(address(this));
-        superchainConfig.unpause(address(this));
+        emit Unpaused(_identifier);
+        superchainConfig.unpause(_identifier);
 
-        assertFalse(superchainConfig.paused(address(this)));
+        assertFalse(superchainConfig.paused(_identifier));
     }
 
     /// @notice Tests that `unpause` reverts when called by a non-guardian.
-    function test_unpause_notGuardian_reverts() external {
+    /// @param _caller The address of the unauthorized caller.
+    function testFuzz_unpause_notGuardian_reverts(address _caller) external {
+        // Use vm.assume to exclude the actual guardian
+        vm.assume(_caller != superchainConfig.guardian());
+
         vm.prank(superchainConfig.guardian());
         superchainConfig.pause(address(this));
         assertTrue(superchainConfig.paused(address(this)));
 
-        assertTrue(superchainConfig.guardian() != alice);
         vm.expectRevert(ISuperchainConfig.SuperchainConfig_OnlyGuardian.selector);
-        vm.prank(alice);
+        vm.prank(_caller);
         superchainConfig.unpause(address(this));
 
         assertTrue(superchainConfig.paused(address(this)));
@@ -310,12 +316,16 @@ contract SuperchainConfig_Extend_Test is SuperchainConfig_TestInit {
     }
 
     /// @notice Tests that `extend` reverts when called by a non-guardian.
-    function test_extend_notGuardian_reverts() external {
+    /// @param _caller The address of the unauthorized caller.
+    function testFuzz_extend_notGuardian_reverts(address _caller) external {
+        // Use vm.assume to exclude the actual guardian
+        vm.assume(_caller != superchainConfig.guardian());
+
         vm.prank(superchainConfig.guardian());
         superchainConfig.pause(address(this));
 
-        vm.prank(alice);
         vm.expectRevert(ISuperchainConfig.SuperchainConfig_OnlyGuardian.selector);
+        vm.prank(_caller);
         superchainConfig.extend(address(this));
     }
 

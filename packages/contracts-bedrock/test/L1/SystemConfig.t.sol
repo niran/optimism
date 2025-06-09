@@ -313,9 +313,9 @@ contract SystemConfig_Upgrade_Test is SystemConfig_TestInit {
     }
 }
 
-/// @title SystemConfig_StartBlock_TestFail
+/// @title SystemConfig_StartBlock_Test
 /// @notice Test contract for SystemConfig `startBlock` function.
-contract SystemConfig_StartBlock_TestFail is SystemConfig_TestInit {
+contract SystemConfig_StartBlock_Test is SystemConfig_TestInit {
     /// @notice Tests that startBlock is updated correctly when it's zero.
     function test_startBlock_update_succeeds() external {
         // Wipe out the initialized slot so the proxy can be initialized again
@@ -389,13 +389,14 @@ contract SystemConfig_SetUnsafeBlockSigner_Test is SystemConfig_TestInit {
     }
 
     /// @notice Tests that `setUnsafeBlockSigner` updates the block signer successfully.
-    function testFuzz_setUnsafeBlockSigner_succeeds(address newUnsafeSigner) external {
+    /// @param _newUnsafeSigner The unsafe block signer address to test.
+    function testFuzz_setUnsafeBlockSigner_succeeds(address _newUnsafeSigner) external {
         vm.expectEmit(address(systemConfig));
-        emit ConfigUpdate(0, ISystemConfig.UpdateType.UNSAFE_BLOCK_SIGNER, abi.encode(newUnsafeSigner));
+        emit ConfigUpdate(0, ISystemConfig.UpdateType.UNSAFE_BLOCK_SIGNER, abi.encode(_newUnsafeSigner));
 
         vm.prank(systemConfig.owner());
-        systemConfig.setUnsafeBlockSigner(newUnsafeSigner);
-        assertEq(systemConfig.unsafeBlockSigner(), newUnsafeSigner);
+        systemConfig.setUnsafeBlockSigner(_newUnsafeSigner);
+        assertEq(systemConfig.unsafeBlockSigner(), _newUnsafeSigner);
     }
 }
 
@@ -409,13 +410,14 @@ contract SystemConfig_SetBatcherHash_Test is SystemConfig_TestInit {
     }
 
     /// @notice Tests that `setBatcherHash` updates the batcher hash successfully.
-    function testFuzz_setBatcherHash_succeeds(bytes32 newBatcherHash) external {
+    /// @param _newBatcherHash The batcher hash value to test.
+    function testFuzz_setBatcherHash_succeeds(bytes32 _newBatcherHash) external {
         vm.expectEmit(address(systemConfig));
-        emit ConfigUpdate(0, ISystemConfig.UpdateType.BATCHER, abi.encode(newBatcherHash));
+        emit ConfigUpdate(0, ISystemConfig.UpdateType.BATCHER, abi.encode(_newBatcherHash));
 
         vm.prank(systemConfig.owner());
-        systemConfig.setBatcherHash(newBatcherHash);
-        assertEq(systemConfig.batcherHash(), newBatcherHash);
+        systemConfig.setBatcherHash(_newBatcherHash);
+        assertEq(systemConfig.batcherHash(), _newBatcherHash);
     }
 }
 
@@ -436,16 +438,18 @@ contract SystemConfig_SetGasConfig_Test is SystemConfig_TestInit {
     }
 
     /// @notice Tests that `setGasConfig` updates the overhead and scalar successfully.
-    function testFuzz_setGasConfig_succeeds(uint256 newOverhead, uint256 newScalar) external {
+    /// @param _newOverhead The overhead value to test.
+    /// @param _newScalar The scalar value to test (most significant byte will be zeroed out).
+    function testFuzz_setGasConfig_succeeds(uint256 _newOverhead, uint256 _newScalar) external {
         // always zero out most significant byte
-        newScalar = (newScalar << 16) >> 16;
+        _newScalar = (_newScalar << 16) >> 16;
         vm.expectEmit(address(systemConfig));
-        emit ConfigUpdate(0, ISystemConfig.UpdateType.FEE_SCALARS, abi.encode(newOverhead, newScalar));
+        emit ConfigUpdate(0, ISystemConfig.UpdateType.FEE_SCALARS, abi.encode(_newOverhead, _newScalar));
 
         vm.prank(systemConfig.owner());
-        systemConfig.setGasConfig(newOverhead, newScalar);
-        assertEq(systemConfig.overhead(), newOverhead);
-        assertEq(systemConfig.scalar(), newScalar);
+        systemConfig.setGasConfig(_newOverhead, _newScalar);
+        assertEq(systemConfig.overhead(), _newOverhead);
+        assertEq(systemConfig.scalar(), _newScalar);
     }
 }
 
@@ -458,6 +462,9 @@ contract SystemConfig_SetGasConfigEcotone_Test is SystemConfig_TestInit {
         systemConfig.setGasConfigEcotone({ _basefeeScalar: 0, _blobbasefeeScalar: 0 });
     }
 
+    /// @notice Tests that `setGasConfigEcotone` updates the basefee and blobbasefee scalars successfully.
+    /// @param _basefeeScalar The basefee scalar value to test.
+    /// @param _blobbasefeeScalar The blobbasefee scalar value to test.
     function testFuzz_setGasConfigEcotone_succeeds(uint32 _basefeeScalar, uint32 _blobbasefeeScalar) external {
         bytes32 encoded =
             ffi.encodeScalarEcotone({ _basefeeScalar: _basefeeScalar, _blobbasefeeScalar: _blobbasefeeScalar });
@@ -487,33 +494,42 @@ contract SystemConfig_SetGasLimit_Test is SystemConfig_TestInit {
     }
 
     /// @notice Tests that `setGasLimit` reverts if the gas limit is too low.
-    function test_setGasLimit_lowGasLimit_reverts() external {
+    /// @param _gasLimit The gas limit value to test (will be constrained to invalid low range).
+    function testFuzz_setGasLimit_tooLow_reverts(uint64 _gasLimit) external {
         uint64 minimumGasLimit = systemConfig.minimumGasLimit();
+        // Use bound to test the full range of invalid low values
+        _gasLimit = uint64(bound(uint256(_gasLimit), 0, uint256(minimumGasLimit - 1)));
+
         vm.prank(systemConfig.owner());
         vm.expectRevert("SystemConfig: gas limit too low");
-        systemConfig.setGasLimit(minimumGasLimit - 1);
+        systemConfig.setGasLimit(_gasLimit);
     }
 
     /// @notice Tests that `setGasLimit` reverts if the gas limit is too high.
-    function test_setGasLimit_highGasLimit_reverts() external {
+    /// @param _gasLimit The gas limit value to test (will be constrained to invalid high range).
+    function testFuzz_setGasLimit_tooHigh_reverts(uint64 _gasLimit) external {
         uint64 maximumGasLimit = systemConfig.maximumGasLimit();
+        // Use bound to test the full range of invalid high values
+        _gasLimit = uint64(bound(uint256(_gasLimit), uint256(maximumGasLimit + 1), type(uint64).max));
+
         vm.prank(systemConfig.owner());
         vm.expectRevert("SystemConfig: gas limit too high");
-        systemConfig.setGasLimit(maximumGasLimit + 1);
+        systemConfig.setGasLimit(_gasLimit);
     }
 
     /// @notice Tests that `setGasLimit` updates the gas limit successfully.
-    function testFuzz_setGasLimit_succeeds(uint64 newGasLimit) external {
+    /// @param _newGasLimit The gas limit value to test (will be constrained to valid range).
+    function testFuzz_setGasLimit_succeeds(uint64 _newGasLimit) external {
         uint64 minimumGasLimit = systemConfig.minimumGasLimit();
         uint64 maximumGasLimit = systemConfig.maximumGasLimit();
-        newGasLimit = uint64(bound(uint256(newGasLimit), uint256(minimumGasLimit), uint256(maximumGasLimit)));
+        _newGasLimit = uint64(bound(uint256(_newGasLimit), uint256(minimumGasLimit), uint256(maximumGasLimit)));
 
         vm.expectEmit(address(systemConfig));
-        emit ConfigUpdate(0, ISystemConfig.UpdateType.GAS_LIMIT, abi.encode(newGasLimit));
+        emit ConfigUpdate(0, ISystemConfig.UpdateType.GAS_LIMIT, abi.encode(_newGasLimit));
 
         vm.prank(systemConfig.owner());
-        systemConfig.setGasLimit(newGasLimit);
-        assertEq(systemConfig.gasLimit(), newGasLimit);
+        systemConfig.setGasLimit(_newGasLimit);
+        assertEq(systemConfig.gasLimit(), _newGasLimit);
     }
 }
 
@@ -521,20 +537,24 @@ contract SystemConfig_SetGasLimit_Test is SystemConfig_TestInit {
 /// @notice Test contract for SystemConfig `setEIP1559Params` function.
 contract SystemConfig_SetEIP1559Params_Test is SystemConfig_TestInit {
     /// @notice Tests that `setEIP1559Params` reverts if the caller is not the owner.
-    function test_setEIP1559Params_notOwner_reverts(uint32 _denominator, uint32 _elasticity) external {
+    /// @param _denominator The denominator value to test.
+    /// @param _elasticity The elasticity value to test.
+    function testFuzz_setEIP1559Params_notOwner_reverts(uint32 _denominator, uint32 _elasticity) external {
         vm.expectRevert("Ownable: caller is not the owner");
         systemConfig.setEIP1559Params({ _denominator: _denominator, _elasticity: _elasticity });
     }
 
     /// @notice Tests that `setEIP1559Params` reverts if the denominator is zero.
-    function test_setEIP1559Params_zeroDenominator_reverts(uint32 _elasticity) external {
+    /// @param _elasticity The elasticity value to test.
+    function testFuzz_setEIP1559Params_zeroDenominator_reverts(uint32 _elasticity) external {
         vm.prank(systemConfig.owner());
         vm.expectRevert("SystemConfig: denominator must be >= 1");
         systemConfig.setEIP1559Params({ _denominator: 0, _elasticity: _elasticity });
     }
 
     /// @notice Tests that `setEIP1559Params` reverts if the elasticity is zero.
-    function test_setEIP1559Params_zeroElasticity_reverts(uint32 _denominator) external {
+    /// @param _denominator The denominator value to test (will be constrained to valid range).
+    function testFuzz_setEIP1559Params_zeroElasticity_reverts(uint32 _denominator) external {
         _denominator = uint32(bound(_denominator, 1, type(uint32).max));
         vm.prank(systemConfig.owner());
         vm.expectRevert("SystemConfig: elasticity must be >= 1");
@@ -542,6 +562,8 @@ contract SystemConfig_SetEIP1559Params_Test is SystemConfig_TestInit {
     }
 
     /// @notice Tests that `setEIP1559Params` updates the EIP1559 parameters successfully.
+    /// @param _denominator The denominator value to test (will be constrained to valid range).
+    /// @param _elasticity The elasticity value to test (will be constrained to valid range).
     function testFuzz_setEIP1559Params_succeeds(uint32 _denominator, uint32 _elasticity) external {
         _denominator = uint32(bound(_denominator, 2, type(uint32).max));
         _elasticity = uint32(bound(_elasticity, 2, type(uint32).max));
