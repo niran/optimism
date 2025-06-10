@@ -18,9 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
-var (
-	l2GenesisBlockBaseFeePerGas = hexutil.Big(*(big.NewInt(1000000000)))
-)
+var l2GenesisBlockBaseFeePerGas = hexutil.Big(*(big.NewInt(1000000000)))
 
 func CombineDeployConfig(intent *Intent, chainIntent *ChainIntent, state *State, chainState *ChainState) (genesis.DeployConfig, error) {
 	upgradeSchedule := standard.DefaultHardforkScheduleForTag(intent.L1ContractsLocator.Tag)
@@ -148,7 +146,6 @@ func CombineDeployConfig(intent *Intent, chainIntent *ChainIntent, state *State,
 		cfg, err = jsonutil.MergeJSON(cfg, intent.GlobalDeployOverrides)
 		if err != nil {
 			return genesis.DeployConfig{}, fmt.Errorf("error merging global L2 overrides: %w", err)
-
 		}
 	}
 
@@ -170,4 +167,31 @@ func calculateBatchInboxAddr(chainID common.Hash) common.Address {
 	var out common.Address
 	copy(out[1:], crypto.Keccak256(chainID[:])[:19])
 	return out
+}
+
+func GetGasPriceOracleDeployConfig(intent *Intent, chainIntent *ChainIntent) (genesis.GasPriceOracleDeployConfig, error) {
+	cfg := genesis.GasPriceOracleDeployConfig{
+		GasPriceOracleBaseFeeScalar:       1368,
+		GasPriceOracleBlobBaseFeeScalar:   810949,
+		GasPriceOracleOperatorFeeScalar:   chainIntent.OperatorFeeScalar,
+		GasPriceOracleOperatorFeeConstant: chainIntent.OperatorFeeConstant,
+	}
+	cfg, err := jsonutil.MergeJSON(cfg, intent.GlobalDeployOverrides, chainIntent.DeployOverrides)
+	if err != nil {
+		return genesis.GasPriceOracleDeployConfig{}, fmt.Errorf("error merging GasPriceOracleDeployConfig overrides: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func GetL2GenesisBlockDeployConfig(intent *Intent, chainIntent *ChainIntent) (genesis.L2GenesisBlockDeployConfig, error) {
+	cfg := genesis.L2GenesisBlockDeployConfig{
+		L2GenesisBlockGasLimit:      60_000_000,
+		L2GenesisBlockBaseFeePerGas: &l2GenesisBlockBaseFeePerGas,
+	}
+	cfg, err := jsonutil.MergeJSON(cfg, intent.GlobalDeployOverrides, chainIntent.DeployOverrides)
+	if err != nil {
+		return genesis.L2GenesisBlockDeployConfig{}, fmt.Errorf("error merging L2GenesisBlockDeployConfig overrides: %w", err)
+	}
+	return cfg, nil
 }

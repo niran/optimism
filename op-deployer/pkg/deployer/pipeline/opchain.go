@@ -89,13 +89,14 @@ func makeDCI(intent *state.Intent, thisIntent *state.ChainIntent, chainID common
 		return opcm.DeployOPChainInput{}, fmt.Errorf("error merging proof params from overrides: %w", err)
 	}
 
-	chainState, err := st.Chain(thisIntent.ID)
+	gasPriceCfg, err := state.GetGasPriceOracleDeployConfig(intent, thisIntent)
 	if err != nil {
-		return opcm.DeployOPChainInput{}, fmt.Errorf("error getting chain state: %w", err)
+		return opcm.DeployOPChainInput{}, fmt.Errorf("error getting gas price config: %w", err)
 	}
-	cfg, err := state.CombineDeployConfig(intent, thisIntent, st, chainState)
+
+	l2GenesisBlockCfg, err := state.GetL2GenesisBlockDeployConfig(intent, thisIntent)
 	if err != nil {
-		return opcm.DeployOPChainInput{}, fmt.Errorf("error combining deploy config: %w", err)
+		return opcm.DeployOPChainInput{}, fmt.Errorf("error getting l2 genesis block config: %w", err)
 	}
 
 	return opcm.DeployOPChainInput{
@@ -105,12 +106,12 @@ func makeDCI(intent *state.Intent, thisIntent *state.ChainIntent, chainID common
 		UnsafeBlockSigner:            thisIntent.Roles.UnsafeBlockSigner,
 		Proposer:                     thisIntent.Roles.Proposer,
 		Challenger:                   thisIntent.Roles.Challenger,
-		BasefeeScalar:                cfg.L2InitializationConfig.GasPriceOracleDeployConfig.GasPriceOracleBaseFeeScalar,
-		BlobBaseFeeScalar:            cfg.L2InitializationConfig.GasPriceOracleDeployConfig.GasPriceOracleBlobBaseFeeScalar,
+		BasefeeScalar:                gasPriceCfg.GasPriceOracleBaseFeeScalar,
+		BlobBaseFeeScalar:            gasPriceCfg.GasPriceOracleBlobBaseFeeScalar,
 		L2ChainId:                    chainID.Big(),
 		Opcm:                         st.ImplementationsDeployment.OpcmImpl,
 		SaltMixer:                    st.Create2Salt.String(), // passing through salt generated at state initialization
-		GasLimit:                     uint64(cfg.L2InitializationConfig.L2GenesisBlockDeployConfig.L2GenesisBlockGasLimit),
+		GasLimit:                     uint64(l2GenesisBlockCfg.L2GenesisBlockGasLimit),
 		DisputeGameType:              proofParams.DisputeGameType,
 		DisputeAbsolutePrestate:      proofParams.DisputeAbsolutePrestate,
 		DisputeMaxGameDepth:          proofParams.DisputeMaxGameDepth,
