@@ -124,9 +124,9 @@ func (cl *SupervisorClient) SyncStatus(ctx context.Context) (result eth.Supervis
 	return result, err
 }
 
-func (cl *SupervisorClient) DependencySet(ctx context.Context) (depset.DependencySet, error) {
+func (cl *SupervisorClient) DependencySetV1(ctx context.Context) (depset.DependencySet, error) {
 	var result *depset.StaticConfigDependencySet
-	err := cl.client.CallContext(ctx, &result, "supervisor_dependencySet")
+	err := cl.client.CallContext(ctx, &result, "supervisor_dependencySetV1")
 	return result, err
 }
 

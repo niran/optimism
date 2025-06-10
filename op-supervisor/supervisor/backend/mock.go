@@ -90,7 +90,7 @@ func (m *MockBackend) Rewind(ctx context.Context, chain eth.ChainID, block eth.B
 	return nil
 }
 
-func (m *MockBackend) DependencySet(ctx context.Context) (depset.DependencySet, error) {
+func (m *MockBackend) DependencySetV1(ctx context.Context) (depset.DependencySet, error) {
 	return nil, errors.New("not supported")
 }
 

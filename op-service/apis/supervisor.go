@@ -34,6 +34,6 @@ type SupervisorQueryAPI interface {
 	FinalizedL1(ctx context.Context) (eth.BlockRef, error)
 	SuperRootAtTimestamp(ctx context.Context, timestamp hexutil.Uint64) (eth.SuperRootResponse, error)
 	SyncStatus(ctx context.Context) (eth.SupervisorSyncStatus, error)
-	DependencySet(ctx context.Context) (depset.DependencySet, error)
+	DependencySetV1(ctx context.Context) (depset.DependencySet, error)
 	AllSafeDerivedAt(ctx context.Context, derivedFrom eth.BlockID) (derived map[eth.ChainID]eth.BlockID, err error)
 }

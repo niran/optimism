@@ -64,8 +64,10 @@ func (q *QueryFrontend) SyncStatus(ctx context.Context) (eth.SupervisorSyncStatu
 	return q.Supervisor.SyncStatus(ctx)
 }
 
-func (q *QueryFrontend) DependencySet(ctx context.Context) (depset.DependencySet, error) {
-	return q.Supervisor.DependencySet(ctx)
+// DependencySetV1 returns a versioned dependency set config.
+// Warning: this assumes the JSON encoding of the dependency set matches V1.
+func (q *QueryFrontend) DependencySetV1(ctx context.Context) (depset.DependencySet, error) {
+	return q.Supervisor.DependencySetV1(ctx)
 }
 
 type AdminFrontend struct {

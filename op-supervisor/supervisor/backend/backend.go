@@ -794,7 +794,7 @@ func (su *SupervisorBackend) SyncStatus(ctx context.Context) (eth.SupervisorSync
 	return su.statusTracker.SyncStatus()
 }
 
-func (su *SupervisorBackend) DependencySet(ctx context.Context) (depset.DependencySet, error) {
+func (su *SupervisorBackend) DependencySetV1(ctx context.Context) (depset.DependencySet, error) {
 	return su.cfgSet, nil
 }
 
