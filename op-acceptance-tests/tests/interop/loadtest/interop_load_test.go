@@ -1,7 +1,16 @@
+// Package loadtest contains interop load tests.
+//
+// Set NAT_INTEROP_LOADTEST_TARGET to the initial amount of messages that should be passed per L2 slot in each test (default: 100).
+//
+// Each test increases the message throughput until some threshold is reached (e.g., the gas target).
+// The throughput is decreased if the threshold is exceeded or if errors are encountered (e.g., transaction inclusion failures).
 package loadtest
 
 import (
+	"math"
+	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"testing"
@@ -11,110 +20,166 @@ import (
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
 	"github.com/ethereum-optimism/optimism/op-devstack/presets"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
+	"golang.org/x/net/context"
 )
-
-const numInitTxsEnvVar = "NAT_LOADTEST_INITTXS"
 
 func TestMain(m *testing.M) {
 	presets.DoMain(m, presets.WithSimpleInterop())
 }
 
-type L2 struct {
-	Chain  *dsl.L2Network
-	EL     *dsl.L2ELNode
-	Funder *dsl.Funder
-}
-
-func TestLoad(gt *testing.T) {
-	if testing.Short() {
-		gt.Skip("skipping load test in short mode")
-	}
-	t := devtest.SerialT(gt)
-	sys := presets.NewSimpleInterop(t)
-
-	numInitTxs := uint64(1)
-	if numInitTxsStr, ok := os.LookupEnv(numInitTxsEnvVar); ok {
-		var err error
-		numInitTxs, err = strconv.ParseUint(numInitTxsStr, 10, 64)
-		t.Require().NoError(err)
-	}
-
-	l2ELA := sys.L2ChainA.PublicRPC()
-	L2A := &L2{
-		Chain:  sys.L2ChainA,
-		EL:     l2ELA,
-		Funder: dsl.NewFunder(sys.Wallet, sys.FaucetA, l2ELA),
-	}
-	l2ELB := sys.L2ChainB.PublicRPC()
-	L2B := &L2{
-		Chain:  sys.L2ChainB,
-		EL:     l2ELB,
-		Funder: dsl.NewFunder(sys.Wallet, sys.FaucetB, l2ELB),
-	}
-
+// TestSteady attempts to approach but not exceed the gas target in every block by spamming interop messages,
+// simulating benign but heavy activity.
+// The test will exit successfully after the global go test deadline or the timeout specified by the
+// NAT_STEADY_TIMEOUT environment variable elapses, whichever comes first.
+// Also see: https://github.com/golang/go/issues/48157.
+func TestSteady(gt *testing.T) {
+	t := setupT(gt)
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		SpamInteropTxs(t, numInitTxs, L2A, L2B, sys.Supervisor)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		SpamInteropTxs(t, numInitTxs, L2B, L2A, sys.Supervisor)
-	}()
-}
 
-func SpamInteropTxs(t devtest.T, numInitTxs uint64, source *L2, dest *L2, supervisor *dsl.Supervisor) {
-	var relayWg sync.WaitGroup
-	defer relayWg.Wait()
-	msgsCh := make(chan []types.Message, 100)
-	defer close(msgsCh) // Must be defer'd after the relayWg.Wait() above.
-
-	// Spam executing messages.
-	relayWg.Add(1)
-	go func() {
-		defer relayWg.Done()
-		dest.Funder.NewFundedEOA(eth.MillionEther.Mul(100))
-		relayers := []Relayer{
-			NewValidRelayer(dest.Funder, dest.EL, supervisor),
-			NewDelayedRelayer(NewValidRelayer(dest.Funder, dest.EL, supervisor), &relayWg, time.Minute),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidChainID),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidBlockNumber),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidLogIndex),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidOrigin),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidPayloadHash),
-			NewInvalidRelayer(dest.Funder, dest.EL, makeInvalidTimestamp),
-		}
-		for msgs := range msgsCh {
-			for _, relayer := range relayers {
-				relayWg.Add(1)
-				go func() {
-					defer relayWg.Done()
-					relayer.Relay(t, msgs)
-				}()
-			}
-			if len(msgs) >= cap(msgs)/2 {
-				t.Logger().Warn("Messages buffer is at least half full", "len", len(msgs), "cap", cap(msgs))
-			}
-		}
-	}()
-
-	// Spam initiating messages.
-	eventLogger := source.Funder.NewFundedEOA(eth.OneEther).DeployEventLogger()
-	initiators := []Initiator{
-		NewManyMsgsInitiator(source.Funder, source.EL, eventLogger),
-		NewLargeMsgInitiator(source.Funder, source.EL, eventLogger),
+	// Configure a context that will allow us to exit the test on time.
+	deadline := time.Unix(math.MaxInt64, 0)
+	testCtxDeadline, testCtxDeadlineExsts := t.Ctx().Deadline()
+	if testCtxDeadlineExsts {
+		deadline = testCtxDeadline.Add(-10 * time.Second) // Give some time for cleanup.
 	}
-	var initWg sync.WaitGroup
-	defer initWg.Wait()
-	for i := range numInitTxs {
-		initWg.Add(1)
+	ctx, cancel := context.WithDeadline(t.Ctx(), deadline)
+	t.Cleanup(cancel) // We only care about the deadline.
+	if timeoutStr, exists := os.LookupEnv("NAT_STEADY_TIMEOUT"); exists {
+		timeout, err := time.ParseDuration(timeoutStr)
+		t.Require().NoError(err)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		t.Cleanup(cancel) // We only care about the timeout.
+	}
+
+	aimd, source, dest := setupLoadTest(t, ctx, &wg)
+	elasticityMultiplier := dest.Config.ElasticityMultiplier()
+	for range aimd.Ready() {
+		wg.Add(1)
 		go func() {
-			defer initWg.Done()
-			msgsCh <- initiators[i%uint64(len(initiators))].Initiate(t)
+			defer wg.Done()
+			if !relayMessage(t, source, dest) {
+				aimd.Adjust(false)
+				return
+			}
+			unsafe := dest.Unsafe()
+			gasTarget := unsafe.GasLimit() / elasticityMultiplier
+			// Apply backpressure when we meet or exceed the gas target.
+			aimd.Adjust(unsafe.GasUsed() < gasTarget)
 		}()
 	}
+}
+
+// TestBurst spams interop messages and exits successfully when the base fee is raised to one gwei.
+// This simulates adversarial behavior.
+func TestBurst(gt *testing.T) {
+	t := setupT(gt)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(t.Ctx())
+	defer cancel()
+	aimd, source, dest := setupLoadTest(t, ctx, &wg)
+	targetBaseFee := eth.OneGWei.ToBig()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-aimd.Ready():
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				success := relayMessage(t, source, dest)
+				if dest.Unsafe().BaseFee().Cmp(targetBaseFee) >= 0 {
+					cancel() // End the test when we've met or exceeded the target base fee.
+				}
+				aimd.Adjust(success)
+			}()
+		}
+	}
+}
+
+func setupT(t *testing.T) devtest.T {
+	if testing.Short() {
+		t.Skip("skipping load test in short mode")
+	}
+	return devtest.SerialT(t)
+}
+
+func setupLoadTest(t devtest.T, ctx context.Context, wg *sync.WaitGroup) (*AIMD, *L2, *L2) {
+	sys := presets.NewSimpleInterop(t)
+	blockTime := time.Duration(sys.L2ChainB.Escape().RollupConfig().BlockTime) * time.Second
+
+	// Scheduler.
+	targetMessagePassesPerBlock := uint64(100)
+	if targetMsgPassesStr, exists := os.LookupEnv("NAT_INTEROP_LOADTEST_TARGET"); exists {
+		var err error
+		targetMessagePassesPerBlock, err = strconv.ParseUint(targetMsgPassesStr, 10, 0)
+		t.Require().NoError(err)
+	}
+	aimd := NewAIMD(targetMessagePassesPerBlock, blockTime, WithAdjustWindow(targetMessagePassesPerBlock/2))
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		aimd.Start(ctx)
+	}()
+
+	// Chains.
+	l2ELA := sys.L2ChainA.PublicRPC()
+	l2ELB := sys.L2ChainB.PublicRPC()
+	funderA := dsl.NewFunder(sys.Wallet, sys.FaucetA, l2ELA)
+	const numEOAs = 300
+	source := &L2{
+		Config:       sys.L2ChainA.Escape().ChainConfig(),
+		RollupConfig: sys.L2ChainA.Escape().RollupConfig(),
+		eoas:         NewEOAPool(funderA, numEOAs, eth.MillionEther),
+		el:           l2ELA,
+		eventLogger:  funderA.NewFundedEOA(eth.OneEther).DeployEventLogger(),
+	}
+	dest := &L2{
+		Config:       sys.L2ChainB.Escape().ChainConfig(),
+		RollupConfig: sys.L2ChainB.Escape().RollupConfig(),
+		eoas:         NewEOAPool(dsl.NewFunder(sys.Wallet, sys.FaucetB, l2ELB), numEOAs, eth.MillionEther),
+		el:           l2ELB,
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		dest.PollUnsafe(ctx, t, blockTime)
+	}()
+
+	// Metrics.
+	metricsCollector := NewMetricsCollector(blockTime)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		t.Require().NoError(metricsCollector.Start(ctx))
+	}()
+	t.Cleanup(func() {
+		dir := filepath.Join("artifacts", t.Name())
+		t.Require().NoError(os.MkdirAll(dir, 0755))
+		t.Require().NoError(metricsCollector.SaveGraph(dir))
+	})
+
+	return aimd, source, dest
+}
+
+func relayMessage(t devtest.T, source, dest *L2) bool {
+	rng := rand.New(rand.NewSource(1234))
+	inFlightMessages.Inc()
+	start := time.Now()
+	initMsg := source.SendInitiatingMsg(t, rng)
+	if initMsg == nil {
+		messageStatusCount.WithLabelValues("init_failed").Inc()
+		inFlightMessages.Dec()
+		return false
+	}
+	success := dest.SendExecutingMsg(t, *initMsg)
+	if success {
+		messageLatency.WithLabelValues("e2e").Observe(time.Since(start).Seconds())
+		messageStatusCount.WithLabelValues("success").Inc()
+	} else {
+		messageStatusCount.WithLabelValues("exec_failed").Inc()
+	}
+	inFlightMessages.Dec()
+	return success
 }

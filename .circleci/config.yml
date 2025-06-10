@@ -137,16 +137,26 @@ commands:
 
   install-contracts-dependencies:
     description: "Install the dependencies for the smart contracts"
+    parameters:
+      solc_versions:
+        description: "The versions of solc to install"
+        type: string
+        default: "0.8.15,0.8.19,0.8.25,0.8.28"
     steps:
+      - restore_cache:
+          keys:
+            # use mise.toml to anchor on the underlying forge/svm versions
+            - svm-cache-{{ checksum "mise.toml" }}-<<parameters.solc_versions>>
       - run:
-          name: Install SVM compilers
+          name: Install solc compilers
           command: |
-            # Have to wipe out the SVM directory to avoid issues with the SVM version
-            rm -rf ~/.svm/*
-            svm install 0.8.15
-            svm install 0.8.19
-            svm install 0.8.25
-            svm install 0.8.28
+            for version in $(echo "<<parameters.solc_versions>>" | tr ',' '\n'); do
+              svm which $version || svm install $version
+            done
+      - save_cache:
+          key: svm-cache-{{ checksum "mise.toml" }}-<<parameters.solc_versions>>
+          paths:
+            - ~/.svm
       - run:
           name: Install dependencies
           command: |
@@ -228,6 +238,7 @@ commands:
             git reset --hard
             git clean -df
             just <<parameters.command>>
+            git status --porcelain
             [ -z "$(git status --porcelain)" ] || exit 1
           working_directory: packages/contracts-bedrock
           when: always
@@ -1005,6 +1016,7 @@ jobs:
           if: ${{ uses_artifacts }}
       - run:
           name: Fuzz
+          no_output_timeout: 15m
           command: |
             make fuzz
           working_directory: "<<parameters.package_name>>"
@@ -1058,7 +1070,7 @@ jobs:
       rule:
         description: Rule to run the tests
         type: string
-        default: "go-tests-ci"
+        default: "go-tests-short-ci"
     machine: true
     resource_class: <<parameters.resource_class>>
     steps:
@@ -1176,6 +1188,7 @@ jobs:
     resource_class: xlarge
     steps:
       - utils/checkout-with-mise
+      - install-contracts-dependencies
       - run:
           name: Setup Kurtosis
           command: |
@@ -1918,6 +1931,7 @@ workflows:
               docker_name:
                 - op-node
                 - op-batcher
+                - op-faucet
                 - op-program
                 - op-proposer
                 - op-challenger
@@ -1996,6 +2010,7 @@ workflows:
               docker_name:
                 - op-node
                 - op-batcher
+                - op-faucet
                 - op-proposer
                 - op-challenger
                 - op-dispute-mon
@@ -2028,6 +2043,7 @@ workflows:
               op_component:
                 - op-node
                 - op-batcher
+                - op-faucet
                 - op-proposer
                 - op-challenger
                 - op-dispute-mon
@@ -2043,6 +2059,7 @@ workflows:
           requires:
             - op-node-docker-release
             - op-batcher-docker-release
+            - op-faucet-docker-release
             - op-proposer-docker-release
             - op-challenger-docker-release
             - op-dispute-mon-docker-release
@@ -2128,7 +2145,7 @@ workflows:
           notify: true
           mentions: "@proofs-team"
           no_output_timeout: 60m
-          test_timeout: 90m
+          test_timeout: 120m
           resource_class: ethereum-optimism/latitude-fps-1
           context:
             - slack
@@ -2194,6 +2211,7 @@ workflows:
               docker_name:
                 - op-node
                 - op-batcher
+                - op-faucet
                 - op-program
                 - op-proposer
                 - op-challenger
@@ -2217,6 +2235,7 @@ workflows:
               op_component:
                 - op-node
                 - op-batcher
+                - op-faucet
                 - op-program
                 - op-proposer
                 - op-challenger

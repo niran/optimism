@@ -27,10 +27,10 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/oppprof"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
+	"github.com/ethereum-optimism/optimism/op-service/testreq"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/depset"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 )
 
@@ -123,7 +123,7 @@ func (n *L2CLNode) Stop() {
 	n.opNode = nil
 }
 
-func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNodeID, l1ELID stack.L1ELNodeID, l2ELID stack.L2ELNodeID) stack.Option[*Orchestrator] {
+func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, managedMode bool, l1CLID stack.L1CLNodeID, l1ELID stack.L1ELNodeID, l2ELID stack.L2ELNodeID) stack.Option[*Orchestrator] {
 	return stack.AfterDeploy(func(orch *Orchestrator) {
 		p := orch.P().WithCtx(stack.ContextWithID(orch.P().Ctx(), l2CLID))
 
@@ -192,6 +192,19 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 			require.NoError(err, "failed to load p2p config")
 		}
 
+		// specify interop config, but do not configure anything, to disable managed mode
+		interopCfg := &interop.Config{}
+
+		if managedMode {
+			interopCfg = &interop.Config{
+				RPCAddr: "127.0.0.1",
+				// When L2CL starts, store its RPC port here
+				// given by the os, to reclaim when restart.
+				RPCPort:          0,
+				RPCJwtSecretPath: jwtPath,
+			}
+		}
+
 		nodeCfg := &node.Config{
 			L1: &node.L1EndpointConfig{
 				L1NodeAddr:       l1EL.userRPC,
@@ -211,7 +224,8 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 				BeaconAddr: l1CL.beacon.BeaconAddr(),
 			},
 			Driver: driver.Config{
-				SequencerEnabled: isSequencer,
+				SequencerEnabled:   isSequencer,
+				SequencerConfDepth: 2,
 			},
 			Rollup:        *l2Net.rollupCfg,
 			DependencySet: depSet,
@@ -223,13 +237,7 @@ func WithL2CLNode(l2CLID stack.L2CLNodeID, isSequencer bool, l1CLID stack.L1CLNo
 				ListenPort:  0,
 				EnableAdmin: true,
 			},
-			InteropConfig: &interop.Config{
-				RPCAddr: "127.0.0.1",
-				// When L2CL starts, store its RPC port here
-				// given by the os, to reclaim when restart.
-				RPCPort:          0,
-				RPCJwtSecretPath: jwtPath,
-			},
+			InteropConfig:               interopCfg,
 			P2P:                         p2pConfig,
 			L1EpochPollInterval:         time.Second * 2,
 			RuntimeConfigReloadInterval: 0,
@@ -300,7 +308,7 @@ type p2pClientsAndPeers struct {
 	peerInfo2 *apis.PeerInfo
 }
 
-func getP2PClientsAndPeers(ctx context.Context, logger log.Logger, require *require.Assertions, l2CL1, l2CL2 *L2CLNode) *p2pClientsAndPeers {
+func getP2PClientsAndPeers(ctx context.Context, logger log.Logger, require *testreq.Assertions, l2CL1, l2CL2 *L2CLNode) *p2pClientsAndPeers {
 	p2pClient1, err := GetP2PClient(ctx, logger, l2CL1)
 	require.NoError(err)
 	p2pClient2, err := GetP2PClient(ctx, logger, l2CL2)
