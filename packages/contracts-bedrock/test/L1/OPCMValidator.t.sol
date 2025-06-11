@@ -121,11 +121,21 @@ contract OPCMValidator_TestInit is CommonTest {
         if (isForkTest()) {
             l2ChainId = uint256(uint160(address(artifacts.mustGetAddress("L2ChainId"))));
             absolutePrestate = Claim.wrap(bytes32(keccak256("absolutePrestate")));
-            challenger = pdg.challenger();
+            // Replace the challenger address and optimismMintableERC20Factory implementation used at deployment of the
+            // values from the fork network.
+            vm.store(address(opcm.opcmValidator()), bytes32(uint256(2)), bytes32(uint256(uint160(pdg.challenger()))));
+            vm.store(
+                address(opcm.opcmValidator()),
+                bytes32(uint256(8)),
+                bytes32(
+                    uint256(
+                        uint160(proxyAdmin.getProxyImplementation(address(systemConfig.optimismMintableERC20Factory())))
+                    )
+                )
+            );
         } else {
             l2ChainId = deployInput.l2ChainId;
             absolutePrestate = deployInput.disputeAbsolutePrestate;
-            challenger = deployInput.roles.challenger;
         }
 
         // Deploy the BadDisputeGameFactoryReturner once.
