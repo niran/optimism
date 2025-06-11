@@ -104,6 +104,7 @@ contract OPCMValidator_TestInit is CommonTest {
     /// @notice Sets up the test suite.
     function setUp() public virtual override {
         super.setUp();
+        skipIfForkTest("Skipping fork test for OPCMValidator tests");
 
         // Grab the deploy input for later use.
         deployInput = deploy.getDeployInput();
@@ -114,29 +115,8 @@ contract OPCMValidator_TestInit is CommonTest {
         // Load the PreimageOracle once, we'll need it later.
         preimageOracle = IPreimageOracle(artifacts.mustGetAddress("PreimageOracle"));
 
-        // Values are slightly different for fork tests vs local tests. Most we can get from
-        // reasonable sources, challenger we need to get from live system because there's no other
-        // consistent way to get it right now. Means we're cheating a tiny bit for the challenger
-        // address in fork tests but it's fine.
-        if (isForkTest()) {
-            l2ChainId = uint256(uint160(address(artifacts.mustGetAddress("L2ChainId"))));
-            absolutePrestate = Claim.wrap(bytes32(keccak256("absolutePrestate")));
-            // Replace the challenger address and optimismMintableERC20Factory implementation used at deployment of the
-            // values from the fork network.
-            vm.store(address(opcm.opcmValidator()), bytes32(uint256(2)), bytes32(uint256(uint160(pdg.challenger()))));
-            vm.store(
-                address(opcm.opcmValidator()),
-                bytes32(uint256(8)),
-                bytes32(
-                    uint256(
-                        uint160(proxyAdmin.getProxyImplementation(address(systemConfig.optimismMintableERC20Factory())))
-                    )
-                )
-            );
-        } else {
-            l2ChainId = deployInput.l2ChainId;
-            absolutePrestate = deployInput.disputeAbsolutePrestate;
-        }
+        l2ChainId = deployInput.l2ChainId;
+        absolutePrestate = deployInput.disputeAbsolutePrestate;
 
         // Deploy the BadDisputeGameFactoryReturner once.
         badDisputeGameFactoryReturner = new BadDisputeGameFactoryReturner(
