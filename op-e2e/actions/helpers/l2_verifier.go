@@ -27,7 +27,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup/event"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/finality"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/interop"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/managed"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/indexing"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/status"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/sync"
 	"github.com/ethereum-optimism/optimism/op-service/client"
@@ -130,7 +130,7 @@ func NewL2Verifier(t Testing, log log.Logger, l1 derive.L1Fetcher,
 
 	var interopSys interop.SubSystem
 	if cfg.InteropTime != nil {
-		interopSys = managed.NewManagedMode(log, cfg, "127.0.0.1", 0, interopJWTSecret, l1, eng, &opmetrics.NoopRPCMetrics{})
+		interopSys = indexing.NewIndexingMode(log, cfg, "127.0.0.1", 0, interopJWTSecret, l1, eng, &opmetrics.NoopRPCMetrics{})
 		sys.Register("interop", interopSys, opts)
 		require.NoError(t, interopSys.Start(context.Background()))
 		t.Cleanup(func() {
@@ -159,8 +159,8 @@ func NewL2Verifier(t Testing, log log.Logger, l1 derive.L1Fetcher,
 	sys.Register("attributes-handler",
 		attributes.NewAttributesHandler(log, cfg, ctx, eng), opts)
 
-	managedMode := interopSys != nil
-	pipeline := derive.NewDerivationPipeline(log, cfg, depSet, l1, blobsSrc, altDASrc, eng, metrics, managedMode)
+	indexingMode := interopSys != nil
+	pipeline := derive.NewDerivationPipeline(log, cfg, depSet, l1, blobsSrc, altDASrc, eng, metrics, indexingMode)
 	sys.Register("pipeline", derive.NewPipelineDeriver(ctx, pipeline), opts)
 
 	testActionEmitter := sys.Register("test-action", nil, opts)
@@ -179,7 +179,7 @@ func NewL2Verifier(t Testing, log log.Logger, l1 derive.L1Fetcher,
 		L2:             eng,
 		Log:            log,
 		Ctx:            ctx,
-		ManagedMode:    managedMode,
+		IndexingMode:   indexingMode,
 	}, opts)
 
 	sys.Register("engine", engine.NewEngDeriver(log, ctx, cfg, metrics, ec), opts)
@@ -234,8 +234,8 @@ func NewL2Verifier(t Testing, log log.Logger, l1 derive.L1Fetcher,
 
 func (v *L2Verifier) InteropSyncNode(t Testing) syncnode.SyncNode {
 	require.NotNil(t, v.interopSys, "interop sub-system must be running")
-	m, ok := v.interopSys.(*managed.ManagedMode)
-	require.True(t, ok, "Interop sub-system must be in managed-mode if used as sync-node")
+	m, ok := v.interopSys.(*indexing.IndexingMode)
+	require.True(t, ok, "Interop sub-system must be in indexing-mode if used as sync-node")
 	auth := rpc.WithHTTPAuth(gnode.NewJWTAuth(m.JWTSecret()))
 	opts := []client.RPCOption{client.WithGethRPCOptions(auth)}
 	cl, err := client.CheckAndDial(t.Ctx(), v.log, m.WSEndpoint(), auth)

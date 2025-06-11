@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/managed"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/indexing"
 	"github.com/ethereum-optimism/optimism/op-service/rpc"
 	"github.com/ethereum-optimism/optimism/op-supervisor/supervisor/backend/processors"
 

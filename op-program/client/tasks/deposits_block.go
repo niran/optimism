@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/managed"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/interop/indexing"
 	preimage "github.com/ethereum-optimism/optimism/op-preimage"
 	"github.com/ethereum-optimism/optimism/op-program/client/l1"
 	"github.com/ethereum-optimism/optimism/op-program/client/l2"
