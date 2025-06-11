@@ -22,7 +22,6 @@ import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
-import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
@@ -33,7 +32,7 @@ import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 /// It is a stateless contract that can be used to ensure that the L1 contracts are configured correctly.
 /// It is intended to be used by the L1 PAO multisig to validate the configuration of the L1 contracts
 /// before and after an upgrade.
-contract OPCMValidator is ISemver {
+contract OPCMValidator {
     /// @notice The semantic version of the OPCMValidator contract.
     /// @custom:semver 1.2.0
     string public constant version = "1.2.0";
@@ -270,8 +269,7 @@ contract OPCMValidator is ISemver {
         virtual
         returns (string memory)
     {
-        ISemver _semver = ISemver(address(_sysCfg));
-        _errors = internalRequire(LibString.eq(_semver.version(), systemConfigVersion()), "SYSCON-10", _errors);
+        _errors = internalRequire(LibString.eq(_sysCfg.version(), systemConfigVersion()), "SYSCON-10", _errors);
         _errors = internalRequire(_sysCfg.gasLimit() <= uint64(500_000_000), "SYSCON-20", _errors);
         _errors = internalRequire(_sysCfg.scalar() != 0, "SYSCON-30", _errors);
         _errors =
@@ -678,9 +676,8 @@ contract OPCMValidator is ISemver {
     {
         _errorPrefix = string.concat(_errorPrefix, "-VM");
         _errors = internalRequire(address(_mips) == mipsImpl, string.concat(_errorPrefix, "-10"), _errors);
-        _errors = internalRequire(
-            LibString.eq(ISemver(_mips).version(), mipsVersion()), string.concat(_errorPrefix, "-20"), _errors
-        );
+        _errors =
+            internalRequire(LibString.eq(_mips.version(), mipsVersion()), string.concat(_errorPrefix, "-20"), _errors);
         _errors = internalRequire(_mips.stateVersion() == 7, string.concat(_errorPrefix, "-30"), _errors);
         return _errors;
     }
