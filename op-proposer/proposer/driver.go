@@ -501,3 +501,34 @@ func (l *L2OutputSubmitter) proposeOutput(ctx context.Context, output source.Pro
 		l.Metr.RecordL2BlocksProposed(output.Legacy.BlockRef)
 	}
 }
+
+// ProposeOutput fetches and submits the output for the specified block number.
+// If no block number is provided, the latest synced block is proposed.
+func (l *L2OutputSubmitter) ProposeOutput(ctx context.Context, block *uint64) error {
+	var blockNum uint64
+	if block == nil {
+		num, err := l.FetchCurrentBlockNumber(ctx)
+		if err != nil {
+			return err
+		}
+		blockNum = num
+	} else {
+		blockNum = *block
+	}
+
+	output, err := l.FetchOutput(ctx, blockNum)
+	if err != nil {
+		return err
+	}
+
+	cCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	if err := l.sendTransaction(cCtx, output); err != nil {
+		return err
+	}
+	l.Metr.RecordL2Proposal(output.SequenceNum)
+	if output.Legacy.BlockRef != (eth.L2BlockRef{}) {
+		l.Metr.RecordL2BlocksProposed(output.Legacy.BlockRef)
+	}
+	return nil
+}
