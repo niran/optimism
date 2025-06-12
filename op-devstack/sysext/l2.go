@@ -116,7 +116,7 @@ func (o *Orchestrator) hydrateConductors(node *descriptors.Node, l2Net stack.Ext
 		return
 	}
 
-	endpoint, _, err := o.findProtocolService(conductorService, HTTPProtocol)
+	endpoint, _, err := o.findProtocolService(conductorService, RPCProtocol)
 	require.NoError(err, "failed to find RPC service for conductor")
 
 	conductorClient, err := rpc.DialContext(l2Net.T().Ctx(), endpoint)
