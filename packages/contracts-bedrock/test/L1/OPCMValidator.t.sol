@@ -123,42 +123,35 @@ contract OPCMValidator_TestInit is CommonTest {
             opcm.opcmValidator(), disputeGameFactory, IDisputeGameFactory(address(0xbad))
         );
 
-        // If this is not a fork test then we will also need to add the permissionless game to the
-        // DisputeGameFactory. Local tests don't create this game by default.
-        if (isForkTest()) {
-            // Load the FaultDisputeGame once, we'll need it later.
-            fdg = IFaultDisputeGame(artifacts.mustGetAddress("FaultDisputeGame"));
-        } else {
-            // Deploy the FaultDisputeGame.
-            fdg = IFaultDisputeGame(
-                DeployUtils.create1({
-                    _name: "FaultDisputeGame",
-                    _args: DeployUtils.encodeConstructor(
-                        abi.encodeCall(
-                            IFaultDisputeGame.__constructor__,
-                            (
-                                IFaultDisputeGame.GameConstructorParams({
-                                    gameType: GameTypes.CANNON,
-                                    absolutePrestate: absolutePrestate,
-                                    maxGameDepth: 73,
-                                    splitDepth: 30,
-                                    clockExtension: Duration.wrap(10800),
-                                    maxClockDuration: Duration.wrap(302400),
-                                    vm: mips,
-                                    weth: delayedWeth,
-                                    anchorStateRegistry: anchorStateRegistry,
-                                    l2ChainId: l2ChainId
-                                })
-                            )
+        // Deploy the FaultDisputeGame.
+        fdg = IFaultDisputeGame(
+            DeployUtils.create1({
+                _name: "FaultDisputeGame",
+                _args: DeployUtils.encodeConstructor(
+                    abi.encodeCall(
+                        IFaultDisputeGame.__constructor__,
+                        (
+                            IFaultDisputeGame.GameConstructorParams({
+                                gameType: GameTypes.CANNON,
+                                absolutePrestate: absolutePrestate,
+                                maxGameDepth: 73,
+                                splitDepth: 30,
+                                clockExtension: Duration.wrap(10800),
+                                maxClockDuration: Duration.wrap(302400),
+                                vm: mips,
+                                weth: delayedWeth,
+                                anchorStateRegistry: anchorStateRegistry,
+                                l2ChainId: l2ChainId
+                            })
                         )
                     )
-                })
-            );
+                )
+            })
+        );
 
-            // Add the FaultDisputeGame to the DisputeGameFactory.
-            vm.prank(disputeGameFactory.owner());
-            disputeGameFactory.setImplementation(GameTypes.CANNON, IDisputeGame(address(fdg)));
-        }
+        // Add the FaultDisputeGame to the DisputeGameFactory.
+        vm.prank(disputeGameFactory.owner());
+        disputeGameFactory.setImplementation(GameTypes.CANNON, IDisputeGame(address(fdg)));
     }
 
     /// @notice Runs the OPCMValidator.validate function.
