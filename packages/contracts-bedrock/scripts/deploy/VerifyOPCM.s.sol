@@ -621,7 +621,7 @@ contract VerifyOPCM is Script {
             string.concat(
                 "forge inspect ",
                 _contractName,
-                " abi --json | jq -r '.[] | select(.type == \"constructor\") | .inputs | map(.type) | join(\",\")'"
+                " abi --json | jq -r '.[] | select(.type == \"constructor\") | .inputs | map(if .type == \"tuple\" then \"(\" + (.components | map(.type) | join(\",\")) + \")\" else .type end) | join(\",\")'"
             )
         );
 
@@ -636,7 +636,7 @@ contract VerifyOPCM is Script {
                     types,
                     ")\" ",
                     vm.toString(_constructorArgs),
-                    " --json | jq -r 'map(.) | join(\" \")')"
+                    " --json | jq -r 'map(if type == \"string\" and startswith(\"(\") then gsub(\", \"; \",\") else . end) | join(\" \")')"
                 )
             )
         );

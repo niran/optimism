@@ -34,10 +34,10 @@ import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 /// It is a stateless contract that can be used to ensure that the L1 contracts are configured correctly.
 /// It is intended to be used by the L1 PAO multisig to validate the configuration of the L1 contracts
 /// before and after an upgrade.
-contract OPCMValidator {
+contract OPCMValidator is ISemver {
     /// @notice The semantic version of the OPCMValidator contract.
-    /// @custom:semver 1.2.0
-    string public constant version = "1.2.0";
+    /// @custom:semver 1.3.0
+    string public constant version = "1.3.0";
 
     /// @notice The SuperchainConfig contract.
     ISuperchainConfig public superchainConfig;
@@ -201,7 +201,7 @@ contract OPCMValidator {
 
     /// @notice Returns the expected MIPS version.
     function mipsVersion() public pure returns (string memory) {
-        return "1.5.0";
+        return "1.7.0";
     }
 
     /// @notice Returns the expected OptimismMintableERC20Factory version.
