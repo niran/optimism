@@ -130,6 +130,7 @@ func WithDevkeySuperRoles(t require.TestingT, dk devkeys.Keys, l1ID eth.ChainID,
 	configurator.WithGuardian(addrFor(devkeys.SuperchainConfigGuardianKey))
 	configurator.WithProtocolVersionsOwner(addrFor(devkeys.SuperchainDeployerKey))
 	configurator.WithProxyAdminOwner(addrFor(devkeys.L1ProxyAdminOwnerRole))
+	configurator.WithChallenger(addrFor(devkeys.ChallengerRole))
 }
 
 func WithOverrideGuardianToL1PAO(t require.TestingT, dk devkeys.Keys, l1ID eth.ChainID, configurator SuperchainConfigurator) {
