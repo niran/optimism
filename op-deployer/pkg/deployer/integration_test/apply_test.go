@@ -689,6 +689,7 @@ func newIntent(
 			SuperchainProxyAdminOwner: addrFor(t, dk, devkeys.L1ProxyAdminOwnerRole.Key(l1ChainID)),
 			ProtocolVersionsOwner:     addrFor(t, dk, devkeys.SuperchainDeployerKey.Key(l1ChainID)),
 			SuperchainGuardian:        addrFor(t, dk, devkeys.SuperchainConfigGuardianKey.Key(l1ChainID)),
+			Challenger:                addrFor(t, dk, devkeys.ChallengerRole.Key(l1ChainID)),
 		},
 		FundDevAccounts:    false,
 		L1ContractsLocator: l1Loc,

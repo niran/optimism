@@ -38,6 +38,7 @@ type SuperchainConfigurator interface {
 	WithProxyAdminOwner(address common.Address) SuperchainConfigurator
 	WithGuardian(address common.Address) SuperchainConfigurator
 	WithProtocolVersionsOwner(address common.Address) SuperchainConfigurator
+	WithChallenger(address common.Address) SuperchainConfigurator
 }
 
 type L2Configurator interface {
@@ -250,6 +251,11 @@ func (c *superchainConfigurator) WithGuardian(address common.Address) Superchain
 
 func (c *superchainConfigurator) WithProtocolVersionsOwner(address common.Address) SuperchainConfigurator {
 	c.builder.intent.SuperchainRoles.ProtocolVersionsOwner = address
+	return c
+}
+
+func (c *superchainConfigurator) WithChallenger(address common.Address) SuperchainConfigurator {
+	c.builder.intent.SuperchainRoles.Challenger = address
 	return c
 }
 
