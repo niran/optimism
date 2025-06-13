@@ -326,7 +326,7 @@ func TestInteropLocalSafeInvalidation(gt *testing.T) {
 	replacementBlock, err := actors.ChainB.SequencerEngine.EthClient().BlockByHash(t.Ctx(), status.SafeL2.Hash)
 	require.NoError(t, err)
 	txs := replacementBlock.Transactions()
-	out, err := managed.DecodeInvalidatedBlockTx(txs[len(txs)-1])
+       out, err := indexing.DecodeInvalidatedBlockTx(txs[len(txs)-1])
 	require.NoError(t, err)
 	require.Equal(t, originalOutput.OutputRoot, eth.OutputRoot(out))
 
