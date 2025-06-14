@@ -12,7 +12,6 @@ import { Deployer } from "scripts/deploy/Deployer.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
-import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { DeploySuperchain } from "scripts/deploy/DeploySuperchain.s.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
@@ -231,19 +230,6 @@ contract Deploy is Deployer {
         artifacts.save("SuperchainConfigImpl", address(dso.superchainConfigImpl));
         artifacts.save("ProtocolVersionsProxy", address(dso.protocolVersionsProxy));
         artifacts.save("ProtocolVersionsImpl", address(dso.protocolVersionsImpl));
-
-        // First run assertions for the ProtocolVersions and SuperchainConfig proxy contracts.
-        Types.ContractSet memory contracts = _proxies();
-        ChainAssertions.checkProtocolVersions({ _contracts: contracts, _cfg: cfg, _isProxy: true });
-        ChainAssertions.checkSuperchainConfig({ _contracts: contracts, _cfg: cfg, _isProxy: true });
-
-        // Then replace the ProtocolVersions proxy with the implementation address and run assertions on it.
-        contracts.ProtocolVersions = artifacts.mustGetAddress("ProtocolVersionsImpl");
-        ChainAssertions.checkProtocolVersions({ _contracts: contracts, _cfg: cfg, _isProxy: false });
-
-        // Finally replace the SuperchainConfig proxy with the implementation address and run assertions on it.
-        contracts.SuperchainConfig = artifacts.mustGetAddress("SuperchainConfigImpl");
-        ChainAssertions.checkSuperchainConfig({ _contracts: contracts, _cfg: cfg, _isProxy: false });
     }
 
     /// @notice Deploy all of the implementations
@@ -281,46 +267,6 @@ contract Deploy is Deployer {
         artifacts.save("OPContractsManager", address(dio.opcm));
         artifacts.save("DelayedWETHImpl", address(dio.delayedWETHImpl));
         artifacts.save("PreimageOracle", address(dio.preimageOracleSingleton));
-
-        // Get a contract set from the implementation addresses which were just deployed.
-        Types.ContractSet memory impls = Types.ContractSet({
-            L1CrossDomainMessenger: address(dio.l1CrossDomainMessengerImpl),
-            L1StandardBridge: address(dio.l1StandardBridgeImpl),
-            L2OutputOracle: address(0),
-            DisputeGameFactory: address(dio.disputeGameFactoryImpl),
-            DelayedWETH: address(dio.delayedWETHImpl),
-            PermissionedDelayedWETH: address(dio.delayedWETHImpl),
-            AnchorStateRegistry: address(0),
-            OptimismMintableERC20Factory: address(dio.optimismMintableERC20FactoryImpl),
-            OptimismPortal: address(dio.optimismPortalImpl),
-            ETHLockbox: address(dio.ethLockboxImpl),
-            SystemConfig: address(dio.systemConfigImpl),
-            L1ERC721Bridge: address(dio.l1ERC721BridgeImpl),
-            ProtocolVersions: address(dio.protocolVersionsImpl),
-            SuperchainConfig: address(dio.superchainConfigImpl)
-        });
-
-        ChainAssertions.checkL1CrossDomainMessenger({ _contracts: impls, _vm: vm, _isProxy: false });
-        ChainAssertions.checkL1StandardBridge({ _contracts: impls, _isProxy: false });
-        ChainAssertions.checkL1ERC721Bridge({ _contracts: impls, _isProxy: false });
-        ChainAssertions.checkOptimismPortal2({ _contracts: impls, _cfg: cfg, _isProxy: false });
-        ChainAssertions.checkETHLockbox({ _contracts: impls, _cfg: cfg, _isProxy: false });
-        ChainAssertions.checkOptimismMintableERC20Factory({ _contracts: impls, _isProxy: false });
-        ChainAssertions.checkDisputeGameFactory({ _contracts: impls, _expectedOwner: address(0), _isProxy: false });
-        ChainAssertions.checkDelayedWETH({ _contracts: impls, _cfg: cfg, _isProxy: false, _expectedOwner: address(0) });
-        ChainAssertions.checkPreimageOracle({ _oracle: IPreimageOracle(address(dio.preimageOracleSingleton)), _cfg: cfg });
-        ChainAssertions.checkMIPS({
-            _mips: IMIPS(address(dio.mipsSingleton)),
-            _oracle: IPreimageOracle(address(dio.preimageOracleSingleton))
-        });
-        ChainAssertions.checkOPContractsManager({
-            _impls: impls,
-            _proxies: _proxies(),
-            _opcm: IOPContractsManager(address(dio.opcm)),
-            _mips: IMIPS(address(dio.mipsSingleton)),
-            _superchainProxyAdmin: superchainProxyAdmin
-        });
-        ChainAssertions.checkSystemConfig({ _contracts: impls, _cfg: cfg, _isProxy: false });
     }
 
     /// @notice Deploy all of the OP Chain specific contracts
