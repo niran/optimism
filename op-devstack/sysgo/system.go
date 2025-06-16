@@ -234,6 +234,8 @@ func DefaultInteropSystem(dest *DefaultInteropSystemIDs) stack.Option[*Orchestra
 
 	opt.Add(WithFaucets([]stack.L1ELNodeID{ids.L1EL}, []stack.L2ELNodeID{ids.L2AEL, ids.L2BEL}))
 
+	opt.Add(WithInteropMonitor(ids.L2AEL, ids.L2BEL))
+
 	// Upon evaluation of the option, export the contents we created.
 	// Ids here are static, but other things may be exported too.
 	opt.Add(stack.Finally(func(orch *Orchestrator) {

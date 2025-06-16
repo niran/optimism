@@ -48,6 +48,8 @@ type Orchestrator struct {
 
 	faucet *FaucetService
 
+	interopMon *InteropMonitorService
+
 	controlPlane *ControlPlane
 
 	// sysHook is called after hydration of a new test-scope system frontend,
@@ -115,6 +117,7 @@ func (o *Orchestrator) Hydrate(sys stack.ExtensibleSystem) {
 	o.challengers.Range(rangeHydrateFn[stack.L2ChallengerID, *L2Challenger](sys))
 	o.proposers.Range(rangeHydrateFn[stack.L2ProposerID, *L2Proposer](sys))
 	o.faucet.hydrate(sys)
+	o.interopMon.hydrate(sys)
 	o.sysHook.PostHydrate(sys)
 }
 

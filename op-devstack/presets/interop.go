@@ -96,6 +96,8 @@ type SimpleInterop struct {
 
 	FaucetB *dsl.Faucet
 	FunderB *dsl.Funder
+
+	InteropMon stack.InteropMonitor
 }
 
 func (s *SimpleInterop) L2Networks() []*dsl.L2Network {
