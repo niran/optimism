@@ -54,7 +54,8 @@ type RPCFinder struct {
 	next          uint64
 	seenBlocks    *buffer.Ring[eth.BlockInfo]
 	toJobs        JobFilter
-	newCallback   NewCallback
+
+	newJobs chan *Job
 
 	closed chan struct{}
 }
@@ -62,7 +63,7 @@ type RPCFinder struct {
 func NewFinder(chainID eth.ChainID,
 	client FinderClient,
 	toCases JobFilter,
-	newCallback NewCallback,
+	newJobs chan *Job,
 	finalityCallback FinalityCallback,
 	bufferSize int,
 	log log.Logger) *RPCFinder {
@@ -73,7 +74,7 @@ func NewFinder(chainID eth.ChainID,
 		fetchInterval:        1 * time.Second,
 		seenBlocks:           buffer.NewRing[eth.BlockInfo](1000),
 		toJobs:               toCases,
-		newCallback:          newCallback,
+		newJobs:              newJobs,
 		finalityPollInterval: 10 * time.Second,
 		finalityCallback:     finalityCallback,
 		closed:               make(chan struct{}),
@@ -170,7 +171,7 @@ func (t *RPCFinder) processBlock(blockInfo eth.BlockInfo, receipts types.Receipt
 	for _, job := range jobs {
 		job.firstSeen = firstSeen
 		job.UpdateStatus(jobStatusUnknown)
-		t.newCallback(job)
+		t.newJobs <- job
 	}
 	t.log.Debug("block processed", "block", blockInfo.NumberU64(), "jobs", len(jobs))
 	t.seenBlocks.Add(blockInfo)

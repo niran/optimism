@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
+	"github.com/ethereum-optimism/optimism/op-service/testutils"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -60,16 +61,14 @@ func mockReceiptsToCases(receipts []*types.Receipt) []*Job {
 	return nil
 }
 
-func mockCallback(job *Job) {
-}
-
 func mockFinalizedCallback(chainID eth.ChainID, block eth.BlockInfo) {
 }
 
 func TestRPCFinder_StartStop(t *testing.T) {
 	client := &mockClient{}
 	logger := testlog.Logger(t, slog.LevelDebug)
-	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, mockCallback, mockFinalizedCallback, 1000, logger)
+	newJobsChan := make(chan *Job)
+	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, mockFinalizedCallback, 1000, logger)
 
 	require.NoError(t, finder.Start(context.Background()))
 	require.NoError(t, finder.Stop())
@@ -93,13 +92,10 @@ func TestRPCFinder_processBlock(t *testing.T) {
 		}
 	}
 
-	callbackInvocations := 0
-	callback := func(job *Job) {
-		require.Equal(t, job.LatestStatus(), jobStatusUnknown)
-		callbackInvocations++
-	}
+	cr, newJobsChan := testutils.LaunchNewChannelReader[*Job]()
+	defer close(newJobsChan)
 
-	finder := NewFinder(eth.ChainIDFromUInt64(1), client, fakeReceiptsToCases, callback, mockFinalizedCallback, 1000, logger)
+	finder := NewFinder(eth.ChainIDFromUInt64(1), client, fakeReceiptsToCases, newJobsChan, mockFinalizedCallback, 1000, logger)
 
 	receipts := []*types.Receipt{
 		{
@@ -114,7 +110,7 @@ func TestRPCFinder_processBlock(t *testing.T) {
 	})
 	err := finder.processBlock(i, receipts)
 	require.NoError(t, err)
-	require.Equal(t, 1, callbackInvocations)
+	cr.RequireValuesRead(t, 1)
 
 	// Add a contiguous block
 	j := eth.HeaderBlockInfo(&types.Header{
@@ -123,7 +119,7 @@ func TestRPCFinder_processBlock(t *testing.T) {
 	})
 	err = finder.processBlock(j, receipts)
 	require.NoError(t, err)
-	require.Equal(t, 2, callbackInvocations)
+	cr.RequireValuesRead(t, 2)
 
 	// Add a non-contiguous block
 	k := eth.HeaderBlockInfo(&types.Header{
@@ -132,7 +128,7 @@ func TestRPCFinder_processBlock(t *testing.T) {
 	})
 	err = finder.processBlock(k, receipts)
 	require.ErrorIs(t, err, ErrBlockNotContiguous)
-	require.Equal(t, 2, callbackInvocations)
+	cr.RequireValuesRead(t, 2)
 }
 
 func TestRPCFinder_walkback(t *testing.T) {
@@ -168,8 +164,10 @@ func TestRPCFinder_walkback(t *testing.T) {
 	}
 
 	logger := testlog.Logger(t, slog.LevelDebug)
+	_, newJobsChan := testutils.LaunchNewChannelReader[*Job]()
+	defer close(newJobsChan)
 
-	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, mockCallback, mockFinalizedCallback, 1000, logger)
+	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, mockFinalizedCallback, 1000, logger)
 
 	finder.seenBlocks.Add(a0)
 	finder.seenBlocks.Add(a1)
@@ -206,7 +204,10 @@ func TestRPCFinder_finality(t *testing.T) {
 		require.Equal(t, uint64(99), block.NumberU64())
 	}
 	logger := testlog.Logger(t, slog.LevelDebug)
-	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, mockCallback, testFinalizedCallback, 1000, logger)
+	_, newJobsChan := testutils.LaunchNewChannelReader[*Job]()
+	defer close(newJobsChan)
+
+	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, testFinalizedCallback, 1000, logger)
 
 	finder.checkFinality(context.Background())
 }

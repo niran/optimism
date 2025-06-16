@@ -38,6 +38,9 @@ type InteropMonitorService struct {
 	collector *MetricCollector
 	expiry    *locks.RWMap[eth.ChainID, eth.NumberAndHash]
 
+	newJobs chan *Job
+	closed  chan struct{}
+
 	Version string
 
 	pprofService *oppprof.Service
@@ -103,6 +106,10 @@ func (ms *InteropMonitorService) initFromCLIConfig(ctx context.Context, version 
 		fmt.Println("initialized from cli config")
 		return nil
 	}
+
+	// Start the routing service
+	go ms.RouteNewJobs()
+
 	return nil
 }
 
@@ -149,18 +156,25 @@ func (ms *InteropMonitorService) initUpdaters(clients map[eth.ChainID]*sources.E
 // initFinders initializes the finders for the given clients
 func (ms *InteropMonitorService) initFinders(clients map[eth.ChainID]*sources.EthClient) error {
 	for chainID, ethClient := range clients {
-		finder := NewFinder(chainID, ethClient, BlockReceiptsToJobs, ms.RouteNewJob, ms.SetExpiry, 1000, ms.Log)
+		finder := NewFinder(chainID, ethClient, BlockReceiptsToJobs, ms.newJobs, ms.SetExpiry, 1000, ms.Log)
 		ms.finders[chainID] = finder
 	}
 	return nil
 }
 
 // RouteNewJob routes a new job to the appropriate updater by simply enqueuing to the initiating chain's updater
-func (ms *InteropMonitorService) RouteNewJob(job *Job) {
-	if updater, ok := ms.updaters[job.initiating.ChainID]; ok {
-		updater.Enqueue(job)
-	} else {
-		ms.Log.Error("no updater found for chain ID", "chain_id", job.initiating.ChainID)
+func (ms *InteropMonitorService) RouteNewJobs() {
+	for {
+		select {
+		case <-ms.closed:
+			return
+		case job := <-ms.newJobs:
+			if updater, ok := ms.updaters[job.initiating.ChainID]; ok {
+				updater.Enqueue(job)
+			} else {
+				ms.Log.Error("no updater found for chain ID", "chain_id", job.initiating.ChainID)
+			}
+		}
 	}
 }
 
@@ -274,6 +288,9 @@ func (ms *InteropMonitorService) Stop(ctx context.Context) error {
 			result = errors.Join(result, fmt.Errorf("failed to stop finder: %w", err))
 		}
 	}
+
+	ms.Log.Info("stopping new jobs router")
+	close(ms.closed)
 
 	ms.Log.Info("stopping updaters")
 	for _, updater := range ms.updaters {
