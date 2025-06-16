@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/httputil"
-	"github.com/ethereum-optimism/optimism/op-service/locks"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/oppprof"
 	oprpc "github.com/ethereum-optimism/optimism/op-service/rpc"
@@ -36,10 +35,11 @@ type InteropMonitorService struct {
 	finders   map[eth.ChainID]Finder
 	updaters  map[eth.ChainID]Updater
 	collector *MetricCollector
-	expiry    *locks.RWMap[eth.ChainID, eth.NumberAndHash]
 
-	newJobs chan *Job
-	closed  chan struct{}
+	newJobs             chan *Job
+	finalizationInbox   chan FinalityNotice
+	finalizationNotices chan FinalityNotice
+	closed              chan struct{}
 
 	Version string
 
@@ -65,9 +65,6 @@ func (ms *InteropMonitorService) initFromCLIConfig(ctx context.Context, version 
 	ms.initMetrics(cfg)
 
 	ms.PollInterval = cfg.PollInterval
-
-	// Initialize the expiry map
-	ms.expiry = locks.RWMapFromMap(make(map[eth.ChainID]eth.NumberAndHash))
 
 	// Initialize all clients
 	clients, err := ms.initClients(ctx, cfg.L2Rpcs)
@@ -147,7 +144,7 @@ func (ms *InteropMonitorService) dial(ctx context.Context, l2Rpc string) (*sourc
 // initUpdaters initializes the updaters for the given clients
 func (ms *InteropMonitorService) initUpdaters(clients map[eth.ChainID]*sources.EthClient) error {
 	for chainID, ethClient := range clients {
-		updater := NewUpdater(chainID, ethClient, ms.expiry, ms.Log)
+		updater := NewUpdater(chainID, ethClient, ms.finalizationNotices, ms.Log)
 		ms.updaters[chainID] = updater
 	}
 	return nil
@@ -156,7 +153,7 @@ func (ms *InteropMonitorService) initUpdaters(clients map[eth.ChainID]*sources.E
 // initFinders initializes the finders for the given clients
 func (ms *InteropMonitorService) initFinders(clients map[eth.ChainID]*sources.EthClient) error {
 	for chainID, ethClient := range clients {
-		finder := NewFinder(chainID, ethClient, BlockReceiptsToJobs, ms.newJobs, ms.SetExpiry, 1000, ms.Log)
+		finder := NewFinder(chainID, ethClient, BlockReceiptsToJobs, ms.newJobs, ms.finalizationInbox, 1000, ms.Log)
 		ms.finders[chainID] = finder
 	}
 	return nil
@@ -174,13 +171,14 @@ func (ms *InteropMonitorService) RouteNewJobs() {
 			} else {
 				ms.Log.Error("no updater found for chain ID", "chain_id", job.initiating.ChainID)
 			}
+		case finalized := <-ms.finalizationInbox:
+			if updater, ok := ms.updaters[finalized.ChainID]; ok {
+				updater.Notify(finalized)
+			} else {
+				ms.Log.Error("no updater found for chain ID", "chain_id", finalized.ChainID)
+			}
 		}
 	}
-}
-
-// SetExpiry sets the expiry for a chain ID
-func (ms *InteropMonitorService) SetExpiry(chainID eth.ChainID, expiry eth.BlockInfo) {
-	ms.expiry.Set(chainID, expiry)
 }
 
 func (ms *InteropMonitorService) initMetrics(cfg *CLIConfig) {

@@ -69,12 +69,14 @@ type Job struct {
 	terminalAt    time.Time
 	didMetrics    atomic.Bool
 
-	executingAddress common.Address
-	executingChain   eth.ChainID
-	executingBlock   eth.BlockID
-	executingPayload common.Hash
+	executingAddress   common.Address
+	executingChain     eth.ChainID
+	executingBlock     eth.BlockID
+	executingPayload   common.Hash
+	executingFinalized bool
 
-	initiating *supervisortypes.Identifier
+	initiating          *supervisortypes.Identifier
+	initiatingFinalized bool
 
 	// track each status seen over time
 	status []jobStatus

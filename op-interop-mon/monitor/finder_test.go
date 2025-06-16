@@ -61,14 +61,12 @@ func mockReceiptsToCases(receipts []*types.Receipt) []*Job {
 	return nil
 }
 
-func mockFinalizedCallback(chainID eth.ChainID, block eth.BlockInfo) {
-}
-
 func TestRPCFinder_StartStop(t *testing.T) {
 	client := &mockClient{}
 	logger := testlog.Logger(t, slog.LevelDebug)
 	newJobsChan := make(chan *Job)
-	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, mockFinalizedCallback, 1000, logger)
+	finalizationNotices := make(chan FinalityNotice)
+	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, finalizationNotices, 1000, logger)
 
 	require.NoError(t, finder.Start(context.Background()))
 	require.NoError(t, finder.Stop())
@@ -94,8 +92,10 @@ func TestRPCFinder_processBlock(t *testing.T) {
 
 	cr, newJobsChan := testutils.LaunchNewChannelReader[*Job]()
 	defer close(newJobsChan)
+	_, finalizationNotices := testutils.LaunchNewChannelReader[FinalityNotice]()
+	defer close(finalizationNotices)
 
-	finder := NewFinder(eth.ChainIDFromUInt64(1), client, fakeReceiptsToCases, newJobsChan, mockFinalizedCallback, 1000, logger)
+	finder := NewFinder(eth.ChainIDFromUInt64(1), client, fakeReceiptsToCases, newJobsChan, finalizationNotices, 1000, logger)
 
 	receipts := []*types.Receipt{
 		{
@@ -166,8 +166,10 @@ func TestRPCFinder_walkback(t *testing.T) {
 	logger := testlog.Logger(t, slog.LevelDebug)
 	_, newJobsChan := testutils.LaunchNewChannelReader[*Job]()
 	defer close(newJobsChan)
+	_, finalizationNotices := testutils.LaunchNewChannelReader[FinalityNotice]()
+	defer close(finalizationNotices)
 
-	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, mockFinalizedCallback, 1000, logger)
+	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, finalizationNotices, 1000, logger)
 
 	finder.seenBlocks.Add(a0)
 	finder.seenBlocks.Add(a1)
@@ -198,16 +200,13 @@ func TestRPCFinder_finality(t *testing.T) {
 		return nil, ethereum.NotFound
 	}
 
-	// confirm the callback is called with the correct chain and block
-	testFinalizedCallback := func(chainID eth.ChainID, block eth.BlockInfo) {
-		require.Equal(t, eth.ChainIDFromUInt64(1), chainID)
-		require.Equal(t, uint64(99), block.NumberU64())
-	}
 	logger := testlog.Logger(t, slog.LevelDebug)
 	_, newJobsChan := testutils.LaunchNewChannelReader[*Job]()
 	defer close(newJobsChan)
+	finalityReader, finalizationNotices := testutils.LaunchNewChannelReader[FinalityNotice]()
+	defer close(finalizationNotices)
 
-	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, testFinalizedCallback, 1000, logger)
-
+	finder := NewFinder(eth.ChainIDFromUInt64(1), client, mockReceiptsToCases, newJobsChan, finalizationNotices, 1000, logger)
+	finalityReader.RequireValuesRead(t, 1)
 	finder.checkFinality(context.Background())
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-service/locks"
 	supervisortypes "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -34,8 +33,8 @@ func (m mockNumberAndHash) Hash() common.Hash {
 func setupTestUpdater(t *testing.T) (*RPCUpdater, *mockClient) {
 	logger := log.New()
 	client := &mockClient{}
-	expiry := locks.RWMapFromMap(map[eth.ChainID]eth.NumberAndHash{})
-	updater := NewUpdater(eth.ChainIDFromUInt64(1), client, expiry, logger)
+	finalizationNotices := make(chan FinalityNotice)
+	updater := NewUpdater(eth.ChainIDFromUInt64(1), client, finalizationNotices, logger)
 	return updater, client
 }
 
@@ -45,8 +44,8 @@ func TestUpdaterJobExpiration(t *testing.T) {
 		name           string
 		initiatingInfo *supervisortypes.Identifier
 		executingInfo  eth.BlockID
-		initExpiry     eth.NumberAndHash
-		execExpiry     eth.NumberAndHash
+		initFinalized  bool
+		execFinalized  bool
 		lastEvaluated  time.Time
 		didMetrics     bool
 		shouldExpire   bool
@@ -60,8 +59,8 @@ func TestUpdaterJobExpiration(t *testing.T) {
 			executingInfo: eth.BlockID{
 				Number: 200,
 			},
-			initExpiry:    mockNumberAndHash{number: 150}, // initiating block is finalized
-			execExpiry:    mockNumberAndHash{number: 250}, // executing block is finalized
+			initFinalized: true,
+			execFinalized: true,
 			lastEvaluated: time.Now().Add(-time.Hour),
 			didMetrics:    true,
 			shouldExpire:  true,
@@ -75,8 +74,8 @@ func TestUpdaterJobExpiration(t *testing.T) {
 			executingInfo: eth.BlockID{
 				Number: 200,
 			},
-			initExpiry:    mockNumberAndHash{number: 50},  // initiating block not finalized
-			execExpiry:    mockNumberAndHash{number: 250}, // executing block is finalized
+			initFinalized: false,
+			execFinalized: true,
 			lastEvaluated: time.Now().Add(-time.Hour),
 			didMetrics:    true,
 			shouldExpire:  false,
@@ -90,8 +89,8 @@ func TestUpdaterJobExpiration(t *testing.T) {
 			executingInfo: eth.BlockID{
 				Number: 200,
 			},
-			initExpiry:    mockNumberAndHash{number: 150}, // initiating block is finalized
-			execExpiry:    mockNumberAndHash{number: 150}, // executing block not finalized
+			initFinalized: true,
+			execFinalized: false,
 			lastEvaluated: time.Now().Add(-time.Hour),
 			didMetrics:    true,
 			shouldExpire:  false,
@@ -105,8 +104,8 @@ func TestUpdaterJobExpiration(t *testing.T) {
 			executingInfo: eth.BlockID{
 				Number: 200,
 			},
-			initExpiry:    mockNumberAndHash{number: 150},
-			execExpiry:    mockNumberAndHash{number: 250},
+			initFinalized: false,
+			execFinalized: false,
 			lastEvaluated: time.Time{}, // never evaluated
 			didMetrics:    true,
 			shouldExpire:  false,
@@ -120,8 +119,8 @@ func TestUpdaterJobExpiration(t *testing.T) {
 			executingInfo: eth.BlockID{
 				Number: 200,
 			},
-			initExpiry:    mockNumberAndHash{number: 150},
-			execExpiry:    mockNumberAndHash{number: 250},
+			initFinalized: false,
+			execFinalized: false,
 			lastEvaluated: time.Now().Add(-time.Hour),
 			didMetrics:    false,
 			shouldExpire:  false,
@@ -149,10 +148,6 @@ func TestUpdaterJobExpiration(t *testing.T) {
 			if tt.didMetrics {
 				job.SetDidMetrics()
 			}
-
-			// Set expiry blocks
-			updater.expiry.Set(tt.initiatingInfo.ChainID, tt.initExpiry)
-			updater.expiry.Set(job.executingChain, tt.execExpiry)
 
 			// Check if job should expire
 			shouldExpire := updater.ShouldExpire(job)

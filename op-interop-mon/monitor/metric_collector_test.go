@@ -62,6 +62,10 @@ func (m *mockUpdater) Stop() error {
 	return nil
 }
 
+func (m *mockUpdater) Notify(finalization FinalityNotice) {
+
+}
+
 // mockMetrics implements the metrics.Metricer interface with configurable function implementations
 // by default, it records the calls to the metrics functions
 type mockMetrics struct {

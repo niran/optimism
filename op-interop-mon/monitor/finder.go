@@ -48,7 +48,7 @@ type RPCFinder struct {
 	log     log.Logger
 
 	finalityPollInterval time.Duration
-	finalityCallback     FinalityCallback
+	finalizationNotices  chan FinalityNotice
 
 	fetchInterval time.Duration
 	next          uint64
@@ -64,7 +64,7 @@ func NewFinder(chainID eth.ChainID,
 	client FinderClient,
 	toCases JobFilter,
 	newJobs chan *Job,
-	finalityCallback FinalityCallback,
+	finalizationNotices chan FinalityNotice,
 	bufferSize int,
 	log log.Logger) *RPCFinder {
 	return &RPCFinder{
@@ -76,7 +76,7 @@ func NewFinder(chainID eth.ChainID,
 		toJobs:               toCases,
 		newJobs:              newJobs,
 		finalityPollInterval: 10 * time.Second,
-		finalityCallback:     finalityCallback,
+		finalizationNotices:  finalizationNotices,
 		closed:               make(chan struct{}),
 	}
 }
@@ -143,7 +143,10 @@ func (t *RPCFinder) checkFinality(ctx context.Context) {
 		t.log.Error("error getting finalized block", "error", err)
 		return
 	}
-	t.finalityCallback(t.chainID, blockInfo)
+	t.finalizationNotices <- FinalityNotice{
+		ChainID: t.chainID,
+		Block:   blockInfo,
+	}
 }
 
 var ErrBlockNotContiguous = errors.New("blocks are not contiguous")

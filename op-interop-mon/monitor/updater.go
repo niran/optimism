@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
-	"github.com/ethereum-optimism/optimism/op-service/locks"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
 	supervisortypes "github.com/ethereum-optimism/optimism/op-supervisor/supervisor/types"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -32,8 +31,14 @@ var _ UpdaterClient = &sources.EthClient{}
 type Updater interface {
 	Start(ctx context.Context) error
 	Enqueue(job *Job)
+	Notify(finalization FinalityNotice)
 	Stop() error
 	CollectForMetrics(jobs map[JobID]*Job) map[JobID]*Job
+}
+
+type FinalityNotice struct {
+	ChainID eth.ChainID
+	Block   eth.BlockInfo
 }
 
 // RPCFinder connects to an Ethereum chain and extracts receipts in order to create jobs
@@ -44,11 +49,12 @@ type RPCUpdater struct {
 	// the duration after the terminal state is set that the job is considered expired
 	expireTime time.Duration
 
-	inbox  chan *Job
-	closed chan struct{}
+	inbox         chan *Job
+	finalizations chan FinalityNotice
+	closed        chan struct{}
 
-	jobs   sync.Map
-	expiry *locks.RWMap[eth.ChainID, eth.NumberAndHash]
+	jobs                sync.Map
+	finalizationNotices chan FinalityNotice
 
 	log log.Logger
 }
@@ -56,17 +62,17 @@ type RPCUpdater struct {
 func NewUpdater(
 	chainID eth.ChainID,
 	client UpdaterClient,
-	expiry *locks.RWMap[eth.ChainID, eth.NumberAndHash],
+	finalizationNotices chan FinalityNotice,
 	log log.Logger) *RPCUpdater {
 	return &RPCUpdater{
 		chainID: chainID,
 		client:  client,
 		log:     log.New("component", "rpc_updater", "chain_id", chainID),
 		// inbox depth is set very deep to allow spikes in job creation plus generous buffer
-		inbox:      make(chan *Job, inboxDepth),
-		closed:     make(chan struct{}),
-		expireTime: 2 * time.Minute,
-		expiry:     expiry,
+		inbox:               make(chan *Job, inboxDepth),
+		closed:              make(chan struct{}),
+		expireTime:          2 * time.Minute,
+		finalizationNotices: finalizationNotices,
 	}
 }
 
@@ -88,6 +94,17 @@ func (t *RPCUpdater) Run(ctx context.Context) {
 		case job := <-t.inbox:
 			t.log.Trace("received job", "job", job.String())
 			t.jobs.Store(job.ID(), job)
+		case finalized := <-t.finalizations:
+			t.log.Trace("received finalized block", "block", finalized.Block.NumberU64(), "chain_id", finalized.ChainID)
+			t.jobs.Range(func(key, value any) bool {
+				job := value.(*Job)
+				if job.initiating.ChainID == finalized.ChainID {
+					job.initiatingFinalized = finalized.Block.NumberU64() >= job.initiating.BlockNumber
+				} else if job.executingChain == finalized.ChainID {
+					job.executingFinalized = finalized.Block.NumberU64() >= job.executingBlock.Number
+				}
+				return true
+			})
 		case <-processTicker.C:
 			t.log.Trace("processing jobs")
 			t.processJobs()
@@ -156,22 +173,10 @@ func (t *RPCUpdater) ShouldExpire(job *Job) bool {
 		t.log.Trace("job has not been counted for metrics", "job", job.String())
 		return false
 	}
-	initExpiryBlock, ok := t.expiry.Get(job.initiating.ChainID)
-	if !ok {
-		t.log.Warn("initiating chain has no expiry block", "job", job.String())
+	if !job.initiatingFinalized || !job.executingFinalized {
 		return false
-	}
-	execExpiryBlock, ok := t.expiry.Get(job.executingChain)
-	if !ok {
-		t.log.Warn("executing chain has no expiry block", "job", job.String())
-		return false
-	}
-	if job.initiating.BlockNumber <= initExpiryBlock.NumberU64() &&
-		job.executingBlock.Number <= execExpiryBlock.NumberU64() {
-		t.log.Debug("job should expire", "job", job.String())
-		return true
 	} else {
-		t.log.Trace("job should not expire", "job", job.String(), "initExpiryBlock", initExpiryBlock.NumberU64(), "execExpiryBlock", execExpiryBlock.NumberU64())
+		t.log.Trace("job should not expire", "job", job.String(), "initiatingFinalized", job.initiatingFinalized, "executingFinalized", job.executingFinalized)
 	}
 	return false
 }
@@ -227,6 +232,13 @@ func (t *RPCUpdater) Enqueue(job *Job) {
 		return
 	}
 	t.inbox <- job
+}
+
+func (t *RPCUpdater) Notify(finalization FinalityNotice) {
+	if t.Stopped() {
+		return
+	}
+	t.finalizations <- finalization
 }
 
 // TODO: add wait group to make Stop return sync
