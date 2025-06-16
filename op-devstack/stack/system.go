@@ -28,6 +28,7 @@ type System interface {
 	L2Networks() []L2Network
 	Supervisors() []Supervisor
 	TestSequencers() []TestSequencer
+	InteropMonitor() InteropMonitor
 }
 
 // ExtensibleSystem is an extension-interface to add new components to the system.

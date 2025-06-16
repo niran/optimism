@@ -30,7 +30,7 @@ type presetSystem struct {
 	supervisors locks.RWMap[stack.SupervisorID, stack.Supervisor]
 	sequencers  locks.RWMap[stack.TestSequencerID, stack.TestSequencer]
 
-	interopMonitors locks.RWMap[stack.InteropMonitorID, stack.InteropMonitor]
+	interopMonitor stack.InteropMonitor
 }
 
 var _ stack.ExtensibleSystem = (*presetSystem)(nil)
@@ -107,8 +107,12 @@ func (p *presetSystem) AddSupervisor(v stack.Supervisor) {
 	p.require().True(p.supervisors.SetIfMissing(v.ID(), v), "supervisor %s must not already exist", v.ID())
 }
 
+func (p *presetSystem) InteropMonitor() stack.InteropMonitor {
+	return p.interopMonitor
+}
+
 func (p *presetSystem) AddInteropMonitor(v stack.InteropMonitor) {
-	// p.require().True(p.interopMonitors.SetIfMissing(v.ID(), v), "interop monitor %s must not already exist", v.ID())
+	p.interopMonitor = v
 }
 
 func (p *presetSystem) TestSequencer(m stack.TestSequencerMatcher) stack.TestSequencer {

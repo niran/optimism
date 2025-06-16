@@ -63,6 +63,7 @@ Available components:
   - `L2Challenger`: op-challenger, or equivalent
 - `Supervisor`: op-supervisor service, or equivalent
 - `Faucet`: util to fund eth to test accounts
+- `Interop-Mon`: op-interop-mon service
 
 ### DSL-only components
 

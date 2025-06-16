@@ -47,5 +47,6 @@ func WithInteropMonitor(elids ...stack.L2ELNodeID) stack.Option[*Orchestrator] {
 		require.NoError(err)
 		orch.interopMon = &InteropMonitorService{service: service}
 		orch.interopMon.service.Start(p.Ctx())
+		orch.interopMon.metricsEndpoint = orch.interopMon.service.MetricsEndpoint
 	})
 }

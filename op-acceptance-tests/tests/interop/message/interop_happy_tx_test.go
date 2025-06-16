@@ -25,7 +25,7 @@ func TestInteropHappyTx(gt *testing.T) {
 
 	im := sys.InteropMon
 
-	result, warnings, err := im.Query(t.Ctx(), "up", time.Now())
+	result, warnings, err := im.Query(t.Ctx(), "up", time.Now()) // TODO: This doesn't work at the moment, probably hitting the wrong endpoint
 	if err != nil {
 		fmt.Printf("Error querying Prometheus: %v\n", err)
 		os.Exit(1)

@@ -1,6 +1,8 @@
 package shim
 
 import (
+	"fmt"
+
 	"github.com/ethereum-optimism/optimism/op-devstack/stack"
 	promAPI "github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -30,7 +32,7 @@ func NewInteropMonitor(cfg InteropMonitorConfig) stack.InteropMonitor {
 		Address: cfg.MetricsEndpoint,
 	})
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("failed to create prometheus client at %s: %w", cfg.MetricsEndpoint, err))
 	}
 	metrics := v1.NewAPI(client)
 

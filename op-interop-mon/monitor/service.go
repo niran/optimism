@@ -104,7 +104,7 @@ func (ms *InteropMonitorService) initFromCLIConfig(ctx context.Context, version 
 		fmt.Println("initialized from cli config")
 		return nil
 	}
-	ms.MetricsEndpoint = fmt.Sprintf(":%d", ms.metricsSrv.Addr())
+	ms.MetricsEndpoint = ms.metricsSrv.HTTPEndpoint()
 
 	return nil
 }

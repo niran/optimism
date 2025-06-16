@@ -148,10 +148,7 @@ func NewSimpleInterop(t devtest.T) *SimpleInterop {
 	}
 	out.FunderB = dsl.NewFunder(out.Wallet, out.FaucetB, out.L2ELB)
 
-	out.system.AddInteropMonitor(shim.NewInteropMonitor(shim.InteropMonitorConfig{
-		CommonConfig: shim.NewCommonConfig(t),
-		ID:           stack.InteropMonitorID("interop-mon"),
-	}))
+	out.InteropMon = singleChain.system.InteropMonitor()
 
 	return out
 }
