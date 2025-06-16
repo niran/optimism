@@ -8,7 +8,8 @@ import (
 )
 
 type InteropMonitorService struct {
-	service *monitor.InteropMonitorService
+	metricsEndpoint string
+	service         *monitor.InteropMonitorService
 }
 
 func (m *InteropMonitorService) Metrics() metrics.Metricer {
@@ -17,9 +18,12 @@ func (m *InteropMonitorService) Metrics() metrics.Metricer {
 
 func (m *InteropMonitorService) hydrate(system stack.ExtensibleSystem) {
 	frontend := shim.NewInteropMonitor(shim.InteropMonitorConfig{
-		CommonConfig: shim.NewCommonConfig(system.T()),
+		CommonConfig:    shim.NewCommonConfig(system.T()),
+		ID:              stack.InteropMonitorID("interop-mon"),
+		MetricsEndpoint: m.metricsEndpoint,
 	})
 	system.AddInteropMonitor(frontend)
+	m.metricsEndpoint = m.service.MetricsEndpoint
 }
 
 func WithInteropMonitor(elids ...stack.L2ELNodeID) stack.Option[*Orchestrator] {
@@ -33,6 +37,7 @@ func WithInteropMonitor(elids ...stack.L2ELNodeID) stack.Option[*Orchestrator] {
 			require.True(ok)
 			cliConfig.L2Rpcs = append(cliConfig.L2Rpcs, l2EL.userRPC)
 		}
+		cliConfig.MetricsConfig.Enabled = true
 		service, err := monitor.InteropMonitorServiceFromCLIConfig(
 			p.Ctx(),
 			"test",
@@ -41,6 +46,6 @@ func WithInteropMonitor(elids ...stack.L2ELNodeID) stack.Option[*Orchestrator] {
 		)
 		require.NoError(err)
 		orch.interopMon = &InteropMonitorService{service: service}
-		// orch.interopMon.service.Start(p.Ctx())
+		orch.interopMon.service.Start(p.Ctx())
 	})
 }

@@ -28,8 +28,9 @@ type InteropMonitorConfig struct {
 }
 
 type InteropMonitorService struct {
-	Log     log.Logger
-	Metrics metrics.Metricer
+	Log             log.Logger
+	Metrics         metrics.Metricer
+	MetricsEndpoint string
 
 	InteropMonitorConfig
 
@@ -103,6 +104,8 @@ func (ms *InteropMonitorService) initFromCLIConfig(ctx context.Context, version 
 		fmt.Println("initialized from cli config")
 		return nil
 	}
+	ms.MetricsEndpoint = fmt.Sprintf(":%d", ms.metricsSrv.Addr())
+
 	return nil
 }
 

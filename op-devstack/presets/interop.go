@@ -147,6 +147,12 @@ func NewSimpleInterop(t devtest.T) *SimpleInterop {
 		L2BatcherB:         dsl.NewL2Batcher(l2B.L2Batcher(match.Assume(t, match.FirstL2Batcher))),
 	}
 	out.FunderB = dsl.NewFunder(out.Wallet, out.FaucetB, out.L2ELB)
+
+	out.system.AddInteropMonitor(shim.NewInteropMonitor(shim.InteropMonitorConfig{
+		CommonConfig: shim.NewCommonConfig(t),
+		ID:           stack.InteropMonitorID("interop-mon"),
+	}))
+
 	return out
 }
 

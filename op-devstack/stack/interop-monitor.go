@@ -3,15 +3,13 @@ package stack
 import (
 	"log/slog"
 
-	"github.com/ethereum-optimism/optimism/op-service/apis"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
 type InteropMonitor interface {
 	Common
+	v1.API
 	ID() InteropMonitorID
-	ActivityAPI() apis.InteropMonitorActivity
-	Metrics() v1.API
 }
 type InteropMonitorID string
 

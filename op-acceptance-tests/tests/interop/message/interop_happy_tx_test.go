@@ -1,7 +1,9 @@
 package msg
 
 import (
+	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -22,7 +24,16 @@ func TestInteropHappyTx(gt *testing.T) {
 	sys := presets.NewSimpleInterop(t)
 
 	im := sys.InteropMon
-	im.Start(t.Ctx())
+
+	result, warnings, err := im.Query(t.Ctx(), "up", time.Now())
+	if err != nil {
+		fmt.Printf("Error querying Prometheus: %v\n", err)
+		os.Exit(1)
+	}
+
+	sys.T.Require().NoError(err)
+	sys.T.Require().Empty(warnings)
+	sys.T.Require().NotNil(result)
 
 	// two EOAs for triggering the init and exec interop txs
 	alice := sys.FunderA.NewFundedEOA(eth.OneEther)
