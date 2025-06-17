@@ -9,7 +9,7 @@ jq = "1.7.1"
 yq = "4.44.5"
 shellcheck = "0.10.0"
 direnv = "2.35.0"
-just = "1.37.0"
+just = "1.40.0"
 
 # Cargo dependencies
 "cargo:svm-rs" = "0.5.8"
