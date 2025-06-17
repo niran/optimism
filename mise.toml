@@ -12,7 +12,7 @@ direnv = "2.35.0"
 just = "1.40.0"
 
 # Cargo dependencies
-"cargo:svm-rs" = "0.5.8"
+"cargo:svm-rs" = "0.5.16"
 
 # Go dependencies
 "go:github.com/ethereum/go-ethereum/cmd/abigen" = "1.15.10"
