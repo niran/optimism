@@ -76,7 +76,7 @@ func TestEventResponse(t *testing.T) {
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{
 			ExhaustL1: &pair})
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{
-			DerivationOriginUpdate: &pair})
+			DerivationCurrentL1Update: &pair})
 
 		require.NoError(t, ex.Drain())
 
@@ -84,7 +84,7 @@ func TestEventResponse(t *testing.T) {
 			crossSafe >= 1 &&
 			finalized >= 1 &&
 			mon.receivedLocalUnsafe >= 1 &&
-			// DerivationUpdate and DerivationOriginUpdate both emits LocalDerivedEvent
+			// DerivationUpdate and DerivationCurrentL1Update both emits LocalDerivedEvent
 			mon.localDerived >= 2 &&
 			nodeExhausted >= 1 &&
 			mon.localDerivedOriginUpdate >= 1

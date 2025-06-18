@@ -493,7 +493,7 @@ type IndexingEvent struct {
 	DerivationUpdate       *DerivedBlockRefPair `json:"derivationUpdate,omitempty"`
 	ExhaustL1              *DerivedBlockRefPair `json:"exhaustL1,omitempty"`
 	ReplaceBlock           *BlockReplacement    `json:"replaceBlock,omitempty"`
-	DerivationOriginUpdate *DerivedBlockRefPair `json:"derivationOriginUpdate,omitempty"`
+	DerivationCurrentL1Update *DerivedBlockRefPair `json:"DerivationCurrentL1Update,omitempty"`
 }
 
 // MessageChecksum represents a message checksum, as used for access-list checks.

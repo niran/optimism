@@ -280,8 +280,8 @@ func (m *ManagedNode) onNodeEvent(ev *types.IndexingEvent) {
 	if ev.ReplaceBlock != nil {
 		m.onReplaceBlock(*ev.ReplaceBlock)
 	}
-	if ev.DerivationOriginUpdate != nil {
-		m.onDerivationOriginUpdate(*ev.DerivationOriginUpdate)
+	if ev.DerivationCurrentL1Update != nil {
+		m.onDerivationCurrentL1Update(*ev.DerivationCurrentL1Update)
 	}
 }
 
@@ -370,7 +370,7 @@ func (m *ManagedNode) onDerivationUpdate(pair types.DerivedBlockRefPair) {
 	m.resetIfInconsistent()
 }
 
-func (m *ManagedNode) onDerivationOriginUpdate(pair types.DerivedBlockRefPair) {
+func (m *ManagedNode) onDerivationCurrentL1Update(pair types.DerivedBlockRefPair) {
 	m.log.Info("Node derived new block with new origin", "derived", pair.Derived,
 		"derivedParent", pair.Derived.ParentID(), "source", pair.Source)
 	m.emitter.Emit(m.ctx, superevents.LocalDerivedOriginUpdateEvent{
