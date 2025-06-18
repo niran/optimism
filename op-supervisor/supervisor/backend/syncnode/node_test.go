@@ -84,6 +84,7 @@ func TestEventResponse(t *testing.T) {
 			crossSafe >= 1 &&
 			finalized >= 1 &&
 			mon.receivedLocalUnsafe >= 1 &&
+			// DerivationUpdate and DerivationOriginUpdate both emits LocalDerivedEvent
 			mon.localDerived >= 2 &&
 			nodeExhausted >= 1 &&
 			mon.localDerivedOriginUpdate >= 1
