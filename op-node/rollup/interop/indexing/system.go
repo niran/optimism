@@ -214,11 +214,10 @@ func (m *IndexingMode) OnEvent(ctx context.Context, ev event.Event) bool {
 		}
 		logger.Info("Sending derivation update to supervisor (L1 traversal)")
 		m.events.Send(&supervisortypes.IndexingEvent{
-			DerivationUpdate: &supervisortypes.DerivedBlockRefPair{
+			DerivationOriginUpdate: &supervisortypes.DerivedBlockRefPair{
 				Source:  x.Origin,
 				Derived: x.LastL2.BlockRef(),
 			},
-			DerivationOriginUpdate: &x.Origin,
 		})
 
 	case derive.ExhaustedL1Event:

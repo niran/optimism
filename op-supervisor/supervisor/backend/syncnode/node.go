@@ -370,12 +370,21 @@ func (m *ManagedNode) onDerivationUpdate(pair types.DerivedBlockRefPair) {
 	m.resetIfInconsistent()
 }
 
-func (m *ManagedNode) onDerivationOriginUpdate(origin eth.BlockRef) {
-	m.log.Info("Node derived new origin", "origin", origin)
+func (m *ManagedNode) onDerivationOriginUpdate(pair types.DerivedBlockRefPair) {
+	m.log.Info("Node derived new block with new origin", "derived", pair.Derived,
+		"derivedParent", pair.Derived.ParentID(), "source", pair.Source)
 	m.emitter.Emit(m.ctx, superevents.LocalDerivedOriginUpdateEvent{
 		ChainID: m.chainID,
-		Origin:  origin,
+		Origin:  pair.Source,
 	})
+	m.emitter.Emit(superevents.LocalDerivedEvent{
+		ChainID: m.chainID,
+		Derived: pair,
+		NodeID:  m.Node.String(),
+		Ctx:     event.WrapCtx(m.ctx),
+	})
+	m.lastNodeLocalSafe = pair.Derived.ID()
+	m.resetIfInconsistent()
 }
 
 func (m *ManagedNode) onExhaustL1Event(completed types.DerivedBlockRefPair) {
