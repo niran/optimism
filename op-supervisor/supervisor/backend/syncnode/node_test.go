@@ -72,11 +72,11 @@ func TestEventResponse(t *testing.T) {
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{
 			UnsafeBlock: &eth.BlockRef{Number: 1}})
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{
-			DerivationUpdate: &types.DerivedBlockRefPair{Source: eth.BlockRef{Number: 1}, Derived: eth.BlockRef{Number: 2}}})
+			DerivationUpdate: &pair})
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{
-			ExhaustL1: &types.DerivedBlockRefPair{Source: eth.BlockRef{Number: 1}, Derived: eth.BlockRef{Number: 2}}})
+			ExhaustL1: &pair})
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{
-			DerivationOriginUpdate: &eth.BlockRef{Number: 1}})
+			DerivationOriginUpdate: &pair})
 
 		require.NoError(t, ex.Drain())
 
@@ -84,7 +84,7 @@ func TestEventResponse(t *testing.T) {
 			crossSafe >= 1 &&
 			finalized >= 1 &&
 			mon.receivedLocalUnsafe >= 1 &&
-			mon.localDerived >= 1 &&
+			mon.localDerived >= 2 &&
 			nodeExhausted >= 1 &&
 			mon.localDerivedOriginUpdate >= 1
 	}, 4*time.Second, 250*time.Millisecond)

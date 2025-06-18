@@ -214,10 +214,9 @@ func TestManagedMode_OnEvent_Deduplication(t *testing.T) {
 
 		events := mockStream.drainEvents()
 		require.Len(t, events, 1, "First L1 status event should be sent")
-		require.NotNil(t, events[0].DerivationUpdate)
 		require.NotNil(t, events[0].DerivationOriginUpdate)
-		require.Equal(t, l1Ref1, events[0].DerivationUpdate.Source)
-		require.Equal(t, l1Ref1, *events[0].DerivationOriginUpdate)
+		require.Equal(t, l1Ref1, events[0].DerivationOriginUpdate.Source)
+		require.Equal(t, l2Ref1.BlockRef(), events[0].DerivationOriginUpdate.Derived)
 
 		// Check that no skipping log was generated
 		hasSkipLog := testlog.NewMessageContainsFilter("Skipped sending duplicate derivation update (L1 traversal)")
@@ -241,8 +240,9 @@ func TestManagedMode_OnEvent_Deduplication(t *testing.T) {
 
 		events = mockStream.drainEvents()
 		require.Len(t, events, 1, "L1 status event with different origin should be sent")
-		require.NotNil(t, events[0].DerivationUpdate)
-		require.Equal(t, l1Ref2, events[0].DerivationUpdate.Source)
+		require.NotNil(t, events[0].DerivationOriginUpdate)
+		require.Equal(t, l1Ref2, events[0].DerivationOriginUpdate.Source)
+		require.Equal(t, l2Ref1.BlockRef(), events[0].DerivationOriginUpdate.Derived)
 
 		// Check that no skipping log was generated for different origin
 		require.Nil(t, logs.FindLog(testlog.NewLevelFilter(log.LevelWarn), hasSkipLog), "No skip log for different origin")
