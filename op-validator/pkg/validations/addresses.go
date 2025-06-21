@@ -16,8 +16,8 @@ var addresses = map[uint64]map[string]common.Address{
 		standard.ContractsV200Tag: common.HexToAddress("0x12a9e38628e5a5b24d18b1956ed68a24fe4e3dc0"),
 		// Bootstrapped on 04/16/2025 using OP Deployer.
 		standard.ContractsV300Tag: common.HexToAddress("0xf989Df70FB46c581ba6157Ab335c0833bA60e1f0"),
-		// Bootstrapped on 06/03/2025 using OP Deployer.
-		standard.ContractsV400Tag: common.HexToAddress("0x3dfc5e44043DC5998928E0b8280136b7352d3F70"),
+		// Bootstrapped on 06/19/2025 using OP Deployer.
+		standard.ContractsV400Tag: common.HexToAddress("0xbb43313d206a9b02032c749ca0828a07c962b4b5"),
 	},
 	11155111: {
 		// Bootstrapped on 03/02/2025 using OP Deployer.
@@ -26,8 +26,8 @@ var addresses = map[uint64]map[string]common.Address{
 		standard.ContractsV200Tag: common.HexToAddress("0x37739a6b0a3f1e7429499a4ec4a0685439daff5c"),
 		// Bootstrapped on 04/03/2025 using OP Deployer.
 		standard.ContractsV300Tag: common.HexToAddress("0x2d56022cb84ce6b961c3b4288ca36386bcd9024c"),
-		// Bootstrapped on 06/03/2025 using OP Deployer.
-		standard.ContractsV400Tag: common.HexToAddress("0xA8a1529547306FEC7A32a001705160f2110451aE"),
+		// Bootstrapped on 06/19/2025 using OP Deployer.
+		standard.ContractsV400Tag: common.HexToAddress("0xaaabe70a4198ab9e99e1a22b1afa0a43cc7f2c79"),
 	},
 }
 
