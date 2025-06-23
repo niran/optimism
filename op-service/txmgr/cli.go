@@ -325,11 +325,11 @@ func (m CLIConfig) Check() error {
 		return errors.New("cannot specify both a private key and a mnemonic")
 	}
 	if m.SignerCLIConfig.Enabled() && (m.PrivateKey != "" || m.Mnemonic != "") {
-		return errors.New("must provide neither a mnemonic nor a private key when using the opsigner CLIConfig")
+		return errors.New("must provide neither a mnemonic nor a private key when using a remote signer")
 	}
 	if !m.SignerCLIConfig.Enabled() {
 		if m.PrivateKey == "" && m.Mnemonic == "" {
-			return errors.New("must provide either a mnemonic or a private key when not using the opsigner CLIConfig")
+			return errors.New("must provide either a mnemonic or a private key when not using a remote signer")
 		}
 	}
 	return nil
