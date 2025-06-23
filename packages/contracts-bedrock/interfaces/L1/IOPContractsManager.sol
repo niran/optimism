@@ -161,8 +161,6 @@ interface IOPContractsManager {
         IOptimismPortal2 optimismPortalProxy;
         IDisputeGameFactory disputeGameFactoryProxy;
         IAnchorStateRegistry anchorStateRegistryProxy;
-        IFaultDisputeGame faultDisputeGame;
-        IPermissionedDisputeGame permissionedDisputeGame;
         IDelayedWETH delayedWETHPermissionedGameProxy;
         IDelayedWETH delayedWETHPermissionlessGameProxy;
     }
@@ -178,14 +176,6 @@ interface IOPContractsManager {
         address proxyAdmin;
         address l1ChugSplashProxy;
         address resolvedDelegateProxy;
-        address permissionedDisputeGame1;
-        address permissionedDisputeGame2;
-        address permissionlessDisputeGame1;
-        address permissionlessDisputeGame2;
-        address superPermissionedDisputeGame1;
-        address superPermissionedDisputeGame2;
-        address superPermissionlessDisputeGame1;
-        address superPermissionlessDisputeGame2;
     }
 
     /// @notice The latest implementation contracts for the OP Stack.
@@ -203,6 +193,10 @@ interface IOPContractsManager {
         address anchorStateRegistryImpl;
         address delayedWETHImpl;
         address mipsImpl;
+        address faultDisputeGameImpl;
+        address permissionedDisputeGameImpl;
+        address superFaultDisputeGameImpl;
+        address superPermissionedDisputeGameImpl;
     }
 
     /// @notice The input required to identify a chain for upgrading.
@@ -369,6 +363,10 @@ interface IOPCMImplementationsWithoutLockbox {
         address anchorStateRegistryImpl;
         address delayedWETHImpl;
         address mipsImpl;
+        address faultDisputeGameImpl;
+        address permissionedDisputeGameImpl;
+        address superFaultDisputeGameImpl;
+        address superPermissionedDisputeGameImpl;
     }
 
     /// @notice Returns the implementation contracts without the ETHLockbox.

@@ -47,6 +47,10 @@ contract DeployImplementations_Test is Test {
         DeployImplementations.Output memory output = deployImplementations.run(input);
 
         assertNotEq(address(output.systemConfigImpl), address(0));
+        assertNotEq(address(output.faultDisputeGameImpl), address(0));
+        assertNotEq(address(output.permissionedDisputeGameImpl), address(0));
+        assertNotEq(address(output.superFaultDisputeGameImpl), address(0));
+        assertNotEq(address(output.superPermissionedDisputeGameImpl), address(0));
     }
 
     function test_reuseImplementation_succeeds() public {
@@ -70,6 +74,12 @@ contract DeployImplementations_Test is Test {
         assertEq(address(output1.anchorStateRegistryImpl), address(output2.anchorStateRegistryImpl), "1100");
         assertEq(address(output1.opcm), address(output2.opcm), "1200");
         assertEq(address(output1.ethLockboxImpl), address(output2.ethLockboxImpl), "1300");
+        assertEq(address(output1.faultDisputeGameImpl), address(output2.faultDisputeGameImpl), "1400");
+        assertEq(address(output1.permissionedDisputeGameImpl), address(output2.permissionedDisputeGameImpl), "1500");
+        assertEq(address(output1.superFaultDisputeGameImpl), address(output2.superFaultDisputeGameImpl), "1600");
+        assertEq(
+            address(output1.superPermissionedDisputeGameImpl), address(output2.superPermissionedDisputeGameImpl), "1700"
+        );
     }
 
     function testFuzz_run_memory_succeeds(
@@ -122,7 +132,11 @@ contract DeployImplementations_Test is Test {
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,
-            upgradeController
+            upgradeController,
+            73, // gameMaxGameDepth
+            30, // gameSplitDepth
+            10800, // gameClockExtension (3 hours)
+            302400 // gameMaxClockDuration (3.5 days)
         );
 
         DeployImplementations.Output memory output = deployImplementations.run(input);
@@ -140,6 +154,10 @@ contract DeployImplementations_Test is Test {
         assertNotEq(address(output.opcmContractsContainer), address(0), "900");
         assertNotEq(address(output.opcmDeployer), address(0), "1000");
         assertNotEq(address(output.opcmGameTypeAdder), address(0), "1100");
+        assertNotEq(address(output.faultDisputeGameImpl), address(0), "1200");
+        assertNotEq(address(output.permissionedDisputeGameImpl), address(0), "1300");
+        assertNotEq(address(output.superFaultDisputeGameImpl), address(0), "1400");
+        assertNotEq(address(output.superPermissionedDisputeGameImpl), address(0), "1500");
 
         // Address contents assertions
         bytes memory empty;
@@ -156,6 +174,10 @@ contract DeployImplementations_Test is Test {
         assertNotEq(address(output.opcmContractsContainer).code, empty, "2100");
         assertNotEq(address(output.opcmDeployer).code, empty, "2200");
         assertNotEq(address(output.opcmGameTypeAdder).code, empty, "2300");
+        assertNotEq(address(output.faultDisputeGameImpl).code, empty, "2400");
+        assertNotEq(address(output.permissionedDisputeGameImpl).code, empty, "2500");
+        assertNotEq(address(output.superFaultDisputeGameImpl).code, empty, "2600");
+        assertNotEq(address(output.superPermissionedDisputeGameImpl).code, empty, "2700");
 
         // Architecture assertions.
         assertEq(address(output.mipsSingleton.oracle()), address(output.preimageOracleSingleton), "600");
@@ -255,7 +277,11 @@ contract DeployImplementations_Test is Test {
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,
-            upgradeController
+            upgradeController,
+            73, // gameMaxGameDepth
+            30, // gameSplitDepth
+            10800, // gameClockExtension (3 hours)
+            302400 // gameMaxClockDuration (3.5 days)
         );
     }
 }
