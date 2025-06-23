@@ -321,6 +321,17 @@ func (m CLIConfig) Check() error {
 	if err := m.SignerCLIConfig.Check(); err != nil {
 		return err
 	}
+	if m.PrivateKey != "" && m.Mnemonic != "" {
+		return errors.New("cannot specify both a private key and a mnemonic")
+	}
+	if m.SignerCLIConfig.Enabled() && (m.PrivateKey != "" || m.Mnemonic != "") {
+		return errors.New("must provide neither a mnemonic nor a private key when using the opsigner CLIConfig")
+	}
+	if !m.SignerCLIConfig.Enabled() {
+		if m.PrivateKey == "" && m.Mnemonic == "" {
+			return errors.New("must provide either a mnemonic or a private key when not using the opsigner CLIConfig")
+		}
+	}
 	return nil
 }
 
