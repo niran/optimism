@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-chain-ops/script"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 func IsSupportedStateVersion(version int) bool {
@@ -47,7 +48,7 @@ func InitLiveStrategy(ctx context.Context, env *Env, intent *state.Intent, st *s
 			return fmt.Errorf("cannot set superchain roles for predeployed OPCM")
 		}
 
-		superDeployment, superRoles, err := PopulateSuperchainState(env.L1ScriptHost, *intent.OPCMAddress)
+		superDeployment, superRoles, err := PopulateSuperchainState(env.L1Client.Client(), *intent.OPCMAddress)
 		if err != nil {
 			return fmt.Errorf("error populating superchain state: %w", err)
 		}
@@ -133,13 +134,8 @@ func immutableErr(field string, was, is any) error {
 	return fmt.Errorf("%s is immutable: was %v, is %v", field, was, is)
 }
 
-func PopulateSuperchainState(host *script.Host, opcmAddr common.Address) (*state.SuperchainDeployment, *state.SuperchainRoles, error) {
-	readScript, err := opcm.NewReadSuperchainDeploymentScript(host)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error generating read superchain deployment script: %w", err)
-	}
-
-	out, err := readScript.Run(opcm.ReadSuperchainDeploymentInput{
+func PopulateSuperchainState(rpcClient *rpc.Client, opcmAddr common.Address) (*state.SuperchainDeployment, *state.SuperchainRoles, error) {
+	out, err := opcm.ReadSuperchainDeployment(context.Background(), rpcClient, opcm.ReadSuperchainDeploymentInput{
 		OPCMAddress: opcmAddr,
 	})
 	if err != nil {

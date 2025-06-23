@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"log/slog"
-	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -217,25 +216,12 @@ func TestPopulateSuperchainState(t *testing.T) {
 	rpcClient, err := rpc.Dial(retryProxy.Endpoint())
 	require.NoError(t, err)
 
-	_, afacts := testutil.LocalArtifacts(t)
-	host, err := env.ForkedScriptHost(
-		broadcaster.NoopBroadcaster(),
-		testlog.Logger(t, log.LevelInfo),
-		common.Address{'D'},
-		afacts,
-		rpcClient,
-		// corresponds to the latest block on sepolia as of 04/30/2025. used to prevent config drift on sepolia
-		// from failing this test
-		big.NewInt(8227159),
-	)
-	require.NoError(t, err)
-
 	l1Versions, err := standard.L1VersionsFor(11155111)
 	require.NoError(t, err)
 	superchain, err := standard.SuperchainFor(11155111)
 	require.NoError(t, err)
 	opcmAddr := l1Versions["op-contracts/v2.0.0-rc.1"].OPContractsManager.Address
-	dep, roles, err := PopulateSuperchainState(host, common.Address(*opcmAddr))
+	dep, roles, err := PopulateSuperchainState(rpcClient, common.Address(*opcmAddr))
 	require.NoError(t, err)
 	require.Equal(t, state.SuperchainDeployment{
 		ProxyAdminAddress:            common.HexToAddress("0x189aBAAaa82DfC015A588A7dbaD6F13b1D3485Bc"),
