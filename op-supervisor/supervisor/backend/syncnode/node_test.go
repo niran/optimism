@@ -69,8 +69,9 @@ func TestEventResponse(t *testing.T) {
 		emitter.Emit(testCtx, superevents.CrossSafeUpdateEvent{ChainID: chainID})
 		emitter.Emit(testCtx, superevents.FinalizedL2UpdateEvent{ChainID: chainID})
 
+		pair := types.DerivedBlockRefPair{Source: eth.BlockRef{Number: 1}, Derived: eth.BlockRef{Number: 2}}
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{
-			UnsafeBlock: &eth.BlockRef{Number: 1}})
+			UnsafeBlock: &pair.Source})
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{
 			DerivationUpdate: &pair})
 		syncCtrl.subscribeEvents.Send(&types.IndexingEvent{

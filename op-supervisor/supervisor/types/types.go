@@ -488,11 +488,11 @@ type BlockReplacement struct {
 // IndexingEvent is an event sent by the indexing node to the supervisor,
 // to share an update. One of the fields will be non-null; different kinds of updates may be sent.
 type IndexingEvent struct {
-	Reset                  *string              `json:"reset,omitempty"`
-	UnsafeBlock            *eth.BlockRef        `json:"unsafeBlock,omitempty"`
-	DerivationUpdate       *DerivedBlockRefPair `json:"derivationUpdate,omitempty"`
-	ExhaustL1              *DerivedBlockRefPair `json:"exhaustL1,omitempty"`
-	ReplaceBlock           *BlockReplacement    `json:"replaceBlock,omitempty"`
+	Reset                     *string              `json:"reset,omitempty"`
+	UnsafeBlock               *eth.BlockRef        `json:"unsafeBlock,omitempty"`
+	DerivationUpdate          *DerivedBlockRefPair `json:"derivationUpdate,omitempty"`
+	ExhaustL1                 *DerivedBlockRefPair `json:"exhaustL1,omitempty"`
+	ReplaceBlock              *BlockReplacement    `json:"replaceBlock,omitempty"`
 	DerivationCurrentL1Update *DerivedBlockRefPair `json:"derivationCurrentL1Update,omitempty"`
 }
 

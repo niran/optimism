@@ -377,11 +377,10 @@ func (m *ManagedNode) onDerivationCurrentL1Update(pair types.DerivedBlockRefPair
 		ChainID: m.chainID,
 		Origin:  pair.Source,
 	})
-	m.emitter.Emit(superevents.LocalDerivedEvent{
+	m.emitter.Emit(m.ctx, superevents.LocalDerivedEvent{
 		ChainID: m.chainID,
 		Derived: pair,
 		NodeID:  m.Node.String(),
-		Ctx:     event.WrapCtx(m.ctx),
 	})
 	m.lastNodeLocalSafe = pair.Derived.ID()
 	m.resetIfInconsistent()
