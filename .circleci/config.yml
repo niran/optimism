@@ -2333,6 +2333,16 @@ workflows:
           - equal: [true, <<pipeline.parameters.acceptance_tests_dispatch>>]
           - equal: ["api",<< pipeline.trigger_source >>]
     jobs:
+      # IN-PROCESS (base)
+      - op-acceptance-tests:
+          # Acceptance Testing params
+          name: memory-base
+          gate: base
+          # CircleCI params
+          no_output_timeout: 10m
+          context:
+            - circleci-repo-readonly-authenticated-github-token
+            - discord
       # KURTOSIS (Simple)
       - op-acceptance-tests:
           # Acceptance Testing params
@@ -2379,6 +2389,16 @@ workflows:
       not:
         equal: [<< pipeline.git.branch >>, "develop"]
     jobs:
+      # IN-PROCESS (base)
+      - op-acceptance-tests:
+          # Acceptance Testing params
+          name: memory-base
+          gate: base
+          # CircleCI params
+          no_output_timeout: 10m
+          context:
+            - circleci-repo-readonly-authenticated-github-token
+            - discord
       # KURTOSIS (Simple)
       - op-acceptance-tests:
           # Acceptance Testing params
