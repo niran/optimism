@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -123,9 +124,9 @@ func (e *ExpectedState) ExpectMemoryReservationCleared() {
 	e.LLOwnerThread = 0
 }
 
-func (e *ExpectedState) ExpectMemoryWriteUint32(t require.TestingT, initialState mipsevm.FPVMState, addr arch.Word, val uint32) {
+func (e *ExpectedState) ExpectMemoryWriteUint32(t *testing.T, initialState mipsevm.FPVMState, addr arch.Word, val uint32) {
 	state := ToMTState(t, initialState)
-	maybeSetLLReservation(state, addr)
+	reservationSet := maybeSetLLReservation(t, state, addr)
 
 	// Align address to 4-byte boundaries
 	addr = addr & ^arch.Word(3)
@@ -138,31 +139,29 @@ func (e *ExpectedState) ExpectMemoryWriteUint32(t require.TestingT, initialState
 	e.MemoryRoot = e.expectedMemory.MerkleRoot()
 
 	// Expect any matching memory reservation to be cleared
-	if addr&arch.AddressMask == e.LLAddress&arch.AddressMask {
-		e.ExpectMemoryReservationCleared()
-	}
+	e.maybeExpectMemoryReservationCleared(t, state, addr, reservationSet)
 }
 
-func (e *ExpectedState) ExpectMemoryWrite(t require.TestingT, initialState mipsevm.FPVMState, addr arch.Word, val arch.Word) {
+func (e *ExpectedState) ExpectMemoryWrite(t *testing.T, initialState mipsevm.FPVMState, addr arch.Word, val arch.Word) {
 	state := ToMTState(t, initialState)
-	maybeSetLLReservation(state, addr)
+	reservationSet := maybeSetLLReservation(t, state, addr)
 
 	e.expectedMemory.SetWord(addr, val)
 	e.MemoryRoot = e.expectedMemory.MerkleRoot()
 
 	// Expect any matching memory reservation to be cleared
-	if addr&arch.AddressMask == e.LLAddress&arch.AddressMask {
-		e.ExpectMemoryReservationCleared()
-	}
+	e.maybeExpectMemoryReservationCleared(t, state, addr, reservationSet)
 }
 
 // maybeSetLLReservation Sets up a memory reservation that overlaps with the given targetMemAddr
-// only if the memory reservation is currently empty
-func maybeSetLLReservation(state *multithreaded.State, targetMemAddr arch.Word) {
+// only if the memory reservation is currently empty.  Returns true if state was modified, false otherwise.
+func maybeSetLLReservation(t *testing.T, state *multithreaded.State, targetMemAddr arch.Word) bool {
 	if state.LLReservationStatus != multithreaded.LLStatusNone || state.LLAddress != 0 || state.LLOwnerThread != 0 {
 		// LL reservation fields are not empty - leave them alone as they appear to have been intentionally set
-		return
+		return false
 	}
+
+	t.Logf("Automatically setting up memory reservation on initial state targeting memory address 0x%x", targetMemAddr)
 
 	// Setup PRNG from snapshot of state
 	_, witness := state.EncodeWitness()
@@ -174,6 +173,20 @@ func maybeSetLLReservation(state *multithreaded.State, targetMemAddr arch.Word) 
 	state.LLReservationStatus = multithreaded.LLReservationStatus(r.Intn(2) + 1)
 	state.LLAddress = effAddr + arch.Word(r.Intn(arch.WordSizeBytes))
 	state.LLOwnerThread = arch.Word(r.Intn(10))
+
+	return true
+}
+
+// maybeExpectMemoryReservationCleared Checks if an existing reservation matches the target address.  If so, sets
+// expectation that existing reservation will be cleared.  If we know the reservation should match the target,
+// but it does not, error out.
+func (e *ExpectedState) maybeExpectMemoryReservationCleared(t *testing.T, state *multithreaded.State, targetAddr arch.Word, reservationShouldMatch bool) {
+	if targetAddr&arch.AddressMask == state.LLAddress&arch.AddressMask {
+		t.Logf("Automatically setting expectation that memory reservation at 0x%x will be cleared", state.LLAddress)
+		e.ExpectMemoryReservationCleared()
+	} else if reservationShouldMatch {
+		t.Errorf("Memory reservation was set to match target address 0x%x, but LLAddress 0x%x does not match", targetAddr, state.LLAddress)
+	}
 }
 
 func (e *ExpectedState) ExpectPreemption(preState *multithreaded.State) {

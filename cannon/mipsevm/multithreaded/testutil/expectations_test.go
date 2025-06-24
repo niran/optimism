@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum-optimism/optimism/cannon/mipsevm"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/multithreaded"
 )
@@ -137,6 +138,80 @@ func TestValidate_shouldPassUnchangedExpectations(t *testing.T) {
 			expected.Validate(mockT, state)
 			mockT.RequireNoFailure(t)
 		})
+	}
+}
+
+func TestExpectMemoryWrite(t *testing.T) {
+	memoryWriteFns := []struct {
+		name string
+		fn   func(t *testing.T, expectedState *ExpectedState, initialState mipsevm.FPVMState, addr arch.Word, val arch.Word)
+	}{
+		{
+			name: "ExpectMemoryWrite",
+			fn: func(t *testing.T, expectedState *ExpectedState, initialState mipsevm.FPVMState, addr arch.Word, val arch.Word) {
+				expectedState.ExpectMemoryWrite(t, initialState, addr, val)
+			},
+		},
+		{
+			name: "ExpectMemoryWriteUint32",
+			fn: func(t *testing.T, expectedState *ExpectedState, initialState mipsevm.FPVMState, addr arch.Word, val arch.Word) {
+				expectedState.ExpectMemoryWriteUint32(t, initialState, addr, uint32(val))
+			},
+		},
+	}
+
+	cases := []struct {
+		name                           string
+		llAddress                      arch.Word
+		llStatus                       multithreaded.LLReservationStatus
+		llOwnerThread                  arch.Word
+		targetAddress                  arch.Word
+		shouldModifyReservation        bool
+		shouldExpectReservationCleared bool
+	}{
+		{name: "Reservation has non-empty address, target does not match", llAddress: 0xF000, targetAddress: 0xF008},
+		{name: "Reservation has non-empty status", llStatus: multithreaded.LLStatusActive64bit, targetAddress: 0xF008},
+		{name: "Reservation has non-empty owner", llOwnerThread: 1, targetAddress: 0xF008},
+		{name: "Reservation is empty", targetAddress: 0xF008, shouldModifyReservation: true, shouldExpectReservationCleared: true},
+		{name: "Reservation is non-empty, target matches", llAddress: 0xF004, llStatus: multithreaded.LLStatusActive32bit, targetAddress: 0xF000, shouldExpectReservationCleared: true},
+	}
+
+	for _, fnCase := range memoryWriteFns {
+		for i, c := range cases {
+
+			caseName := fmt.Sprintf("%v: %v", fnCase.name, c.name)
+			t.Run(caseName, func(t *testing.T) {
+				state := RandomState(i)
+				state.LLReservationStatus = c.llStatus
+				state.LLAddress = c.llAddress
+				state.LLOwnerThread = c.llOwnerThread
+
+				expected := NewExpectedState(t, state)
+				fnCase.fn(t, expected, state, c.targetAddress, 0x1234)
+
+				if c.shouldModifyReservation {
+					// We should have created a reservation that matches the target address
+					targetEffAddr := c.targetAddress & arch.AddressMask
+					llEffAddr := state.LLAddress & arch.AddressMask
+					require.Equal(t, targetEffAddr, llEffAddr)
+					require.NotEqual(t, multithreaded.LLStatusNone, state.LLReservationStatus)
+				} else {
+					require.Equal(t, c.llStatus, state.LLReservationStatus)
+					require.Equal(t, c.llAddress, state.LLAddress)
+					require.Equal(t, c.llOwnerThread, state.LLOwnerThread)
+				}
+
+				if c.shouldExpectReservationCleared {
+					require.Equal(t, multithreaded.LLStatusNone, expected.LLReservationStatus)
+					require.Equal(t, arch.Word(0), expected.LLAddress)
+					require.Equal(t, arch.Word(0), expected.LLOwnerThread)
+				} else {
+					require.Equal(t, c.llStatus, expected.LLReservationStatus)
+					require.Equal(t, c.llAddress, expected.LLAddress)
+					require.Equal(t, c.llOwnerThread, expected.LLOwnerThread)
+				}
+			})
+		}
 	}
 }
 
