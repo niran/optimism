@@ -461,6 +461,28 @@ func (m *IndexingMode) Reset(ctx context.Context, lUnsafe, xUnsafe, lSafe, xSafe
 	return nil
 }
 
+const (
+	MaxReorgSeqWindows = 5
+)
+
+var (
+	ErrTooDeepReorgErr = errors.New("reorg is too deep")
+)
+
+func sanityCheckReorgDepth(logger log.Logger, cfg *rollup.Config, valid eth.L2BlockRef, latestUnsafe eth.L2BlockRef) error {
+	// Check we are not reorging L2 incredibly deep
+	if valid.L1Origin.Number+(MaxReorgSeqWindows*cfg.SyncLookback()) < latestUnsafe.L1Origin.Number {
+		logger.Error("reorg depth is too deep", "valid_l1origin", valid.L1Origin.Number, "latestUnsafe_l1origin", latestUnsafe.L1Origin.Number, "sync_lookback", cfg.SyncLookback())
+		// If the reorg depth is too large, something is fishy.
+		// This can legitimately happen if L1 goes down for a while. But in that case,
+		// restarting the L2 node with a bigger configured MaxReorgDepth is an acceptable
+		// stopgap solution.
+		return fmt.Errorf("%w: traversed back to L2 block %s, but too deep compared to previous unsafe block %s", ErrTooDeepReorgErr, valid, latestUnsafe)
+	}
+
+	return nil
+}
+
 // findLatestValidLocalUnsafe searches and returns the latest valid block of the L2 chain
 // starting from `l2UnsafeTarget` and checking until the latest unsafe block.
 func (m *IndexingMode) findLatestValidLocalUnsafe(ctx context.Context, l2UnsafeTarget eth.BlockID) (eth.L2BlockRef, error) {
@@ -495,6 +517,9 @@ func (m *IndexingMode) findLatestValidLocalUnsafe(ctx context.Context, l2UnsafeT
 
 		if idx != -1 {
 			logger.Info("Found last valid block with binary search", "valid", valid)
+			if err := sanityCheckReorgDepth(logger, m.cfg, valid, latestUnsafe); err != nil {
+				return eth.L2BlockRef{}, err
+			}
 			return valid, nil
 		} else {
 			logger.Info("All blocks checked by binary search are invalid between target and latestUnsafe")
@@ -520,6 +545,9 @@ func (m *IndexingMode) findLatestValidLocalUnsafe(ctx context.Context, l2UnsafeT
 
 		if valid != (eth.L2BlockRef{}) {
 			logger.Info("Fould last valid block", "valid", valid)
+			if err := sanityCheckReorgDepth(logger, m.cfg, valid, latestUnsafe); err != nil {
+				return eth.L2BlockRef{}, err
+			}
 			return valid, nil
 		}
 	}
