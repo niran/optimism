@@ -23,7 +23,7 @@ type rewinderDB interface {
 	DependencySet() depset.DependencySet
 
 	PreviousSource(chain eth.ChainID, source eth.BlockID) (prevSource types.BlockSeal, err error)
-	CrossDerivedToSourceRef(chainID eth.ChainID, derived eth.BlockID) (source eth.BlockRef, err error)
+	CrossDerivedToSource(chainID eth.ChainID, derived eth.BlockID) (source types.BlockSeal, err error)
 
 	LocalSafe(eth.ChainID) (types.DerivedBlockSealPair, error)
 	CrossSafe(eth.ChainID) (types.DerivedBlockSealPair, error)
@@ -186,7 +186,7 @@ func (r *Rewinder) rewindL1ChainIfReorged(chainID eth.ChainID, newTip eth.BlockI
 			return fmt.Errorf("failed to get finalized block for chain %s: %w", chainID, err)
 		}
 	}
-	finalizedL1, err := r.db.CrossDerivedToSourceRef(chainID, finalized.ID())
+	finalizedL1, err := r.db.CrossDerivedToSource(chainID, finalized.ID())
 	if err != nil {
 		return fmt.Errorf("failed to get finalized L1 block for chain %s: %w", chainID, err)
 	}
