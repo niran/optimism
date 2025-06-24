@@ -44,6 +44,21 @@ func (m *mockResetBackend) IsLocalSafe(ctx context.Context, block eth.BlockID) e
 	return types.ErrFuture
 }
 
+func (m *mockResetBackend) L2BlockRefByNumber(ctx context.Context, n uint64) (eth.L2BlockRef, error) {
+	// TODO
+	return eth.L2BlockRef{}, ethereum.NotFound
+}
+
+func (m *mockResetBackend) L1BlockIDByNumber(ctx context.Context, n uint64) (eth.BlockID, error) {
+	// TODO
+	return eth.BlockID{}, ethereum.NotFound
+}
+
+func (m *mockResetBackend) LocalUnsafe(ctx context.Context) (eth.BlockID, error) {
+	// TODO
+	return eth.BlockID{}, ethereum.NotFound
+}
+
 func TestResetTracker(t *testing.T) {
 	logger := testlog.Logger(t, log.LvlDebug)
 	backend := new(mockResetBackend)

@@ -28,6 +28,19 @@ func (m *managedNodeResetBackend) IsLocalSafe(ctx context.Context, block eth.Blo
 	return m.backend.IsLocalSafe(ctx, m.chainID, block)
 }
 
+func (m *managedNodeResetBackend) L2BlockRefByNumber(ctx context.Context, n uint64) (eth.L2BlockRef, error) {
+	return m.node.L2BlockRefByNumber(ctx, n)
+}
+
+func (m *managedNodeResetBackend) L1BlockIDByNumber(ctx context.Context, n uint64) (eth.BlockID, error) {
+	r, err := m.backend.L1BlockRefByNumber(ctx, n)
+	return r.ID(), err
+}
+
+func (m *managedNodeResetBackend) LocalUnsafe(ctx context.Context) (eth.BlockID, error) {
+	return m.backend.LocalUnsafe(ctx, m.chainID)
+}
+
 func (m *ManagedNode) resetBackend() *managedNodeResetBackend {
 	return &managedNodeResetBackend{
 		chainID: m.chainID,

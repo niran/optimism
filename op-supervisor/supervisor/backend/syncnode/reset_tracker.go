@@ -24,6 +24,10 @@ type resetTracker struct {
 type resetBackend interface {
 	BlockIDByNumber(ctx context.Context, n uint64) (eth.BlockID, error)
 	IsLocalSafe(ctx context.Context, block eth.BlockID) error
+
+	L2BlockRefByNumber(ctx context.Context, n uint64) (eth.L2BlockRef, error)
+	L1BlockIDByNumber(ctx context.Context, n uint64) (eth.BlockID, error)
+	LocalUnsafe(ctx context.Context) (eth.BlockID, error)
 }
 
 // init initializes the reset tracker with
