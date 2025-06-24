@@ -47,7 +47,7 @@ func (m *ManagedNode) initiateReset(z eth.BlockID) {
 	start, err := m.backend.ActivationBlock(ctx, m.chainID)
 	if errors.Is(err, types.ErrFuture) {
 		m.log.Info("no activation block yet, initiating pre-Interop reset", "err", err)
-		m.emitter.Emit(superevents.ResetPreInteropRequestEvent{ChainID: m.chainID})
+		m.emitter.Emit(m.ctx, superevents.ResetPreInteropRequestEvent{ChainID: m.chainID})
 		return
 	} else if err != nil {
 		m.log.Error("failed to get activation block, cancelling reset", "err", err)
@@ -60,7 +60,7 @@ func (m *ManagedNode) initiateReset(z eth.BlockID) {
 		return
 	} else if target.PreInterop {
 		m.log.Info("bisection results in pre-Interop reset")
-		m.emitter.Emit(superevents.ResetPreInteropRequestEvent{ChainID: m.chainID})
+		m.emitter.Emit(m.ctx, superevents.ResetPreInteropRequestEvent{ChainID: m.chainID})
 		return
 	}
 	m.log.Info("bisection found reset target", "target", target.Target)

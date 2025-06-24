@@ -1,13 +1,12 @@
 package loadtest
 
 import (
-	"context"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/devnet-sdk/contracts/bindings"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
-	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/txinclude"
 	"github.com/ethereum-optimism/optimism/op-service/txplan"
 	"github.com/ethereum/go-ethereum/common"
@@ -37,28 +36,28 @@ type SyncEOA struct {
 }
 
 type L2 struct {
-	Config       *params.ChainConfig
-	RollupConfig *rollup.Config
-	EL           *dsl.L2ELNode
-	EOAs         *RoundRobin[*SyncEOA]
-	EventLogger  common.Address
+	Config      *params.ChainConfig
+	BlockTime   time.Duration
+	EL          *dsl.L2ELNode
+	EOAs        *RoundRobin[*SyncEOA]
+	EventLogger common.Address
 }
 
-func (l2 *L2) DeployEventLogger(ctx context.Context, t devtest.T) {
-	tx, err := l2.Include(ctx, t, txplan.WithData(common.FromHex(bindings.EventloggerBin)))
+func (l2 *L2) DeployEventLogger(t devtest.T) {
+	tx, err := l2.Include(t, txplan.WithData(common.FromHex(bindings.EventloggerBin)))
 	t.Require().NoError(err)
 	l2.EventLogger = tx.Receipt.ContractAddress
 }
 
-func (l2 *L2) Include(ctx context.Context, t devtest.T, opts ...txplan.Option) (*txinclude.IncludedTx, error) {
+func (l2 *L2) Include(t devtest.T, opts ...txplan.Option) (*txinclude.IncludedTx, error) {
 	eoa := l2.EOAs.Get()
-	unsigned, err := txplan.NewPlannedTx(eoa.Plan, txplan.Combine(opts...)).Unsigned.Eval(ctx)
+	unsigned, err := txplan.NewPlannedTx(eoa.Plan, txplan.Combine(opts...)).Unsigned.Eval(t.Ctx())
 	if err != nil {
 		// Context cancelations and i/o timeouts can cause an error (there may be other scenarios).
 		// Let the caller handle it.
 		return nil, err
 	}
-	includedTx, err := eoa.Includer.Include(ctx, unsigned)
+	includedTx, err := eoa.Includer.Include(t.Ctx(), unsigned)
 	if err != nil {
 		return nil, err // Allow the caller to check for budget overdrafts and context cancelation.
 	}

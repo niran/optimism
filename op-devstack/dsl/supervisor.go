@@ -86,7 +86,9 @@ func (s *Supervisor) FetchSyncStatus() eth.SupervisorSyncStatus {
 	ctx, cancel := context.WithTimeout(s.ctx, DefaultTimeout)
 	defer cancel()
 	syncStatus, err := retry.Do(ctx, 2, retry.Fixed(500*time.Millisecond), func() (eth.SupervisorSyncStatus, error) {
-		syncStatus, err := s.inner.QueryAPI().SyncStatus(s.ctx)
+		ctx, cancel := context.WithTimeout(s.ctx, 300*time.Millisecond)
+		defer cancel()
+		syncStatus, err := s.inner.QueryAPI().SyncStatus(ctx)
 		if errors.Is(err, status.ErrStatusTrackerNotReady) {
 			s.log.Debug("Sync status not ready from supervisor")
 		}
@@ -153,7 +155,7 @@ func (s *Supervisor) WaitForL2HeadToAdvance(chainID eth.ChainID, delta uint64, l
 func (s *Supervisor) WaitForL2HeadToAdvanceTo(chainID eth.ChainID, lvl types.SafetyLevel, blockID eth.BlockID) {
 	ctx, cancel := context.WithCancelCause(s.ctx)
 	defer cancel(nil)
-	err := retry.Do0(ctx, 120, &retry.FixedStrategy{Dur: 500 * time.Millisecond}, func() error {
+	err := retry.Do0(ctx, 5*60, &retry.FixedStrategy{Dur: 1 * time.Second}, func() error {
 		chStatus := s.L2HeadBlockID(chainID, lvl)
 		s.log.Info("Supervisor view",
 			"chain", chainID, "label", lvl, "current", chStatus.Number, "target", blockID.Number)

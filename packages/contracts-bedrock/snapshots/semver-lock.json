@@ -20,8 +20,8 @@
     "sourceCodeHash": "0x11b35ee81f797b30ee834e2ffad52686d2100d7ee139db4299b7d854dba25550"
   },
   "src/L1/OPCMValidator.sol:OPCMValidator": {
-    "initCodeHash": "0x8ef5eb28e5d4cd12ba4a6f3fcbe3ce3b1041b824e91bbf07998177c52223c01b",
-    "sourceCodeHash": "0xeebbdf9835101ba501bb9937f71b7f1c1338d15a845139d4e2954a4438477f7b"
+    "initCodeHash": "0xa58c433d2f4f9db548e43714bf63e5fc7976e3b89e888a59b6485f37d1656627",
+    "sourceCodeHash": "0xec170b06ce05dee802ed735aeef76ef43b28cc6bf60b3d9d2bf64b5deb3fb58c"
   },
   "src/L1/OPContractsManager.sol:OPContractsManager": {
     "initCodeHash": "0xdc3b3f4093ea5d372f770ceffed754c709de4873b4ee2ab60673baebe8dab1a9",
@@ -88,8 +88,8 @@
     "sourceCodeHash": "0x83396cbd12a0c5c02e09a4d99c4b62ab4e9d9eb762745e63283e2e818a78a39c"
   },
   "src/L2/L2ToL2CrossDomainMessenger.sol:L2ToL2CrossDomainMessenger": {
-    "initCodeHash": "0xd997db3cb7c84c8c851719bcf561ef35eb660262b2f4093dd6a3d86c5426240f",
-    "sourceCodeHash": "0x33393a279f32ecd6641adf267b59413d86595357b4f50b8a09afb62b8fc7639c"
+    "initCodeHash": "0x975fd33a3a386310d54dbb01b56f3a6a8350f55a3b6bd7781e5ccc2166ddf2e6",
+    "sourceCodeHash": "0xbea4229c5c6988243dbc7cf5a086ddd412fe1f2903b8e20d56699fec8de0c2c9"
   },
   "src/L2/OperatorFeeVault.sol:OperatorFeeVault": {
     "initCodeHash": "0x3d8c0d7736e8767f2f797da1c20c5fe30bd7f48a4cf75f376290481ad7c0f91f",
@@ -136,8 +136,8 @@
     "sourceCodeHash": "0x734a6b2aa6406bc145d848ad6071d3af1d40852aeb8f4b2f6f51beaad476e2d3"
   },
   "src/cannon/MIPS64.sol:MIPS64": {
-    "initCodeHash": "0x4c62ab095565b59be3e5dcb385c6a65b489e4d35daf060ae44c6add9b75a3681",
-    "sourceCodeHash": "0x476af3b1f1bd924e3bee8e896d2f4adbd2b24464d80519bc7d2b3284a6128c81"
+    "initCodeHash": "0xbc7c3c50e8c3679576f87d79c2dae05dd1174e64bdaa4c1e0857314618e415a3",
+    "sourceCodeHash": "0xf6e87bf46edca31c2b30c83fdf7b57a7851404743e16dd4f783be3a34c481d76"
   },
   "src/cannon/PreimageOracle.sol:PreimageOracle": {
     "initCodeHash": "0x6af5b0e83b455aab8d0946c160a4dc049a4e03be69f8a2a9e87b574f27b25a66",

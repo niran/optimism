@@ -1,11 +1,14 @@
 package presets
 
 import (
+	"time"
+
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/devkeys"
 	"github.com/ethereum-optimism/optimism/op-devstack/devtest"
 	"github.com/ethereum-optimism/optimism/op-devstack/dsl"
+	"github.com/ethereum-optimism/optimism/op-devstack/dsl/proofs"
 	"github.com/ethereum-optimism/optimism/op-devstack/shim"
 	"github.com/ethereum-optimism/optimism/op-devstack/stack"
 	"github.com/ethereum-optimism/optimism/op-devstack/stack/match"
@@ -81,6 +84,12 @@ func (s *SingleChainInterop) L2Networks() []*dsl.L2Network {
 	}
 }
 
+func (s *SingleChainInterop) AdvanceTime(amount time.Duration) {
+	ttSys, ok := s.system.(stack.TimeTravelSystem)
+	s.T.Require().True(ok, "attempting to advance time on incompatible system")
+	ttSys.AdvanceTime(amount)
+}
+
 // WithSingleChainInterop specifies a system that meets the SingleChainInterop criteria.
 func WithSingleChainInterop() stack.CommonOption {
 	return stack.MakeCommon(sysgo.DefaultSingleChainInteropSystem(&sysgo.DefaultSingleChainInteropSystemIDs{}))
@@ -102,6 +111,14 @@ func (s *SimpleInterop) L2Networks() []*dsl.L2Network {
 	return []*dsl.L2Network{
 		s.L2ChainA, s.L2ChainB,
 	}
+}
+
+func (s *SimpleInterop) DisputeGameFactory() *proofs.DisputeGameFactory {
+	return proofs.NewDisputeGameFactory(s.T, s.L1Network, s.L1EL.EthClient(), s.L2ChainA.DisputeGameFactoryProxyAddr(), s.Supervisor)
+}
+
+func (s *SingleChainInterop) StandardBridge(l2Chain *dsl.L2Network) *dsl.StandardBridge {
+	return dsl.NewStandardBridge(s.T, l2Chain, s.Supervisor, s.L1EL)
 }
 
 // WithSimpleInterop specifies a system that meets the SimpleInterop criteria.
