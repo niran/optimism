@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
 	"github.com/ethereum-optimism/optimism/op-service/testutils"
@@ -147,10 +148,15 @@ func TestManagedMode_findLatestValidLocalUnsafe(t *testing.T) {
 				}
 			}
 
+			zeroTime := uint64(0)
 			managedMode := &IndexingMode{
 				log: logger,
 				l1:  mockL1,
 				l2:  mockL2,
+				cfg: &rollup.Config{
+					SeqWindowSize: 100,
+					InteropTime:   &zeroTime,
+				},
 			}
 
 			result, err := managedMode.findLatestValidLocalUnsafe(ctx, eth.BlockID{
