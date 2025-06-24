@@ -419,7 +419,7 @@ func (m *IndexingMode) Reset(ctx context.Context, lUnsafe, xUnsafe, lSafe, xSafe
 	}
 
 	// verify all provided references
-	_, err := verify(lUnsafe, "unsafe")
+	lUnsafeRef, err := verify(lUnsafe, "unsafe")
 	if err != nil {
 		logger.Error("Cannot reset, local-unsafe target invalid")
 		return err
@@ -445,14 +445,8 @@ func (m *IndexingMode) Reset(ctx context.Context, lUnsafe, xUnsafe, lSafe, xSafe
 		return err
 	}
 
-	latestLocalUnsafe, err := m.findLatestValidLocalUnsafe(ctx, lUnsafe)
-	if err != nil {
-		logger.Error("Cannot reset, no valid local-unsafe block found", "err", err)
-		return err
-	}
-
 	m.emitter.Emit(ctx, rollup.ForceResetEvent{
-		LocalUnsafe: latestLocalUnsafe,
+		LocalUnsafe: lUnsafeRef,
 		CrossUnsafe: xUnsafeRef,
 		LocalSafe:   lSafeRef,
 		CrossSafe:   xSafeRef,
@@ -603,5 +597,9 @@ func (m *IndexingMode) L2BlockRefByTimestamp(ctx context.Context, timestamp uint
 	if err != nil {
 		return eth.L2BlockRef{}, err
 	}
+	return m.l2.L2BlockRefByNumber(ctx, num)
+}
+
+func (m *IndexingMode) L2BlockRefByNumber(ctx context.Context, num uint64) (eth.L2BlockRef, error) {
 	return m.l2.L2BlockRefByNumber(ctx, num)
 }
