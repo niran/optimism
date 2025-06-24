@@ -172,7 +172,7 @@ func TestEVM_MT_SC(t *testing.T) {
 					var retVal Word
 					if llVar.shouldSucceed {
 						retVal = 1
-						expected.ExpectMemoryWriteUint32(t, Word(c.expectedAddr), c.storeValue)
+						expected.ExpectMemoryWriteUint32(t, state, Word(c.expectedAddr), c.storeValue)
 						expected.ExpectMemoryReservationCleared()
 					} else {
 						retVal = 0
@@ -880,8 +880,8 @@ func testEVM_SysClockGettime(t *testing.T, clkid Word) {
 						secs = Word(next / exec.HZ)
 						nsecs = Word((next % exec.HZ) * (1_000_000_000 / exec.HZ))
 					}
-					expected.ExpectMemoryWrite(effAddr, secs)
-					expected.ExpectMemoryWrite(effAddr2, nsecs)
+					expected.ExpectMemoryWrite(t, state, effAddr, secs)
+					expected.ExpectMemoryWrite(t, state, effAddr2, nsecs)
 					if llVar.shouldClearReservation {
 						expected.ExpectMemoryReservationCleared()
 					}

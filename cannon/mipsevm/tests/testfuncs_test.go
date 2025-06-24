@@ -188,7 +188,7 @@ func testLoadStore(t *testing.T, cases []loadStoreTestCase) {
 				expected := mtutil.NewExpectedState(t, state)
 				expected.ExpectStep()
 				if tt.expectMemVal != 0 {
-					expected.ExpectMemoryWrite(effAddr, tt.expectMemVal)
+					expected.ExpectMemoryWrite(t, state, effAddr, tt.expectMemVal)
 				} else {
 					expected.ActiveThread().Registers[rtReg] = tt.expectRes
 				}

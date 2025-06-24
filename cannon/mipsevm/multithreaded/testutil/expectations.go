@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -122,7 +123,10 @@ func (e *ExpectedState) ExpectMemoryReservationCleared() {
 	e.LLOwnerThread = 0
 }
 
-func (e *ExpectedState) ExpectMemoryWriteUint32(t require.TestingT, addr arch.Word, val uint32) {
+func (e *ExpectedState) ExpectMemoryWriteUint32(t require.TestingT, initialState mipsevm.FPVMState, addr arch.Word, val uint32) {
+	state := ToMTState(t, initialState)
+	maybeSetLLReservation(state, addr)
+
 	// Align address to 4-byte boundaries
 	addr = addr & ^arch.Word(3)
 
@@ -132,11 +136,44 @@ func (e *ExpectedState) ExpectMemoryWriteUint32(t require.TestingT, addr arch.Wo
 	require.NoError(t, err)
 
 	e.MemoryRoot = e.expectedMemory.MerkleRoot()
+
+	// Expect any matching memory reservation to be cleared
+	if addr&arch.AddressMask == e.LLAddress&arch.AddressMask {
+		e.ExpectMemoryReservationCleared()
+	}
 }
 
-func (e *ExpectedState) ExpectMemoryWrite(addr arch.Word, val arch.Word) {
+func (e *ExpectedState) ExpectMemoryWrite(t require.TestingT, initialState mipsevm.FPVMState, addr arch.Word, val arch.Word) {
+	state := ToMTState(t, initialState)
+	maybeSetLLReservation(state, addr)
+
 	e.expectedMemory.SetWord(addr, val)
 	e.MemoryRoot = e.expectedMemory.MerkleRoot()
+
+	// Expect any matching memory reservation to be cleared
+	if addr&arch.AddressMask == e.LLAddress&arch.AddressMask {
+		e.ExpectMemoryReservationCleared()
+	}
+}
+
+// maybeSetLLReservation Sets up a memory reservation that overlaps with the given targetMemAddr
+// only if the memory reservation is currently empty
+func maybeSetLLReservation(state *multithreaded.State, targetMemAddr arch.Word) {
+	if state.LLReservationStatus != multithreaded.LLStatusNone || state.LLAddress != 0 || state.LLOwnerThread != 0 {
+		// LL reservation fields are not empty - leave them alone as they appear to have been intentionally set
+		return
+	}
+
+	// Setup PRNG from snapshot of state
+	_, witness := state.EncodeWitness()
+	seed := binary.BigEndian.Uint64(witness[0:8])
+	r := testutil.NewRandHelper(int64(seed))
+
+	// Set up a memory reservation that overlaps with the effective address of the target memory word
+	effAddr := targetMemAddr & arch.AddressMask
+	state.LLReservationStatus = multithreaded.LLReservationStatus(r.Intn(2) + 1)
+	state.LLAddress = effAddr + arch.Word(r.Intn(arch.WordSizeBytes))
+	state.LLOwnerThread = arch.Word(r.Intn(10))
 }
 
 func (e *ExpectedState) ExpectPreemption(preState *multithreaded.State) {
