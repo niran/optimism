@@ -22,7 +22,6 @@ type l1Node interface {
 type rewinderDB interface {
 	DependencySet() depset.DependencySet
 
-	CrossSourceToLastDerived(chainID eth.ChainID, source eth.BlockID) (derived types.BlockSeal, err error)
 	PreviousSource(chain eth.ChainID, source eth.BlockID) (prevSource types.BlockSeal, err error)
 	CrossDerivedToSourceRef(chainID eth.ChainID, derived eth.BlockID) (source eth.BlockRef, err error)
 
