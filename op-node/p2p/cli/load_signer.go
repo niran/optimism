@@ -25,7 +25,7 @@ func LoadSignerSetup(ctx *cli.Context, logger log.Logger) (p2p.SignerSetup, erro
 		// Unencrypted keys from file are bad because they are easy to leak (and we are not checking file permissions).
 		priv, err := crypto.HexToECDSA(strings.TrimPrefix(key, "0x"))
 		if err != nil {
-			return nil, fmt.Errorf("failed to read batch submitter key: %w", err)
+			return nil, fmt.Errorf("failed to read sequencer p2p key: %w", err)
 		}
 
 		return &p2p.PreparedSigner{Signer: opsigner.NewLocalSigner(priv)}, nil

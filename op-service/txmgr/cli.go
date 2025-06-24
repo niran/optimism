@@ -321,16 +321,22 @@ func (m CLIConfig) Check() error {
 	if err := m.SignerCLIConfig.Check(); err != nil {
 		return err
 	}
-	if m.PrivateKey != "" && m.Mnemonic != "" {
-		return errors.New("cannot specify both a private key and a mnemonic")
-	}
-	if m.SignerCLIConfig.Enabled() && (m.PrivateKey != "" || m.Mnemonic != "") {
-		return errors.New("must provide neither a mnemonic nor a private key when using a remote signer")
-	}
-	if !m.SignerCLIConfig.Enabled() {
-		if m.PrivateKey == "" && m.Mnemonic == "" {
-			return errors.New("must provide either a mnemonic or a private key when not using a remote signer")
+	onlyOneIsSet := func(options ...bool) bool {
+		boolToInt := func(b bool) int {
+			if b {
+				return 1
+			}
+			return 0
 		}
+
+		sum := 0
+		for _, option := range options {
+			sum += boolToInt(option)
+		}
+		return sum == 1
+	}
+	if !onlyOneIsSet(m.PrivateKey != "", m.Mnemonic != "", m.SignerCLIConfig.Enabled()) {
+		return errors.New("must provide exactly one of: [private key, mnemonic, remote signer]")
 	}
 	return nil
 }
