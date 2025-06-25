@@ -599,3 +599,10 @@ func (s *EthClient) CodeAtHash(ctx context.Context, account common.Address, bloc
 func (s *EthClient) NewMultiCaller(batchSize int) *batching.MultiCaller {
 	return batching.NewMultiCaller(s.client, batchSize)
 }
+
+// TxPoolInspect queries the txpool_inspect RPC method.
+func (s *EthClient) TxPoolInspect(ctx context.Context) (*apis.TxPoolInspect, error) {
+	var result apis.TxPoolInspect
+	err := s.client.CallContext(ctx, &result, "txpool_inspect")
+	return &result, err
+}

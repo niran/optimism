@@ -128,6 +128,26 @@ type EthMultiCaller interface {
 	NewMultiCaller(batchSize int) *batching.MultiCaller
 }
 
+// TxPoolInspect represents the response structure of txpool_inspect.
+type TxPoolInspect struct {
+	Pending map[common.Address]map[string]TxPoolEntry `json:"pending"`
+	Queued  map[common.Address]map[string]TxPoolEntry `json:"queued"`
+}
+
+// TxPoolEntry is a simplified view of a transaction in the pool.
+type TxPoolEntry struct {
+	Nonce    string `json:"nonce"`
+	To       string `json:"to"`
+	Value    string `json:"value"`
+	Gas      string `json:"gas"`
+	GasPrice string `json:"gasPrice"`
+	Input    string `json:"input"`
+}
+
+type TxPool interface {
+	TxPoolInspect(ctx context.Context) (*TxPoolInspect, error)
+}
+
 type EthClient interface {
 	ChainID
 	EthBlockInfo
@@ -143,6 +163,7 @@ type EthClient interface {
 	EthBalance
 	EthCode
 	EthMultiCaller
+	TxPool
 }
 
 type EthExtendedClient interface {
