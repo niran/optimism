@@ -90,7 +90,7 @@ func (t *ManagedNode) resetHeadsFromTarget(ctx context.Context, target eth.Block
 	var lUnsafe, xUnsafe, lSafe, xSafe, finalized eth.BlockID
 
 	// We set the local unsafe block by checking L1 reorg, picking latest possible unsafe target.
-	lUnsafe, err := t.resetTracker.resetToValidLocalUnsafeHead(ctx, target)
+	lUnsafe, err := t.resetTracker.FindResetUnsafeHeadTarget(ctx, target)
 	if err != nil {
 		t.log.Error("failed to get valid local unsafe block. cancelling reset", "err", err)
 		return

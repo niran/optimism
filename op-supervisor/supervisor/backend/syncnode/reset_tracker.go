@@ -147,9 +147,9 @@ func (t *resetTracker) verifyBlock(ctx context.Context, blockNum uint64) (eth.L2
 	return current, nil
 }
 
-// resetToValidLocalUnsafeHead searches and returns the latest valid block of the L2 chain
+// FindResetUnsafeHeadTarget searches and returns the latest valid block of the L2 chain
 // starting from `l2UnsafeTarget` and checking until the latest unsafe block.
-func (t *resetTracker) resetToValidLocalUnsafeHead(ctx context.Context, lSafe eth.BlockID) (eth.BlockID, error) {
+func (t *resetTracker) FindResetUnsafeHeadTarget(ctx context.Context, lSafe eth.BlockID) (eth.BlockID, error) {
 	latestlUnsafe, err := t.backend.LocalUnsafe(ctx)
 	if err != nil {
 		t.log.Error("failed to get last local unsafe block. cancelling reset", "err", err)
