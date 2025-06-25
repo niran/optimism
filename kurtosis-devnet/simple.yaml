@@ -47,6 +47,7 @@ optimism_package:
       batcher_params:
         image: {{ localDockerImage "op-batcher" }}
         extra_params: []
+        pprof_enabled: true
       proposer_params:
         image: {{ localDockerImage "op-proposer" }}
         extra_params: []
