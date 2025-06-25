@@ -336,7 +336,7 @@ func (m CLIConfig) Check() error {
 		return sum == 1 || sum == 0
 	}
 	if !atMostOneIsSet(m.PrivateKey != "", m.Mnemonic != "", m.SignerCLIConfig.Enabled()) {
-		return errors.New("must provide exactly one of: [private key, mnemonic, remote signer]")
+		return errors.New("can only provide at most one of: [private key, mnemonic, remote signer]")
 	}
 	return nil
 }
