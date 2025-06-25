@@ -18,7 +18,7 @@ const (
 type ShadowCompressor struct {
 	config Config
 
-	compressor       derive.ChannelCompressor
+	inputBuffer      []byte
 	shadowCompressor derive.ChannelCompressor
 
 	fullErr error
@@ -26,9 +26,12 @@ type ShadowCompressor struct {
 	bound uint64 // best known upperbound on the size of the compressed output
 }
 
-// NewShadowCompressor creates a new derive.Compressor implementation that contains two
-// compression buffers: one used for size estimation, and one used for the final
-// compressed output. The first is flushed on every write, the second isn't, which means
+// NewShadowCompressor creates a new derive.Compressor implementation that
+// uses an underlying compressor to perform size estimation and a cache of the input data.
+// When the ShadowCompressor is flushed or closed, the underlying compressor is first reset and
+// the input data written to it and then flushed.
+// This means we get an optimal compression ratio while getting an accurate size estimation.
+// The underlying compressor is flushed on every write, which means
 // the final compressed data is always slightly smaller than the target. There is one
 // exception to this rule: the first write to the buffer is not checked against the
 // target, which allows individual blocks larger than the target to be included (and will
@@ -39,10 +42,6 @@ func NewShadowCompressor(config Config) (derive.Compressor, error) {
 	}
 
 	var err error
-	c.compressor, err = derive.NewChannelCompressor(config.CompressionAlgo)
-	if err != nil {
-		return nil, err
-	}
 	c.shadowCompressor, err = derive.NewChannelCompressor(config.CompressionAlgo)
 	if err != nil {
 		return nil, err
@@ -56,7 +55,7 @@ func (t *ShadowCompressor) Write(p []byte) (int, error) {
 	if t.fullErr != nil {
 		return 0, t.fullErr
 	}
-	_, err := t.shadowCompressor.Write(p)
+	n, err := t.shadowCompressor.Write(p)
 	if err != nil {
 		return 0, err
 	}
@@ -71,7 +70,7 @@ func (t *ShadowCompressor) Write(p []byte) (int, error) {
 		newBound = uint64(t.shadowCompressor.Len()) + CloseOverheadZlib
 		if newBound > t.config.TargetOutputSize {
 			t.fullErr = derive.ErrCompressorFull
-			if t.Len() > 0 {
+			if len(t.inputBuffer) > 0 {
 				// only return an error if we've already written data to this compressor before
 				// (otherwise single blocks over the target would never be written)
 				return 0, t.fullErr
@@ -79,30 +78,35 @@ func (t *ShadowCompressor) Write(p []byte) (int, error) {
 		}
 	}
 	t.bound = newBound
-	return t.compressor.Write(p)
+	t.inputBuffer = append(t.inputBuffer, p...)
+	return n, nil
 }
 
 func (t *ShadowCompressor) Close() error {
-	return t.compressor.Close()
+	t.Flush()
+	return t.shadowCompressor.Close()
 }
 
 func (t *ShadowCompressor) Read(p []byte) (int, error) {
-	return t.compressor.Read(p)
+	return t.shadowCompressor.Read(p)
 }
 
 func (t *ShadowCompressor) Reset() {
-	t.compressor.Reset()
+	t.inputBuffer = t.inputBuffer[:0]
 	t.shadowCompressor.Reset()
 	t.fullErr = nil
 	t.bound = safeCompressionOverhead
 }
 
 func (t *ShadowCompressor) Len() int {
-	return t.compressor.Len()
+	return int(t.bound)
 }
 
 func (t *ShadowCompressor) Flush() error {
-	return t.compressor.Flush()
+	t.shadowCompressor.Reset()
+	t.shadowCompressor.Write(t.inputBuffer)
+	t.inputBuffer = t.inputBuffer[:0]
+	return t.shadowCompressor.Flush()
 }
 
 func (t *ShadowCompressor) FullErr() error {
