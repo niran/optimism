@@ -62,7 +62,7 @@ func (t *ShadowCompressor) Write(p []byte) (int, error) {
 	}
 	newBound := t.bound + uint64(len(p))
 	if newBound > t.config.TargetOutputSize {
-		// Do not flush the buffer unless there's some chance we will be over the size limit.
+		// Only flush the buffer if there's some chance we will be over the size limit.
 		// This reduces CPU but more importantly it makes the shadow compression ratio more
 		// closely reflect the ultimate compression ratio.
 		if err = t.shadowCompressor.Flush(); err != nil {
