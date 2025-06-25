@@ -2,6 +2,7 @@ package msg
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -549,6 +550,17 @@ func executeIndexedFault(
 	}
 }
 
+func checkMempool(t devtest.T, sys *presets.SimpleInterop) {
+	require := sys.T.Require()
+	logger := t.Logger()
+	logger.Info("Check mempool")
+	res, err := sys.L2ELB.Escape().EthClient().TxPoolInspect(t.Ctx())
+	require.NoError(err)
+	b, err := json.Marshal(res)
+	require.NoError(err)
+	logger.Info("Mempool", "content", string(b))
+}
+
 // TestExecMessageInvalidAttributes tests below scenario:
 // Execute message, but with one or more invalid attributes inside identifiers
 func TestExecMessageInvalidAttributes(gt *testing.T) {
@@ -558,12 +570,8 @@ func TestExecMessageInvalidAttributes(gt *testing.T) {
 	logger := t.Logger()
 
 	rng := rand.New(rand.NewSource(1234))
-	// honest EOA which initiates messages
 	alice := sys.FunderA.NewFundedEOA(eth.OneTenthEther)
-	// honest EOA which executes messages
 	bob := sys.FunderB.NewFundedEOA(eth.OneTenthEther)
-	// malicious EOA which creates executing messages with invalid attributes
-	chuck := sys.FunderB.NewFundedEOA(eth.OneTenthEther)
 
 	eventLoggerAddress := alice.DeployEventLogger()
 
@@ -584,6 +592,8 @@ func TestExecMessageInvalidAttributes(gt *testing.T) {
 	// Make sure supervisor syncs the chain A events
 	sys.Supervisor.WaitForUnsafeHeadToAdvance(alice.ChainID(), 2)
 
+	checkMempool(t, sys)
+
 	faultsLists := [][]invalidAttributeType{
 		// test each identifier attributes to be faulty for upper bound tests
 		{randomOrigin}, {randomBlockNumber}, {randomLogIndex}, {randomTimestamp}, {randomChainID},
@@ -593,28 +603,42 @@ func TestExecMessageInvalidAttributes(gt *testing.T) {
 		{mismatchedLogIndex}, {mismatchedTimestamp}, {msgNotPresent}, {logIndexGreaterOrEqualToEventCnt},
 	}
 
+	txHashes := []common.Hash{}
 	for _, faults := range faultsLists {
 		logger.Info("Attempt to validate message with invalid attribute", "faults", faults)
 		// Intent to validate message on chain B
-		txC := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput](chuck.Plan())
-		txC.Content.DependOn(&txA.Result)
+		txB := txintent.NewIntent[*txintent.ExecTrigger, *txintent.InteropOutput](bob.Plan())
+		txB.Content.DependOn(&txA.Result)
 
 		// Random select event index in tx for injecting faults
 		eventIdx := rng.Intn(len(initCalls))
-		txC.Content.Fn(executeIndexedFault(constants.CrossL2Inbox, &txA.Result, eventIdx, rng, faults, chuck.ChainID()))
+		txB.Content.Fn(executeIndexedFault(constants.CrossL2Inbox, &txA.Result, eventIdx, rng, faults, bob.ChainID()))
 
 		// make sure that the transaction is not reverted by CrossL2Inbox...
-		gas, err := txC.PlannedTx.Gas.Eval(t.Ctx())
+		gas, err := txB.PlannedTx.Gas.Eval(t.Ctx())
 		require.NoError(err)
 		require.Greater(gas, uint64(0))
+
+		signed, err := txB.PlannedTx.Signed.Eval(t.Ctx())
+		require.NoError(err)
+		txHash := signed.Hash()
+		logger.Info("Invalid exec msg tx hash", "hash", txHash)
+		txHashes = append(txHashes, txHash)
 
 		// but rather not included at chain B because of supervisor check
 		// chain B L2 EL will query supervisor to check whether given message is valid
 		// supervisor will throw ErrConflict(conflicting data), and L2 EL will drop tx
-		_, err = txC.PlannedTx.Included.Eval(t.Ctx())
+		_, err = txB.PlannedTx.Included.Eval(t.Ctx())
 		require.Error(err)
 		logger.Info("Validate message not included")
+
+		checkMempool(t, sys)
 	}
+
+	for idx, txHash := range txHashes {
+		logger.Info("Invalid exec msg tx hash", "idx", idx, "hash", txHash)
+	}
+	checkMempool(t, sys)
 
 	// we now attempt to execute msg correctly
 	// Intent to validate message on chain B
