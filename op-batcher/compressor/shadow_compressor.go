@@ -22,8 +22,6 @@ type ShadowCompressor struct {
 	shadowCompressor derive.ChannelCompressor
 
 	fullErr error
-
-	bound uint64 // best known upperbound on the size of the compressed output
 }
 
 // NewShadowCompressor creates a new derive.Compressor implementation that
@@ -47,7 +45,6 @@ func NewShadowCompressor(config Config) (derive.Compressor, error) {
 		return nil, err
 	}
 
-	c.bound = safeCompressionOverhead
 	return c, nil
 }
 
@@ -55,35 +52,49 @@ func (t *ShadowCompressor) Write(p []byte) (int, error) {
 	if t.fullErr != nil {
 		return 0, t.fullErr
 	}
+
+	// Always write to the shadow compressor, we will roll back the write if we are over the size limit.
 	n, err := t.shadowCompressor.Write(p)
 	if err != nil {
 		return 0, err
 	}
-	newBound := t.bound + uint64(len(p))
+
+	// Flush the shadow compressor on every write to get an accurate size estimation, at the cost of a slightly worse compression ratio.
+	if err = t.shadowCompressor.Flush(); err != nil {
+		return 0, err
+	}
+
+	newBound := uint64(t.shadowCompressor.Len()) + CloseOverheadZlib
 	if newBound > t.config.TargetOutputSize {
-		// Only flush the buffer if there's some chance we will be over the size limit.
-		// This reduces CPU but more importantly it makes the shadow compression ratio more
-		// closely reflect the ultimate compression ratio.
-		if err = t.shadowCompressor.Flush(); err != nil {
+
+		// Rollback the write:
+		if err := t.overwriteCompressorWithInputBuffer(); err != nil {
 			return 0, err
 		}
-		newBound = uint64(t.shadowCompressor.Len()) + CloseOverheadZlib
-		if newBound > t.config.TargetOutputSize {
-			t.fullErr = derive.ErrCompressorFull
-			if len(t.inputBuffer) > 0 {
-				// only return an error if we've already written data to this compressor before
-				// (otherwise single blocks over the target would never be written)
-				return 0, t.fullErr
-			}
+
+		t.fullErr = derive.ErrCompressorFull
+		if len(t.inputBuffer) > 0 {
+			// only return an error if we've already written data to this compressor before
+			// (otherwise single blocks over the target would never be written)
+			return 0, t.fullErr
 		}
 	}
-	t.bound = newBound
 	t.inputBuffer = append(t.inputBuffer, p...)
+
 	return n, nil
 }
 
+func (t *ShadowCompressor) overwriteCompressorWithInputBuffer() error {
+	t.shadowCompressor.Reset()
+	_, err := t.shadowCompressor.Write(t.inputBuffer)
+	return err
+}
+
 func (t *ShadowCompressor) Close() error {
-	t.Flush()
+	if err := t.overwriteCompressorWithInputBuffer(); err != nil {
+		return err
+	}
+	t.inputBuffer = t.inputBuffer[:0]
 	return t.shadowCompressor.Close()
 }
 
@@ -92,20 +103,16 @@ func (t *ShadowCompressor) Read(p []byte) (int, error) {
 }
 
 func (t *ShadowCompressor) Reset() {
-	t.inputBuffer = t.inputBuffer[:0]
 	t.shadowCompressor.Reset()
+	t.inputBuffer = t.inputBuffer[:0]
 	t.fullErr = nil
-	t.bound = safeCompressionOverhead
 }
 
 func (t *ShadowCompressor) Len() int {
-	return int(t.bound)
+	return max(t.shadowCompressor.Len(), safeCompressionOverhead)
 }
 
 func (t *ShadowCompressor) Flush() error {
-	t.shadowCompressor.Reset()
-	t.shadowCompressor.Write(t.inputBuffer)
-	t.inputBuffer = t.inputBuffer[:0]
 	return t.shadowCompressor.Flush()
 }
 
