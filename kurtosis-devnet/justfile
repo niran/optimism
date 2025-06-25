@@ -46,6 +46,8 @@ op-wheel-image TAG='op-wheel:devnet': (_docker_build_stack TAG "op-wheel-target"
 op-faucet-image TAG='op-faucet:devnet': (_docker_build_stack TAG "op-faucet-target")
 op-interop-mon-image TAG='op-interop-mon:devnet': (_docker_build_stack TAG "op-interop-mon-target")
 
+safe-utils-image TAG='safe-utils:devnet': (_docker_build TAG "" "./safe-utils" "Dockerfile")
+
 op-program-builder-image TAG='op-program-builder:devnet': _prerequisites
     just op-program-svc/op-program-svc {{TAG}}
 
