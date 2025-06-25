@@ -1,0 +1,16 @@
+[
+  {
+    "dependencies": {
+      "420120011": {
+        "chainIndex": "0",
+        "activationTime": 0,
+        "historyMinTime": 0
+      },
+      "420120012": {
+        "chainIndex": "1",
+        "activationTime": 0,
+        "historyMinTime": 0
+      }
+    }
+  }
+]
