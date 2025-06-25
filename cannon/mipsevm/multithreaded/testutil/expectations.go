@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"testing"
 
@@ -163,12 +162,8 @@ func maybeSetLLReservation(t *testing.T, state *multithreaded.State, targetMemAd
 
 	t.Logf("Automatically setting up memory reservation on initial state targeting memory address 0x%x", targetMemAddr)
 
-	// Setup PRNG from snapshot of state
-	_, witness := state.EncodeWitness()
-	seed := binary.BigEndian.Uint64(witness[0:8])
-	r := testutil.NewRandHelper(int64(seed))
-
 	// Set up a memory reservation that overlaps with the effective address of the target memory word
+	r := testutil.NewRandHelperFromState(state)
 	effAddr := targetMemAddr & arch.AddressMask
 	state.LLReservationStatus = multithreaded.LLReservationStatus(r.Intn(2) + 1)
 	state.LLAddress = effAddr + arch.Word(r.Intn(arch.WordSizeBytes))

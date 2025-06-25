@@ -4,7 +4,9 @@ import (
 	"encoding/binary"
 	"math/rand"
 
+	"github.com/ethereum-optimism/optimism/cannon/mipsevm"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -16,6 +18,12 @@ type RandHelper struct {
 func NewRandHelper(seed int64) *RandHelper {
 	r := rand.New(rand.NewSource(seed))
 	return &RandHelper{r: r}
+}
+
+func NewRandHelperFromState(state mipsevm.FPVMState) *RandHelper {
+	_, witness := state.EncodeWitness()
+	seed := binary.BigEndian.Uint64(witness[1:9])
+	return NewRandHelper(int64(seed))
 }
 
 func (h *RandHelper) Uint32() uint32 {
