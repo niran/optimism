@@ -655,6 +655,4 @@ func TestExecMessageInvalidAttributes(gt *testing.T) {
 
 	// Check three ExecutingMessage triggered
 	require.Equal(3, len(receiptB.Logs))
-
-	// temp
 }
