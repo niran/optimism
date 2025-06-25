@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -128,24 +129,45 @@ type EthMultiCaller interface {
 	NewMultiCaller(batchSize int) *batching.MultiCaller
 }
 
-// TxPoolInspect represents the response structure of txpool_inspect.
-type TxPoolInspect struct {
-	Pending map[common.Address]map[string]TxPoolEntry `json:"pending"`
-	Queued  map[common.Address]map[string]TxPoolEntry `json:"queued"`
-}
+type RPCTransaction struct {
+	BlockHash           *common.Hash                 `json:"blockHash"`
+	BlockNumber         *hexutil.Big                 `json:"blockNumber"`
+	From                common.Address               `json:"from"`
+	Gas                 hexutil.Uint64               `json:"gas"`
+	GasPrice            *hexutil.Big                 `json:"gasPrice"`
+	GasFeeCap           *hexutil.Big                 `json:"maxFeePerGas,omitempty"`
+	GasTipCap           *hexutil.Big                 `json:"maxPriorityFeePerGas,omitempty"`
+	MaxFeePerBlobGas    *hexutil.Big                 `json:"maxFeePerBlobGas,omitempty"`
+	Hash                common.Hash                  `json:"hash"`
+	Input               hexutil.Bytes                `json:"input"`
+	Nonce               hexutil.Uint64               `json:"nonce"`
+	To                  *common.Address              `json:"to"`
+	TransactionIndex    *hexutil.Uint64              `json:"transactionIndex"`
+	Value               *hexutil.Big                 `json:"value"`
+	Type                hexutil.Uint64               `json:"type"`
+	Accesses            *types.AccessList            `json:"accessList,omitempty"`
+	ChainID             *hexutil.Big                 `json:"chainId,omitempty"`
+	BlobVersionedHashes []common.Hash                `json:"blobVersionedHashes,omitempty"`
+	AuthorizationList   []types.SetCodeAuthorization `json:"authorizationList,omitempty"`
+	V                   *hexutil.Big                 `json:"v"`
+	R                   *hexutil.Big                 `json:"r"`
+	S                   *hexutil.Big                 `json:"s"`
+	YParity             *hexutil.Uint64              `json:"yParity,omitempty"`
 
-// TxPoolEntry is a simplified view of a transaction in the pool.
-type TxPoolEntry struct {
-	Nonce    string `json:"nonce"`
-	To       string `json:"to"`
-	Value    string `json:"value"`
-	Gas      string `json:"gas"`
-	GasPrice string `json:"gasPrice"`
-	Input    string `json:"input"`
+	// deposit-tx only
+	SourceHash *common.Hash `json:"sourceHash,omitempty"`
+	Mint       *hexutil.Big `json:"mint,omitempty"`
+	IsSystemTx *bool        `json:"isSystemTx,omitempty"`
+	// deposit-tx post-Canyon only
+	DepositReceiptVersion *hexutil.Uint64 `json:"depositReceiptVersion,omitempty"`
+}
+type TxPoolContent struct {
+	Pending map[string]map[string]*RPCTransaction `json:"pending"`
+	Queued  map[string]map[string]*RPCTransaction `json:"queued"`
 }
 
 type TxPool interface {
-	TxPoolInspect(ctx context.Context) (*TxPoolInspect, error)
+	TxPoolContent(ctx context.Context) (*TxPoolContent, error)
 }
 
 type EthClient interface {

@@ -600,9 +600,8 @@ func (s *EthClient) NewMultiCaller(batchSize int) *batching.MultiCaller {
 	return batching.NewMultiCaller(s.client, batchSize)
 }
 
-// TxPoolInspect queries the txpool_inspect RPC method.
-func (s *EthClient) TxPoolInspect(ctx context.Context) (*apis.TxPoolInspect, error) {
-	var result apis.TxPoolInspect
-	err := s.client.CallContext(ctx, &result, "txpool_inspect")
+func (s *EthClient) TxPoolContent(ctx context.Context) (*apis.TxPoolContent, error) {
+	var result apis.TxPoolContent
+	err := s.client.CallContext(ctx, &result, "txpool_content")
 	return &result, err
 }

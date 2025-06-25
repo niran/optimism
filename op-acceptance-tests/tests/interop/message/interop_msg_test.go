@@ -554,7 +554,7 @@ func checkMempool(t devtest.T, sys *presets.SimpleInterop) {
 	require := sys.T.Require()
 	logger := t.Logger()
 	logger.Info("Check mempool")
-	res, err := sys.L2ELB.Escape().EthClient().TxPoolInspect(t.Ctx())
+	res, err := sys.L2ELB.Escape().EthClient().TxPoolContent(t.Ctx())
 	require.NoError(err)
 	b, err := json.Marshal(res)
 	require.NoError(err)
