@@ -30,7 +30,7 @@ type DeployImplementationsOutput struct {
 	OpcmDeployer                     common.Address `json:"opcmDeployerAddress"`
 	OpcmUpgrader                     common.Address `json:"opcmUpgraderAddress"`
 	OpcmInteropMigrator              common.Address `json:"opcmInteropMigratorAddress"`
-	OpcmValidator                    common.Address `json:"opcmValidatorAddress"`
+	OpcmStandardValidator            common.Address `json:"opcmStandardValidatorAddress"`
 	DelayedWETHImpl                  common.Address `json:"delayedWETHImplAddress"`
 	OptimismPortalImpl               common.Address `json:"optimismPortalImplAddress"`
 	ETHLockboxImpl                   common.Address `json:"ethLockboxImplAddress" abi:"ethLockboxImpl"`

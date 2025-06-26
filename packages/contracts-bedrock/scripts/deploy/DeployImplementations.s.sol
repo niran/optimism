@@ -144,7 +144,7 @@ contract DeployImplementations is Script {
         deployOPCMDeployer(_input, _output);
         deployOPCMUpgrader(_output);
         deployOPCMInteropMigrator(_output);
-        deployOPCMValidator(_input, _output, implementations);
+        deployOPCMStandardValidator(_input, _output, implementations);
 
         // Semgrep rule will fail because the arguments are encoded inside of a separate function.
         opcm_ = IOPContractsManager(
@@ -531,7 +531,7 @@ contract DeployImplementations is Script {
         _output.opcmInteropMigrator = impl;
     }
 
-    function deployOPCMValidator(
+    function deployOPCMStandardValidator(
         Input memory _input,
         Output memory _output,
         IOPContractsManager.Implementations memory _implementations

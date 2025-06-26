@@ -33,7 +33,7 @@ type ImplementationsContracts struct {
 	OpcmDeployerImpl                 common.Address
 	OpcmUpgraderImpl                 common.Address
 	OpcmInteropMigratorImpl          common.Address
-	OpcmValidatorImpl                common.Address
+	OpcmStandardValidatorImpl        common.Address
 	DelayedWethImpl                  common.Address
 	OptimismPortalImpl               common.Address
 	EthLockboxImpl                   common.Address

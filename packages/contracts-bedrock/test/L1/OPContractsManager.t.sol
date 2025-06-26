@@ -81,7 +81,7 @@ contract OPContractsManager_Harness is OPContractsManager {
         OPContractsManagerDeployer _opcmDeployer,
         OPContractsManagerUpgrader _opcmUpgrader,
         OPContractsManagerInteropMigrator _opcmInteropMigrator,
-        OPContractsManagerStandardValidator _opcmValidator,
+        OPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig,
         IProtocolVersions _protocolVersions,
         IProxyAdmin _superchainProxyAdmin,
@@ -93,7 +93,7 @@ contract OPContractsManager_Harness is OPContractsManager {
             _opcmDeployer,
             _opcmUpgrader,
             _opcmInteropMigrator,
-            _opcmValidator,
+            _opcmStandardValidator,
             _superchainConfig,
             _protocolVersions,
             _superchainProxyAdmin,
@@ -781,7 +781,7 @@ contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test {
             _opcmDeployer: new OPContractsManagerDeployer(container),
             _opcmUpgrader: new OPContractsManagerUpgrader(container),
             _opcmInteropMigrator: new OPContractsManagerInteropMigrator(container),
-            _opcmValidator: new OPContractsManagerStandardValidator(
+            _opcmStandardValidator: new OPContractsManagerStandardValidator(
                 opcmImplementations, superchainConfigProxy, address(superchainProxyAdmin), challenger, 100
             ),
             _superchainConfig: superchainConfigProxy,

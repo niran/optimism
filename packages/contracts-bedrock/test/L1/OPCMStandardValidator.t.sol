@@ -71,9 +71,9 @@ contract BadDisputeGameFactoryReturner {
     }
 }
 
-/// @title OPCMValidator_TestInit
+/// @title OPCMStandardValidator_TestInit
 /// @notice Base contract for `OPCMStandardValidator` tests, handles common setup.
-contract OPCMValidator_TestInit is CommonTest {
+contract OPCMStandardValidator_TestInit is CommonTest {
     // /// @notice OPCMStandardValidator instance, used for testing.
     // IOPCMStandardValidator validator;
 
@@ -197,9 +197,9 @@ contract OPCMValidator_TestInit is CommonTest {
     }
 }
 
-/// @title OPCMValidator_CoreValidation_Test
+/// @title OPCMStandardValidator_CoreValidation_Test
 /// @notice Tests the basic functionality of the `validate` function when all parameters are valid
-contract OPCMValidator_CoreValidation_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_CoreValidation_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function succeeds when all parameters are valid.
     function test_validate_succeeds() public view {
         string memory errors = _validate(false);
@@ -214,10 +214,10 @@ contract OPCMValidator_CoreValidation_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_GeneralOverride_Test
+/// @title OPCMStandardValidator_GeneralOverride_Test
 /// @notice Tests behavior of validation overrides when multiple parameters are overridden
 ///         simultaneously
-contract OPCMValidator_GeneralOverride_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_GeneralOverride_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function (with the L1PAOMultisig and Challenger overridden)
     ///         successfully returns the right error when both are invalid.
     function test_validateL1PAOMultisigAndChallengerOverrides_succeeds() public view {
@@ -263,10 +263,10 @@ contract OPCMValidator_GeneralOverride_Test is OPCMValidator_TestInit {
         _validateWithOverrides(false, overrides);
     }
 }
-/// @title OPCMValidator_SuperchainConfig_Test
+/// @title OPCMStandardValidator_SuperchainConfig_Test
 /// @notice Tests validation of `SuperchainConfig` contract configuration
 
-contract OPCMValidator_SuperchainConfig_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_SuperchainConfig_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         SuperchainConfig contract is paused.
     function test_validate_superchainConfigPaused_succeeds() public {
@@ -279,9 +279,9 @@ contract OPCMValidator_SuperchainConfig_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_ProxyAdmin_Test
+/// @title OPCMStandardValidator_ProxyAdmin_Test
 /// @notice Tests validation of `ProxyAdmin` configuration
-contract OPCMValidator_ProxyAdmin_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_ProxyAdmin_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         ProxyAdmin owner is not correct.
     function test_validate_invalidProxyAdminOwner_succeeds() public {
@@ -315,9 +315,9 @@ contract OPCMValidator_ProxyAdmin_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_SystemConfig_Test
+/// @title OPCMStandardValidator_SystemConfig_Test
 /// @notice Tests validation of `SystemConfig` configuration
-contract OPCMValidator_SystemConfig_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_SystemConfig_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         SystemConfig version is invalid.
     function test_validate_systemConfigInvalidVersion_succeeds() public {
@@ -437,9 +437,9 @@ contract OPCMValidator_SystemConfig_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_L1CrossDomainMessenger_Test
+/// @title OPCMStandardValidator_L1CrossDomainMessenger_Test
 /// @notice Tests validation of `L1CrossDomainMessenger` configuration
-contract OPCMValidator_L1CrossDomainMessenger_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_L1CrossDomainMessenger_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         L1CrossDomainMessenger version is invalid.
     function test_validate_l1CrossDomainMessengerInvalidVersion_succeeds() public {
@@ -525,9 +525,9 @@ contract OPCMValidator_L1CrossDomainMessenger_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_OptimismMintableERC20Factory_Test
+/// @title OPCMStandardValidator_OptimismMintableERC20Factory_Test
 /// @notice Tests validation of `OptimismMintableERC20Factory` configuration
-contract OPCMValidator_OptimismMintableERC20Factory_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_OptimismMintableERC20Factory_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         OptimismMintableERC20Factory version is invalid.
     function test_validate_optimismMintableERC20FactoryInvalidVersion_succeeds() public {
@@ -569,9 +569,9 @@ contract OPCMValidator_OptimismMintableERC20Factory_Test is OPCMValidator_TestIn
     }
 }
 
-/// @title OPCMValidator_L1ERC721Bridge_Test
+/// @title OPCMStandardValidator_L1ERC721Bridge_Test
 /// @notice Tests validation of `L1ERC721Bridge` configuration
-contract OPCMValidator_L1ERC721Bridge_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_L1ERC721Bridge_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         L1ERC721Bridge version is invalid.
     function test_validate_l1ERC721BridgeInvalidVersion_succeeds() public {
@@ -637,9 +637,9 @@ contract OPCMValidator_L1ERC721Bridge_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_OptimismPortal_Test
+/// @title OPCMStandardValidator_OptimismPortal_Test
 /// @notice Tests validation of `OptimismPortal` configuration
-contract OPCMValidator_OptimismPortal_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_OptimismPortal_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         OptimismPortal version is invalid.
     function test_validate_optimismPortalInvalidVersion_succeeds() public {
@@ -695,9 +695,9 @@ contract OPCMValidator_OptimismPortal_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_ETHLockbox_Test
+/// @title OPCMStandardValidator_ETHLockbox_Test
 /// @notice Tests validation of `ETHLockbox` configuration
-contract OPCMValidator_ETHLockbox_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_ETHLockbox_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         ETHLockbox version is invalid.
     function test_validate_ethLockboxInvalidVersion_succeeds() public {
@@ -742,9 +742,9 @@ contract OPCMValidator_ETHLockbox_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_DisputeGameFactory_Test
+/// @title OPCMStandardValidator_DisputeGameFactory_Test
 /// @notice Tests validation of `DisputeGameFactory` configuration
-contract OPCMValidator_DisputeGameFactory_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_DisputeGameFactory_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         DisputeGameFactory version is invalid.
     function test_validate_disputeGameFactoryInvalidVersion_succeeds() public {
@@ -773,9 +773,9 @@ contract OPCMValidator_DisputeGameFactory_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_PermissionedDisputeGame_Test
+/// @title OPCMStandardValidator_PermissionedDisputeGame_Test
 /// @notice Tests validation of `PermissionedDisputeGame` configuration
-contract OPCMValidator_PermissionedDisputeGame_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_PermissionedDisputeGame_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         PermissionedDisputeGame implementation is null.
     function test_validate_permissionedDisputeGameNullImplementation_succeeds() public {
@@ -911,9 +911,9 @@ contract OPCMValidator_PermissionedDisputeGame_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_AnchorStateRegistry_Test
+/// @title OPCMStandardValidator_AnchorStateRegistry_Test
 /// @notice Tests validation of `AnchorStateRegistry` configuration
-contract OPCMValidator_AnchorStateRegistry_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_AnchorStateRegistry_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         AnchorStateRegistry version is invalid.
     function test_validate_anchorStateRegistryInvalidVersion_succeeds() public {
@@ -975,9 +975,9 @@ contract OPCMValidator_AnchorStateRegistry_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_DelayedWETH_Test
+/// @title OPCMStandardValidator_DelayedWETH_Test
 /// @notice Tests validation of `DelayedWETH` configuration
-contract OPCMValidator_DelayedWETH_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_DelayedWETH_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         DelayedWETH version is invalid.
     function test_validate_delayedWETHInvalidVersion_succeeds() public {
@@ -1062,9 +1062,9 @@ contract OPCMValidator_DelayedWETH_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_PreimageOracle_Test
+/// @title OPCMStandardValidator_PreimageOracle_Test
 /// @notice Tests validation of `PreimageOracle` configuration
-contract OPCMValidator_PreimageOracle_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_PreimageOracle_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         PreimageOracle version is invalid.
     function test_validate_preimageOracleInvalidVersion_succeeds() public {
@@ -1087,9 +1087,9 @@ contract OPCMValidator_PreimageOracle_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_FaultDisputeGame_Test
+/// @title OPCMStandardValidator_FaultDisputeGame_Test
 /// @notice Tests validation of `FaultDisputeGame` configuration
-contract OPCMValidator_FaultDisputeGame_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_FaultDisputeGame_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         FaultDisputeGame (permissionless) implementation is null.
     function test_validate_faultDisputeGameNullImplementation_succeeds() public {
@@ -1188,9 +1188,9 @@ contract OPCMValidator_FaultDisputeGame_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_L1StandardBridge_Test
+/// @title OPCMStandardValidator_L1StandardBridge_Test
 /// @notice Tests validation of `L1StandardBridge` configuration
-contract OPCMValidator_L1StandardBridge_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_L1StandardBridge_Test is OPCMStandardValidator_TestInit {
     // L1StandardBridge Tests
     /// @notice Tests that the validate function successfully returns the right error when the
     ///         L1StandardBridge version is invalid.
@@ -1254,9 +1254,9 @@ contract OPCMValidator_L1StandardBridge_Test is OPCMValidator_TestInit {
     }
 }
 
-/// @title OPCMValidator_Versions_Test
+/// @title OPCMStandardValidator_Versions_Test
 /// @notice Tests the `version` functions on `OPCMStandardValidator`.
-contract OPCMValidator_Versions_Test is OPCMValidator_TestInit {
+contract OPCMStandardValidator_Versions_Test is OPCMStandardValidator_TestInit {
     /// @notice Tests that the version getter functions on `OPCMStandardValidator` return non-empty
     ///         strings.
     function test_versions_succeeds() public view {
