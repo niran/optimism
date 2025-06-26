@@ -47,6 +47,9 @@ type Config struct {
 
 	// FailsafeEnabled enables failsafe mode for the supervisor
 	FailsafeEnabled bool
+
+	// FailsafeOnInvalidation controls whether failsafe should activate when a block is invalidated
+	FailsafeOnInvalidation bool
 }
 
 func (c *Config) Check() error {
