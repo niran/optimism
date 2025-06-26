@@ -129,7 +129,7 @@ func (t *resetTracker) bisect(ctx context.Context) error {
 	return nil
 }
 
-func (t *resetTracker) verifyBlock(ctx context.Context, blockNum uint64) (eth.L2BlockRef, error) {
+func (t *resetTracker) isL1OriginValid(ctx context.Context, blockNum uint64) (eth.L2BlockRef, error) {
 	current, err := t.backend.L2BlockRefByNumber(ctx, blockNum)
 	if err != nil {
 		return eth.L2BlockRef{}, err
@@ -170,7 +170,7 @@ func (t *resetTracker) FindResetUnsafeHeadTarget(ctx context.Context, lSafe eth.
 		// false         |  t/f        t/f        t/f       ...  t/f                                 |
 		// ------------------------------------------------------------------------------------------
 		idx, valid, err := binary.SearchL(targetDiff, func(i int) (bool, eth.L2BlockRef, error) {
-			block, err := t.verifyBlock(ctx, target+1+uint64(i))
+			block, err := t.isL1OriginValid(ctx, target+1+uint64(i))
 			return block != (eth.L2BlockRef{}), block, err
 		})
 		if err != nil {
@@ -195,7 +195,7 @@ func (t *resetTracker) FindResetUnsafeHeadTarget(ctx context.Context, lSafe eth.
 		if n == target-1 {
 			t.log.Warn("No valid unsafe block found up to target, searching further")
 		}
-		valid, err := t.verifyBlock(ctx, n)
+		valid, err := t.isL1OriginValid(ctx, n)
 		if err != nil {
 			return eth.BlockID{}, err
 		}
