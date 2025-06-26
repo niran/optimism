@@ -553,7 +553,7 @@ contract DeployImplementations is Script {
 
         IOPContractsManagerStandardValidator impl = IOPContractsManagerStandardValidator(
             DeployUtils.createDeterministic({
-                _name: "OPContractsManager.sol:OPContractsManagerValidator",
+                _name: "OPContractsManager.sol:OPContractsManagerStandardValidator",
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(
                         IOPContractsManagerStandardValidator.__constructor__,
@@ -569,7 +569,7 @@ contract DeployImplementations is Script {
                 _salt: _salt
             })
         );
-        vm.label(address(impl), "OPContractsManagerValidatorImpl");
+        vm.label(address(impl), "OPContractsManagerStandardValidatorImpl");
         _output.opcmStandardValidator = impl;
     }
 

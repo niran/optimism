@@ -670,7 +670,7 @@ contract OPContractsManager_TestInit is Test {
                             ),
                             IOPContractsManagerStandardValidator(
                                 DeployUtils.createDeterministic({
-                                    _name: "OPContractsManagerValidator",
+                                    _name: "OPContractsManagerStandardValidator",
                                     _args: DeployUtils.encodeConstructor(
                                         abi.encodeCall(
                                             IOPContractsManagerStandardValidator.__constructor__,
