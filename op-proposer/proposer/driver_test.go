@@ -181,7 +181,7 @@ func TestL2OutputSubmitter_OutputRetry(t *testing.T) {
 	}
 }
 
-func TestL2OutputSubmitter_ProposeOutput(t *testing.T) {
+func TestL2OutputSubmitter_Propose(t *testing.T) {
 	ps, ep, _, _, txmgr, logs := setup(t, "L2OO")
 
 	blockNum := uint64(10)
@@ -195,7 +195,7 @@ func TestL2OutputSubmitter_ProposeOutput(t *testing.T) {
 		},
 	}, nil)
 
-	err := ps.ProposeOutput(context.Background(), &blockNum)
+	err := ps.Propose(context.Background(), &blockNum)
 	require.NoError(t, err)
 
 	ep.rollupClient.AssertExpectations(t)

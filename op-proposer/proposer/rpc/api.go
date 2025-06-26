@@ -14,7 +14,7 @@ import (
 type ProposerDriver interface {
 	StartL2OutputSubmitting() error
 	StopL2OutputSubmitting() error
-	ProposeOutput(ctx context.Context, block *uint64) error
+	Propose(ctx context.Context, block *uint64) error
 }
 
 type adminAPI struct {
@@ -46,11 +46,11 @@ func (a *adminAPI) StopProposer(ctx context.Context) error {
 	return a.b.StopL2OutputSubmitting()
 }
 
-func (a *adminAPI) ProposeOutput(ctx context.Context, block *hexutil.Uint64) error {
+func (a *adminAPI) Propose(ctx context.Context, block *hexutil.Uint64) error {
 	var blkPtr *uint64
 	if block != nil {
 		b := uint64(*block)
 		blkPtr = &b
 	}
-	return a.b.ProposeOutput(ctx, blkPtr)
+	return a.b.Propose(ctx, blkPtr)
 }

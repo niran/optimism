@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-proposer/bindings"
 	"github.com/ethereum-optimism/optimism/op-proposer/contracts"
 	"github.com/ethereum-optimism/optimism/op-proposer/metrics"
+	driverrpc "github.com/ethereum-optimism/optimism/op-proposer/proposer/rpc"
 	"github.com/ethereum-optimism/optimism/op-proposer/proposer/source"
 	"github.com/ethereum-optimism/optimism/op-service/dial"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -506,9 +507,9 @@ func (l *L2OutputSubmitter) proposeOutput(ctx context.Context, output source.Pro
 	return nil
 }
 
-// ProposeOutput fetches and submits the output for the specified block number.
+// Propose fetches and submits the output for the specified block number.
 // If no block number is provided, the latest synced block is proposed.
-func (l *L2OutputSubmitter) ProposeOutput(ctx context.Context, block *uint64) error {
+func (l *L2OutputSubmitter) Propose(ctx context.Context, block *uint64) error {
 	var blockNum uint64
 	if block == nil {
 		num, err := l.FetchCurrentBlockNumber(ctx)
@@ -527,3 +528,5 @@ func (l *L2OutputSubmitter) ProposeOutput(ctx context.Context, block *uint64) er
 
 	return l.proposeOutput(ctx, output)
 }
+
+var _ driverrpc.ProposerDriver = (*L2OutputSubmitter)(nil)
