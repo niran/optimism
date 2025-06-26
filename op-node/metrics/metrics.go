@@ -72,6 +72,9 @@ type Metricer interface {
 	RecordDial(allow bool)
 	RecordAccept(allow bool)
 	ReportProtocolVersions(local, engine, recommended, required params.ProtocolVersion)
+	// Payload retry metrics
+	RecordPayloadRetry(reason string)
+	SetPayloadRetryAge(ageSeconds float64)
 }
 
 // Metrics tracks all the metrics for the op-node.
@@ -113,6 +116,10 @@ type Metrics struct {
 
 	SequencerSealingDurationSeconds prometheus.Histogram
 	SequencerSealingTotal           prometheus.Counter
+
+	// Payload retry metrics
+	SequencerPayloadRetries  *prometheus.CounterVec
+	SequencerPayloadRetryAge prometheus.Gauge
 
 	UnsafePayloadsBufferLen     prometheus.Gauge
 	UnsafePayloadsBufferMemSize prometheus.Gauge
@@ -374,6 +381,17 @@ func NewMetrics(procName string) *Metrics {
 			Help:      "Number of sequencer block sealing jobs",
 		}),
 
+		SequencerPayloadRetries: factory.NewCounterVec(prometheus.CounterOpts{
+			Namespace: ns,
+			Name:      "sequencer_payload_retries_total",
+			Help:      "Number of payload retries by reason",
+		}, []string{"reason"}),
+		SequencerPayloadRetryAge: factory.NewGauge(prometheus.GaugeOpts{
+			Namespace: ns,
+			Name:      "sequencer_payload_retry_age_seconds",
+			Help:      "Age in seconds of the payload being retried",
+		}),
+
 		ProtocolVersionDelta: factory.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: ns,
 			Name:      "protocol_version_delta",
@@ -631,6 +649,16 @@ func (m *Metrics) ReportProtocolVersions(local, engine, recommended, required pa
 	m.ProtocolVersions.WithLabelValues(local.String(), engine.String(), recommended.String(), required.String()).Set(1)
 }
 
+// RecordPayloadRetry records when a payload retry is triggered
+func (m *Metrics) RecordPayloadRetry(reason string) {
+	m.SequencerPayloadRetries.WithLabelValues(reason).Inc()
+}
+
+// SetPayloadRetryAge sets the age of a payload being retried
+func (m *Metrics) SetPayloadRetryAge(ageSeconds float64) {
+	m.SequencerPayloadRetryAge.Set(ageSeconds)
+}
+
 type noopMetricer struct {
 	metrics.NoopRPCMetrics
 	event.NoopMetrics
@@ -756,4 +784,11 @@ func (n *noopMetricer) RecordDial(allow bool) {
 func (n *noopMetricer) RecordAccept(allow bool) {
 }
 func (n *noopMetricer) ReportProtocolVersions(local, engine, recommended, required params.ProtocolVersion) {
+}
+
+// Payload retry metrics
+func (n *noopMetricer) RecordPayloadRetry(reason string) {
+}
+
+func (n *noopMetricer) SetPayloadRetryAge(ageSeconds float64) {
 }

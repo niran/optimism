@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
@@ -69,7 +70,13 @@ func NewL2Sequencer(t Testing, log log.Logger, l1 derive.L1Fetcher, blobSrc deri
 	seqStateListener := config.DisabledConfigPersistence{}
 	conduc := &conductor.NoOpConductor{}
 	asyncGossip := async.NoOpGossiper{}
-	seq := sequencing.NewSequencer(t.Ctx(), log, cfg, attrBuilder, l1OriginSelector,
+	// Create a mock payload retry config for testing
+	payloadRetryCfg := &sequencing.PayloadRetryConfig{
+		Enabled:     true,
+		TTL:         time.Second * 8,
+		MaxAttempts: 4,
+	}
+	seq := sequencing.NewSequencer(t.Ctx(), log, cfg, payloadRetryCfg, attrBuilder, l1OriginSelector,
 		seqStateListener, conduc, asyncGossip, metr)
 	opts := event.WithEmitLimiter(
 		// TestSyncBatchType/DerivationWithFlakyL1RPC does *a lot* of quick retries

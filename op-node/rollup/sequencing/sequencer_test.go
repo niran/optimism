@@ -15,7 +15,6 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/conductor"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/engine"
 	"github.com/ethereum-optimism/optimism/op-service/clock"
@@ -109,7 +108,7 @@ type FakeConductor struct {
 	committed *eth.ExecutionPayloadEnvelope
 }
 
-var _ conductor.SequencerConductor = &FakeConductor{}
+var _ SequencerConductor = &FakeConductor{}
 
 func (c *FakeConductor) Enabled(ctx context.Context) bool {
 	return true
@@ -709,6 +708,11 @@ func createSequencer(log log.Logger) (*Sequencer, *sequencerTestDeps) {
 		GraniteTime:       new(uint64),
 		HoloceneTime:      new(uint64),
 	}
+	payloadRetryCfg := &PayloadRetryConfig{
+		Enabled:     true,
+		TTL:         time.Second * 8,
+		MaxAttempts: 4,
+	}
 	deps := &sequencerTestDeps{
 		cfg:           cfg,
 		attribBuilder: &FakeAttributesBuilder{cfg: cfg, rng: rng},
@@ -721,7 +725,7 @@ func createSequencer(log log.Logger) (*Sequencer, *sequencerTestDeps) {
 		conductor:   &FakeConductor{},
 		asyncGossip: &FakeAsyncGossip{},
 	}
-	seq := NewSequencer(context.Background(), log, cfg, deps.attribBuilder,
+	seq := NewSequencer(context.Background(), log, cfg, payloadRetryCfg, deps.attribBuilder,
 		deps.l1OriginSelector, deps.seqState, deps.conductor,
 		deps.asyncGossip, metrics.NoopMetrics)
 	// We create mock payloads, with the epoch-id as tx[0], rather than proper L1Block-info deposit tx.

@@ -245,6 +245,27 @@ var (
 		Value:    false,
 		Category: SequencerCategory,
 	}
+	PayloadRetryEnabledFlag = &cli.BoolFlag{
+		Name:     "payload-retry-enabled",
+		Usage:    "Enable payload retry mechanism to avoid restarting from scratch on transient failures",
+		EnvVars:  prefixEnvVars("PAYLOAD_RETRY_ENABLED"),
+		Value:    true,
+		Category: SequencerCategory,
+	}
+	PayloadRetryTTLFlag = &cli.DurationFlag{
+		Name:     "payload-retry-ttl",
+		Usage:    "Time-to-live for cached payloads before expiring",
+		EnvVars:  prefixEnvVars("PAYLOAD_RETRY_TTL"),
+		Value:    time.Second * 8,
+		Category: SequencerCategory,
+	}
+	PayloadRetryMaxAttemptsFlag = &cli.UintFlag{
+		Name:     "payload-retry-max-attempts",
+		Usage:    "Maximum number of attempts to retry payload retrieval",
+		EnvVars:  prefixEnvVars("PAYLOAD_RETRY_MAX_ATTEMPTS"),
+		Value:    4,
+		Category: SequencerCategory,
+	}
 	L1EpochPollIntervalFlag = &cli.DurationFlag{
 		Name:     "l1.epoch-poll-interval",
 		Usage:    "Poll interval for retrieving new L1 epoch updates such as safe and finalized block changes. Disabled if 0 or negative.",
@@ -443,6 +464,9 @@ var optionalFlags = []cli.Flag{
 	SequencerMaxSafeLagFlag,
 	SequencerL1Confs,
 	SequencerRecoverMode,
+	PayloadRetryEnabledFlag,
+	PayloadRetryTTLFlag,
+	PayloadRetryMaxAttemptsFlag,
 	L1EpochPollIntervalFlag,
 	RuntimeConfigReloadIntervalFlag,
 	RPCAdminPersistence,

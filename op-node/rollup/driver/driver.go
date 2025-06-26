@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup/async"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/attributes"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/clsync"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/conductor"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/confdepth"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/engine"
@@ -172,7 +171,7 @@ func NewDriver(
 	sequencerStateListener sequencing.SequencerStateListener,
 	safeHeadListener rollup.SafeHeadListener,
 	syncCfg *sync.Config,
-	sequencerConductor conductor.SequencerConductor,
+	sequencerConductor sequencing.SequencerConductor,
 	altDA AltDAIface,
 	indexingMode bool,
 ) *Driver {
@@ -239,7 +238,12 @@ func NewDriver(
 		sequencerConfDepth := confdepth.NewConfDepth(driverCfg.SequencerConfDepth, statusTracker.L1Head, l1)
 		findL1Origin := sequencing.NewL1OriginSelector(driverCtx, log, cfg, sequencerConfDepth)
 		sys.Register("origin-selector", findL1Origin)
-		sequencer = sequencing.NewSequencer(driverCtx, log, cfg, attrBuilder, findL1Origin,
+		payloadRetryCfg := &sequencing.PayloadRetryConfig{
+			Enabled:     driverCfg.PayloadRetryEnabled,
+			TTL:         driverCfg.PayloadRetryTTL,
+			MaxAttempts: driverCfg.PayloadRetryMaxAttempts,
+		}
+		sequencer = sequencing.NewSequencer(driverCtx, log, cfg, payloadRetryCfg, attrBuilder, findL1Origin,
 			sequencerStateListener, sequencerConductor, asyncGossiper, metrics)
 		sys.Register("sequencer", sequencer)
 	} else {

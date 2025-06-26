@@ -13,20 +13,39 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/conductor"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/engine"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/event"
 )
 
-// sealingDuration defines the expected time it takes to seal the block
-const sealingDuration = time.Millisecond * 50
-
 var (
 	ErrSequencerAlreadyStarted = errors.New("sequencer already running")
 	ErrSequencerAlreadyStopped = errors.New("sequencer not running")
 )
+
+// SequencerConductor defines the interface for conductor interactions
+// This avoids importing the full conductor package to prevent import cycles
+type SequencerConductor interface {
+	Leader(ctx context.Context) (bool, error)
+	CommitUnsafePayload(ctx context.Context, payload *eth.ExecutionPayloadEnvelope) error
+	Enabled(ctx context.Context) bool
+	OverrideLeader(ctx context.Context) error
+	Close()
+}
+
+// PayloadRetryConfig contains settings for payload retry functionality
+type PayloadRetryConfig struct {
+	// Enabled controls whether payload retry is active
+	Enabled bool
+	// TTL is the time-to-live for cached payloads before expiring
+	TTL time.Duration
+	// MaxAttempts is the maximum number of attempts to retry payload retrieval
+	MaxAttempts uint
+}
+
+// sealingDuration defines the expected time it takes to seal the block
+const sealingDuration = time.Millisecond * 50
 
 type L1OriginSelectorIface interface {
 	FindL1Origin(ctx context.Context, l2Head eth.L2BlockRef) (eth.L1BlockRef, error)
@@ -38,6 +57,9 @@ type Metrics interface {
 	RecordSequencerInconsistentL1Origin(from eth.BlockID, to eth.BlockID)
 	RecordSequencerReset()
 	RecordSequencingError()
+	// Payload retry metrics
+	RecordPayloadRetry(reason string)
+	SetPayloadRetryAge(ageSeconds float64)
 }
 
 type SequencerStateListener interface {
@@ -64,6 +86,41 @@ func (ev SequencerActionEvent) String() string {
 	return "sequencer-action"
 }
 
+// cachedPayload stores minimal metadata for payload retry
+type cachedPayload struct {
+	payloadID eth.PayloadID
+	l1Origin  common.Hash // hash of the L1 block we are building on
+	l2Parent  common.Hash
+	timestamp uint64    // for expiry
+	createdAt time.Time // when this cache entry was created
+	attempts  uint      // number of retrieval attempts made
+}
+
+// isValid checks if the cached payload is still valid for the given L1 origin and configuration
+func (c *cachedPayload) isValid(l1Origin common.Hash, cfg *PayloadRetryConfig, now time.Time) bool {
+	if c == nil {
+		return false
+	}
+
+	// Check if L1 origin has changed (invalidates cache)
+	if c.l1Origin != l1Origin {
+		return false
+	}
+
+	// Check if TTL has expired
+	if now.Sub(c.createdAt) > cfg.TTL {
+		return false
+	}
+
+	// Check if max attempts exceeded
+	if c.attempts >= cfg.MaxAttempts {
+		return false
+	}
+
+	return true
+}
+
+// BuildingState represents the state of an active block build
 type BuildingState struct {
 	Onto eth.L2BlockRef
 	Info eth.PayloadInfo
@@ -72,6 +129,9 @@ type BuildingState struct {
 
 	// Set once known
 	Ref eth.L2BlockRef
+
+	// Cached payload for retry logic
+	CachedPayload *cachedPayload
 }
 
 // Sequencer implements the sequencing interface of the driver: it starts and completes block building jobs.
@@ -85,6 +145,9 @@ type Sequencer struct {
 	rollupCfg *rollup.Config
 	spec      *rollup.ChainSpec
 
+	// Payload retry configuration
+	payloadRetryCfg *PayloadRetryConfig
+
 	maxSafeLag atomic.Uint64
 
 	recoverMode atomic.Bool
@@ -97,7 +160,7 @@ type Sequencer struct {
 	// May be used to ensure sequencer-state is accurately persisted.
 	listener SequencerStateListener
 
-	conductor conductor.SequencerConductor
+	conductor SequencerConductor
 
 	asyncGossip AsyncGossiper
 
@@ -128,10 +191,11 @@ type Sequencer struct {
 var _ SequencerIface = (*Sequencer)(nil)
 
 func NewSequencer(driverCtx context.Context, log log.Logger, rollupCfg *rollup.Config,
+	payloadRetryCfg *PayloadRetryConfig,
 	attributesBuilder derive.AttributesBuilder,
 	l1OriginSelector L1OriginSelectorIface,
 	listener SequencerStateListener,
-	conductor conductor.SequencerConductor,
+	conductor SequencerConductor,
 	asyncGossip AsyncGossiper,
 	metrics Metrics,
 ) *Sequencer {
@@ -140,6 +204,7 @@ func NewSequencer(driverCtx context.Context, log log.Logger, rollupCfg *rollup.C
 		log:              log,
 		rollupCfg:        rollupCfg,
 		spec:             rollup.NewChainSpec(rollupCfg),
+		payloadRetryCfg:  payloadRetryCfg,
 		listener:         listener,
 		conductor:        conductor,
 		asyncGossip:      asyncGossip,
@@ -225,6 +290,28 @@ func (d *Sequencer) onBuildStarted(x engine.BuildStartedEvent) {
 	d.latest.Info = x.Info
 	d.latest.Started = x.BuildStarted
 
+	// Create cached payload for retry logic if enabled
+	if d.payloadRetryCfg.Enabled {
+		// Get current L1 origin
+		l1Origin, err := d.l1OriginSelector.FindL1Origin(d.ctx, x.Parent)
+		if err != nil {
+			d.log.Warn("Failed to get L1 origin for payload cache", "err", err)
+		} else {
+			d.latest.CachedPayload = &cachedPayload{
+				payloadID: x.Info.ID,
+				l1Origin:  l1Origin.Hash,
+				l2Parent:  x.Parent.Hash,
+				timestamp: x.Info.Timestamp,
+				createdAt: d.timeNow(),
+				attempts:  0,
+			}
+			d.log.Debug("Created cached payload for retry",
+				"payloadID", x.Info.ID,
+				"l1Origin", l1Origin.Hash,
+				"ttl", d.payloadRetryCfg.TTL)
+		}
+	}
+
 	d.nextActionOK = d.active.Load()
 
 	// schedule sealing
@@ -309,6 +396,60 @@ func (d *Sequencer) onPayloadSealExpiredError(x engine.PayloadSealExpiredErrorEv
 	if d.latest.Info != x.Info {
 		return // not our payload, should be ignored.
 	}
+
+	now := d.timeNow()
+
+	// Check if payload retry is enabled and we have a cached payload
+	if d.payloadRetryCfg.Enabled && d.latest.CachedPayload != nil {
+		// Get current L1 origin to check if cache is still valid
+		l1Origin, err := d.l1OriginSelector.FindL1Origin(d.ctx, d.latestHead)
+		if err != nil {
+			d.log.Error("Failed to get L1 origin for payload retry check", "err", err)
+			d.handleInvalid()
+			return
+		}
+
+		// Check if the cached payload is still valid for retry
+		if d.latest.CachedPayload.isValid(l1Origin.Hash, d.payloadRetryCfg, now) {
+			// Increment attempt count
+			d.latest.CachedPayload.attempts++
+
+			// Record retry metrics
+			d.metrics.RecordPayloadRetry("seal_expired")
+			d.metrics.SetPayloadRetryAge(now.Sub(d.latest.CachedPayload.createdAt).Seconds())
+
+			d.log.Warn("Sequencer temporarily could not seal block, retrying with cached payload",
+				"payloadID", x.Info.ID, "timestamp", x.Info.Timestamp,
+				"attempt", d.latest.CachedPayload.attempts,
+				"max_attempts", d.payloadRetryCfg.MaxAttempts,
+				"ttl_remaining", d.payloadRetryCfg.TTL-now.Sub(d.latest.CachedPayload.createdAt),
+				"err", x.Err)
+
+			// Schedule retry after a delay
+			d.nextAction = now.Add(time.Second)
+			d.nextActionOK = d.active.Load()
+			return
+		} else {
+			// Record retry abandon reason
+			if d.latest.CachedPayload.l1Origin != l1Origin.Hash {
+				d.metrics.RecordPayloadRetry("l1_origin_changed")
+			} else if now.Sub(d.latest.CachedPayload.createdAt) > d.payloadRetryCfg.TTL {
+				d.metrics.RecordPayloadRetry("expired")
+			} else if d.latest.CachedPayload.attempts >= d.payloadRetryCfg.MaxAttempts {
+				d.metrics.RecordPayloadRetry("max_attempts")
+			}
+
+			d.log.Info("Cached payload is no longer valid for retry",
+				"payloadID", x.Info.ID,
+				"cache_l1_origin", d.latest.CachedPayload.l1Origin,
+				"current_l1_origin", l1Origin.Hash,
+				"attempts", d.latest.CachedPayload.attempts,
+				"max_attempts", d.payloadRetryCfg.MaxAttempts,
+				"age", now.Sub(d.latest.CachedPayload.createdAt),
+				"ttl", d.payloadRetryCfg.TTL)
+		}
+	}
+
 	d.log.Error("Sequencer temporarily could not seal block",
 		"payloadID", x.Info.ID, "timestamp", x.Info.Timestamp, "err", x.Err)
 	// Restart building, this way we get a block we should be able to seal
