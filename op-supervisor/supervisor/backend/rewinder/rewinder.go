@@ -147,9 +147,6 @@ func (r *Rewinder) handleLocalDerivedEvent(ev superevents.LocalSafeUpdateEvent) 
 		r.log.Error("failed to rewind logs DB", "chain", ev.ChainID, "err", err)
 		return
 	}
-
-	// Emit event to trigger node reset with new heads
-	//r.emitter.Emit(r.rootCtx, superevents.ChainRewoundEvent{ChainID: ev.ChainID})
 }
 
 // rewindL1ChainIfReorged rewinds the L1 chain for the given chain ID if a reorg is detected
@@ -254,9 +251,6 @@ func (r *Rewinder) rewindL1ChainIfReorged(chainID eth.ChainID, newTip eth.BlockI
 			return fmt.Errorf("failed to rewind cross-safe for chain %s: %w", chainID, err)
 		}
 	}
-
-	// Emit rewound event for sync node
-	//r.emitter.Emit(r.rootCtx, superevents.ChainRewoundEvent{ChainID: ev.ChainID})
 
 	return nil
 }
