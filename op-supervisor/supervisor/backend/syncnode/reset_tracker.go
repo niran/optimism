@@ -129,6 +129,7 @@ func (t *resetTracker) bisect(ctx context.Context) error {
 	return nil
 }
 
+// isL1OriginValid compares l1 origin info from the node and compares with l1 block fetched from l1 accessor db
 func (t *resetTracker) isL1OriginValid(ctx context.Context, blockNum uint64) (eth.L2BlockRef, error) {
 	current, err := t.backend.L2BlockRefByNumber(ctx, blockNum)
 	if err != nil {
@@ -147,8 +148,8 @@ func (t *resetTracker) isL1OriginValid(ctx context.Context, blockNum uint64) (et
 	return current, nil
 }
 
-// FindResetUnsafeHeadTarget searches and returns the latest valid block of the L2 chain
-// starting from `l2UnsafeTarget` and checking until the latest unsafe block.
+// FindResetUnsafeHeadTarget searches and returns the latest valid unsafe block of the L2 chain
+// starting from lSafe and checking until the latest unsafe block.
 func (t *resetTracker) FindResetUnsafeHeadTarget(ctx context.Context, lSafe eth.BlockID) (eth.BlockID, error) {
 	latestlUnsafe, err := t.backend.LocalUnsafe(ctx)
 	if err != nil {
