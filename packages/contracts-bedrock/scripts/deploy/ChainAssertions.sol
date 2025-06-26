@@ -71,14 +71,6 @@ library ChainAssertions {
             require(config.gasLimit() == uint64(_cfg.l2GenesisBlockGasLimit()), "CHECK-SCFG-50");
             require(config.unsafeBlockSigner() == _cfg.p2pSequencerAddress(), "CHECK-SCFG-60");
             require(config.scalar() >> 248 == 1, "CHECK-SCFG-70");
-            // Check _config
-            IResourceMetering.ResourceConfig memory rconfig = Constants.DEFAULT_RESOURCE_CONFIG();
-            require(resourceConfig.maxResourceLimit == rconfig.maxResourceLimit, "CHECK-SCFG-80");
-            require(resourceConfig.elasticityMultiplier == rconfig.elasticityMultiplier, "CHECK-SCFG-90");
-            require(resourceConfig.baseFeeMaxChangeDenominator == rconfig.baseFeeMaxChangeDenominator, "CHECK-SCFG-100");
-            require(resourceConfig.systemTxMaxGas == rconfig.systemTxMaxGas, "CHECK-SCFG-110");
-            require(resourceConfig.minimumBaseFee == rconfig.minimumBaseFee, "CHECK-SCFG-120");
-            require(resourceConfig.maximumBaseFee == rconfig.maximumBaseFee, "CHECK-SCFG-130");
             // Depends on start block being set to 0 in `initialize`
             uint256 cfgStartBlock = _cfg.systemConfigStartBlock();
             require(config.startBlock() == (cfgStartBlock == 0 ? block.number : cfgStartBlock), "CHECK-SCFG-140");
@@ -117,34 +109,30 @@ library ChainAssertions {
     }
 
     /// @notice Asserts that the L1CrossDomainMessenger is setup correctly
-    function checkL1CrossDomainMessenger(IL1CrossDomainMessenger _messenger, Vm _vm, bool _isProxy) internal view {
+    function checkL1CrossDomainMessenger(Types.ContractSet memory _contracts, Vm _vm, bool _isProxy) internal view {
+        IL1CrossDomainMessenger messenger = IL1CrossDomainMessenger(_contracts.L1CrossDomainMessenger);
         console.log(
             "Running chain assertions on the L1CrossDomainMessenger %s at %s",
             _isProxy ? "proxy" : "implementation",
-            address(_messenger)
+            address(messenger)
         );
-        require(address(_messenger) != address(0), "CHECK-L1XDM-10");
+        require(address(messenger) != address(0), "CHECK-L1XDM-10");
 
         // Check that the contract is initialized
-        DeployUtils.assertInitialized({
-            _contractAddress: address(_messenger),
-            _isProxy: _isProxy,
-            _slot: 0,
-            _offset: 20
-        });
+        DeployUtils.assertInitialized({ _contractAddress: address(messenger), _isProxy: _isProxy, _slot: 0, _offset: 20 });
 
         if (_isProxy) {
-            bytes32 xdmSenderSlot = _vm.load(address(_messenger), bytes32(uint256(204)));
+            bytes32 xdmSenderSlot = _vm.load(address(messenger), bytes32(uint256(204)));
             require(address(uint160(uint256(xdmSenderSlot))) == Constants.DEFAULT_L2_SENDER, "CHECK-L1XDM-70");
         } else {
-            require(address(_messenger.OTHER_MESSENGER()) == address(0), "CHECK-L1XDM-80");
-            require(address(_messenger.otherMessenger()) == address(0), "CHECK-L1XDM-90");
-            require(address(_messenger.PORTAL()) == address(0), "CHECK-L1XDM-100");
-            require(address(_messenger.portal()) == address(0), "CHECK-L1XDM-110");
-            require(address(_messenger.systemConfig()) == address(0), "CHECK-L1XDM-120");
+            require(address(messenger.OTHER_MESSENGER()) == address(0), "CHECK-L1XDM-80");
+            require(address(messenger.otherMessenger()) == address(0), "CHECK-L1XDM-90");
+            require(address(messenger.PORTAL()) == address(0), "CHECK-L1XDM-100");
+            require(address(messenger.portal()) == address(0), "CHECK-L1XDM-110");
+            require(address(messenger.systemConfig()) == address(0), "CHECK-L1XDM-120");
             require(
                 checkProxyAdminCallFails(
-                    address(_messenger), IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotResolvedDelegateProxy.selector
+                    address(messenger), IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotResolvedDelegateProxy.selector
                 ),
                 "CHECK-L1XDM-130"
             );
