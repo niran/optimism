@@ -21,9 +21,12 @@ type mockResetBackend struct {
 	// safeBlocks represents blocks marked as safe in the local DB
 	safeBlocks map[uint64]eth.BlockID
 
+	// unsafeBlocks represents L2BlockRefs known to the node
 	unsafeBlocks map[uint64]eth.L2BlockRef
-	l1Blocks     map[uint64]eth.BlockID
-	unsafeHead   eth.BlockID
+	// l1Blocks represents L1 origins known to the node
+	l1Blocks map[uint64]eth.BlockID
+	// unsafeHead represents unsafe head known to the node
+	unsafeHead eth.BlockID
 }
 
 func (m *mockResetBackend) reset() {
@@ -183,155 +186,129 @@ func TestResetTrackerLocalUnsafe(t *testing.T) {
 	tracker := newResetTracker(logger, backend)
 	ctx := context.Background()
 
-	tests := []struct {
+	type test struct {
 		name           string
-		l2Unsafe       uint64   // starting point (trusted valid)
-		latestUnsafe   uint64   // current chain tip
-		validBlocks    []uint64 // blocks with valid L1 origins
+		l2Unsafe       uint64 // starting point (trusted valid)
+		latestUnsafe   uint64 // current chain tip
+		validUntil     uint64 // L2 blocks with valid L1 origins
 		expectedResult uint64
-		expectedError  string
-	}{
+	}
+	tests := []test{
 		{
 			name:           "target_equals_latest",
 			l2Unsafe:       100,
 			latestUnsafe:   100,
-			validBlocks:    []uint64{100},
+			validUntil:     100,
 			expectedResult: 100,
 		},
 		{
 			name:           "all_blocks_valid",
 			l2Unsafe:       100,
 			latestUnsafe:   105,
-			validBlocks:    []uint64{100, 101, 102, 103, 104, 105},
+			validUntil:     105,
 			expectedResult: 105,
 		},
 		{
 			name:           "all_blocks_invalid",
 			l2Unsafe:       100,
 			latestUnsafe:   105,
-			validBlocks:    []uint64{100}, // only l2Unsafe is valid
+			validUntil:     100, // only l2Unsafe is valid
 			expectedResult: 100,
 		},
 		{
 			name:           "mixed_validity_case1",
 			l2Unsafe:       100,
 			latestUnsafe:   105,
-			validBlocks:    []uint64{100, 101, 102}, // 103-105 invalid
+			validUntil:     102, // 103-105 invalid
 			expectedResult: 102,
 		},
 		{
 			name:           "single_block_ahead_valid",
 			l2Unsafe:       100,
 			latestUnsafe:   101,
-			validBlocks:    []uint64{100, 101},
+			validUntil:     101,
 			expectedResult: 101,
 		},
 		{
 			name:           "single_block_ahead_invalid",
 			l2Unsafe:       100,
 			latestUnsafe:   101,
-			validBlocks:    []uint64{100}, // 101 invalid
+			validUntil:     100, // 101 invalid
 			expectedResult: 100,
 		},
 		{
 			name:           "target_not_at_100",
 			l2Unsafe:       95,
 			latestUnsafe:   100,
-			validBlocks:    []uint64{95, 96, 97}, // 98-100 invalid
+			validUntil:     97, // 98-100 invalid
 			expectedResult: 97,
 		},
 		{
 			name:           "target_is_invalid",
 			l2Unsafe:       100,
 			latestUnsafe:   100,
-			validBlocks:    []uint64{96, 97, 98, 99}, // 96-99 valid
+			validUntil:     99,
 			expectedResult: 99,
 		},
 		{
 			name:           "target_is_larger_than_latest",
 			l2Unsafe:       101,
 			latestUnsafe:   100,
-			validBlocks:    []uint64{96, 97, 98, 99}, // 96-99 valid
+			validUntil:     99,
 			expectedResult: 99,
 		},
 		{
 			name:           "walkback_after_binary_search",
 			l2Unsafe:       95,
 			latestUnsafe:   105,
-			validBlocks:    []uint64{92, 93}, // 92-93 valid
+			validUntil:     93,
 			expectedResult: 93,
 		},
+	}
+
+	// Helper to create a block ID with a specific hash
+	mkL1Block := func(n uint64) eth.BlockID {
+		hash := common.Hash{byte(n)}
+		return eth.BlockID{Number: n, Hash: hash}
+	}
+
+	// Helper to create a block ref with a specific hash
+	mkL2BlockRef := func(n, l1OriginNum uint64, nodeDivL1OriginHash bool) eth.L2BlockRef {
+		hash := common.Hash{byte(n)}
+		l1Origin := mkL1Block(l1OriginNum)
+		if nodeDivL1OriginHash {
+			l1Origin.Hash[1] = 0xff
+		}
+		return eth.L2BlockRef{Number: n, Hash: hash, L1Origin: l1Origin}
+	}
+
+	// Helper to initialize l1 origin number of l2 block
+	l1ToL2BlockNum := func(n uint64) uint64 { return n + 10 }
+
+	setupRange := func(tt test) {
+		// setup current chain tip
+		latestUnsafe := mkL2BlockRef(tt.latestUnsafe, l1ToL2BlockNum(tt.latestUnsafe), false)
+		backend.unsafeHead = latestUnsafe.ID()
+
+		// Setup specific expectations for each possible block
+		for blockNum := uint64(0); blockNum <= tt.latestUnsafe; blockNum++ {
+			l1OriginNum := l1ToL2BlockNum(blockNum)
+			l1Origin := mkL1Block(l1OriginNum)
+			l2Block := mkL2BlockRef(blockNum, l1OriginNum, blockNum > tt.validUntil)
+			backend.unsafeBlocks[blockNum] = l2Block
+			backend.l1Blocks[l1OriginNum] = l1Origin
+		}
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			backend.reset()
+			setupRange(tt)
 
-			// Setup l2Unsafe block
-			l2UnsafeHash := common.HexToHash(fmt.Sprintf("0x%x", tt.l2Unsafe))
-
-			latestHash := common.HexToHash(fmt.Sprintf("0x%x", tt.latestUnsafe))
-			latestL1Origin := eth.BlockID{Hash: common.HexToHash("0xf"), Number: 10 + tt.latestUnsafe - tt.l2Unsafe}
-			latestBlockRef := createL2BlockRef(tt.latestUnsafe, latestHash.Hex(), latestL1Origin)
-
-			backend.unsafeHead = latestBlockRef.ID()
-
-			// Setup blocks for binary search
-			validBlocksMap := make(map[uint64]bool)
-			for _, block := range tt.validBlocks {
-				validBlocksMap[block] = true
-			}
-			// Setup specific expectations for each possible block
-			for blockNum := tt.l2Unsafe - 10; blockNum <= tt.latestUnsafe; blockNum++ {
-				l1OriginNum := 10 + blockNum - tt.l2Unsafe
-				l1OriginHash := fmt.Sprintf("0x%x", l1OriginNum)
-				l1Origin := eth.BlockID{Hash: common.HexToHash(l1OriginHash), Number: l1OriginNum}
-				l2Block := createL2BlockRef(blockNum, fmt.Sprintf("0x%x", blockNum), l1Origin)
-				logger.Info("Setting up block", "l2Block", l2Block, "l1Origin", l1Origin)
-				backend.unsafeBlocks[blockNum] = l2Block
-				if validBlocksMap[blockNum] {
-					// Valid: return matching hash
-					backend.l1Blocks[l1OriginNum] = createL1BlockRef(l1OriginNum, l1OriginHash).ID()
-				} else {
-					// Invalid: return different hash (reorg)
-					backend.l1Blocks[l1OriginNum] = createL1BlockRef(l1OriginNum, fmt.Sprintf("0x%x", l1OriginNum+1000)).ID()
-				}
-			}
-
-			lunsafe, err := tracker.FindResetUnsafeHeadTarget(ctx,
-				eth.BlockID{
-					Hash:   l2UnsafeHash,
-					Number: tt.l2Unsafe,
-				})
-
-			if tt.expectedError != "" {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.expectedError)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedResult, lunsafe.Number)
-			}
+			lSafe := mkL2BlockRef(tt.l2Unsafe, l1ToL2BlockNum(tt.l2Unsafe), false).ID()
+			lunsafe, err := tracker.FindResetUnsafeHeadTarget(ctx, lSafe)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedResult, lunsafe.Number)
 		})
-	}
-}
-
-// Helper functions to create test data
-func createL1BlockRef(number uint64, hash string) eth.L1BlockRef {
-	return eth.L1BlockRef{
-		Hash:       common.HexToHash(hash),
-		Number:     number,
-		ParentHash: common.HexToHash("0x0"),
-		Time:       1000000 + number*12, // 12 second block time
-	}
-}
-
-func createL2BlockRef(number uint64, hash string, l1Origin eth.BlockID) eth.L2BlockRef {
-	return eth.L2BlockRef{
-		Hash:           common.HexToHash(hash),
-		Number:         number,
-		ParentHash:     common.HexToHash("0x0"),
-		Time:           1000000 + number*2, // 2 second block time
-		L1Origin:       l1Origin,
-		SequenceNumber: 0,
 	}
 }
