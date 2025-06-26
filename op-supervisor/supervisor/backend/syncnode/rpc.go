@@ -70,13 +70,7 @@ func (rs *RPCSyncNode) L2BlockRefByNumber(ctx context.Context, number uint64) (e
 	var out *eth.L2BlockRef
 	err := rs.cl.CallContext(ctx, &out, "interop_l2BlockRefByNumber", number)
 	if err != nil {
-		var jsonErr gethrpc.Error
-		if errors.As(err, &jsonErr) {
-			if jsonErr.ErrorCode() == 0 { // TODO
-				return eth.L2BlockRef{}, ethereum.NotFound
-			}
-		}
-		return eth.L2BlockRef{}, err
+		return eth.L2BlockRef{}, eth.MaybeAsNotFoundErr(err)
 	}
 	return *out, nil
 }
