@@ -27,9 +27,10 @@ func (cl *ProposerAdminClient) StopProposer(ctx context.Context) error {
 	return cl.client.CallContext(ctx, nil, "admin_stopProposer")
 }
 
-func (cl *ProposerAdminClient) Propose(ctx context.Context, blockNum *hexutil.Uint64) error {
+func (cl *ProposerAdminClient) Propose(ctx context.Context, blockNum *uint64) error {
 	if blockNum != nil {
-		return cl.client.CallContext(ctx, nil, "admin_propose", blockNum)
+		num := hexutil.Uint64(*blockNum)
+		return cl.client.CallContext(ctx, nil, "admin_propose", num)
 	}
 	return cl.client.CallContext(ctx, nil, "admin_propose")
 }

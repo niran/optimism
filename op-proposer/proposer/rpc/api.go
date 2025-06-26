@@ -3,7 +3,6 @@ package rpc
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -46,11 +45,6 @@ func (a *adminAPI) StopProposer(ctx context.Context) error {
 	return a.b.StopL2OutputSubmitting()
 }
 
-func (a *adminAPI) Propose(ctx context.Context, block *hexutil.Uint64) error {
-	var blkPtr *uint64
-	if block != nil {
-		b := uint64(*block)
-		blkPtr = &b
-	}
-	return a.b.Propose(ctx, blkPtr)
+func (a *adminAPI) Propose(ctx context.Context, block *uint64) error {
+	return a.b.Propose(ctx, block)
 }
