@@ -20,7 +20,7 @@
     "sourceCodeHash": "0x11b35ee81f797b30ee834e2ffad52686d2100d7ee139db4299b7d854dba25550"
   },
   "src/L1/OPCMValidator.sol:OPCMValidator": {
-    "initCodeHash": "0xa58c433d2f4f9db548e43714bf63e5fc7976e3b89e888a59b6485f37d1656627",
+    "initCodeHash": "0x491929b9740db3fb47bf094380a5207281d7cf24e4160b4ec31f5acc5fe4e10d",
     "sourceCodeHash": "0xec170b06ce05dee802ed735aeef76ef43b28cc6bf60b3d9d2bf64b5deb3fb58c"
   },
   "src/L1/OPContractsManager.sol:OPContractsManager": {
