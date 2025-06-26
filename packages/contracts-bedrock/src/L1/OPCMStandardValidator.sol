@@ -29,13 +29,13 @@ import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
-/// @title OPCMValidator
+/// @title OPCMStandardValidator
 /// @notice This contract is used to validate the configuration of the L1 contracts of an OP Stack chain.
 /// It is a stateless contract that can be used to ensure that the L1 contracts are configured correctly.
 /// It is intended to be used by the L1 PAO multisig to validate the configuration of the L1 contracts
 /// before and after an upgrade.
-contract OPCMValidator is ISemver {
-    /// @notice The semantic version of the OPCMValidator contract.
+contract OPCMStandardValidator is ISemver {
+    /// @notice The semantic version of the OPCMStandardValidator contract.
     /// @custom:semver 1.5.0
     string public constant version = "1.5.0";
 
@@ -115,7 +115,7 @@ contract OPCMValidator is ISemver {
         address challenger;
     }
 
-    /// @notice Constructor for the OPCMValidator contract.
+    /// @notice Constructor for the OPCMStandardValidator contract.
     constructor(
         Implementations memory _implementations,
         ISuperchainConfig _superchainConfig,
@@ -806,7 +806,7 @@ contract OPCMValidator is ISemver {
 
         // Handle validation failure
         if (bytes(_errors).length > 0 && !_allowFailure) {
-            revert(string.concat("OPCMValidator: ", finalErrors));
+            revert(string.concat("OPCMStandardValidator: ", finalErrors));
         }
 
         return finalErrors;

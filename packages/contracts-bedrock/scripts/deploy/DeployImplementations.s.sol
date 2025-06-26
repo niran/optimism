@@ -24,7 +24,7 @@ import {
     IOPContractsManagerUpgrader,
     IOPContractsManagerContractsContainer,
     IOPContractsManagerInteropMigrator,
-    IOPContractsManagerValidator
+    IOPContractsManagerStandardValidator
 } from "interfaces/L1/IOPContractsManager.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
@@ -34,7 +34,7 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IOPCMValidator } from "interfaces/L1/IOPCMValidator.sol";
+import { IOPCMStandardValidator } from "interfaces/L1/IOPCMStandardValidator.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 
@@ -64,7 +64,7 @@ contract DeployImplementations is Script {
         IOPContractsManagerDeployer opcmDeployer;
         IOPContractsManagerUpgrader opcmUpgrader;
         IOPContractsManagerInteropMigrator opcmInteropMigrator;
-        IOPContractsManagerValidator opcmValidator;
+        IOPContractsManagerStandardValidator opcmStandardValidator;
         IDelayedWETH delayedWETHImpl;
         IOptimismPortal optimismPortalImpl;
         IETHLockbox ethLockboxImpl;
@@ -183,7 +183,7 @@ contract DeployImplementations is Script {
                     _output.opcmDeployer,
                     _output.opcmUpgrader,
                     _output.opcmInteropMigrator,
-                    _output.opcmValidator,
+                    _output.opcmStandardValidator,
                     _input.superchainConfigProxy,
                     _input.protocolVersionsProxy,
                     _input.superchainProxyAdmin,
@@ -538,7 +538,7 @@ contract DeployImplementations is Script {
     )
         private
     {
-        IOPCMValidator.Implementations memory opcmImplementations;
+        IOPCMStandardValidator.Implementations memory opcmImplementations;
         opcmImplementations.l1ERC721BridgeImpl = _implementations.l1ERC721BridgeImpl;
         opcmImplementations.optimismPortalImpl = _implementations.optimismPortalImpl;
         opcmImplementations.ethLockboxImpl = _implementations.ethLockboxImpl;
@@ -551,12 +551,12 @@ contract DeployImplementations is Script {
         opcmImplementations.delayedWETHImpl = _implementations.delayedWETHImpl;
         opcmImplementations.mipsImpl = _implementations.mipsImpl;
 
-        IOPContractsManagerValidator impl = IOPContractsManagerValidator(
+        IOPContractsManagerStandardValidator impl = IOPContractsManagerStandardValidator(
             DeployUtils.createDeterministic({
                 _name: "OPContractsManager.sol:OPContractsManagerValidator",
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(
-                        IOPContractsManagerValidator.__constructor__,
+                        IOPContractsManagerStandardValidator.__constructor__,
                         (
                             opcmImplementations,
                             _input.superchainConfigProxy,
@@ -570,7 +570,7 @@ contract DeployImplementations is Script {
             })
         );
         vm.label(address(impl), "OPContractsManagerValidatorImpl");
-        _output.opcmValidator = impl;
+        _output.opcmStandardValidator = impl;
     }
 
     function assertValidInput(Input memory _input) private pure {

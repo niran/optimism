@@ -51,7 +51,7 @@ import {
     IOPContractsManagerUpgrader,
     IOPContractsManagerContractsContainer,
     IOPContractsManagerInteropMigrator,
-    IOPContractsManagerValidator
+    IOPContractsManagerStandardValidator
 } from "interfaces/L1/IOPContractsManager.sol";
 import { IOPContractsManager200 } from "interfaces/L1/IOPContractsManager200.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -59,7 +59,7 @@ import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
 import { ISuperFaultDisputeGame } from "interfaces/dispute/ISuperFaultDisputeGame.sol";
 import { ISuperPermissionedDisputeGame } from "interfaces/dispute/ISuperPermissionedDisputeGame.sol";
-import { IOPCMValidator } from "interfaces/L1/IOPCMValidator.sol";
+import { IOPCMStandardValidator } from "interfaces/L1/IOPCMStandardValidator.sol";
 
 // Contracts
 import {
@@ -69,9 +69,9 @@ import {
     OPContractsManagerUpgrader,
     OPContractsManagerContractsContainer,
     OPContractsManagerInteropMigrator,
-    OPContractsManagerValidator
+    OPContractsManagerStandardValidator
 } from "src/L1/OPContractsManager.sol";
-import { OPCMValidator } from "src/L1/OPCMValidator.sol";
+import { OPCMStandardValidator } from "src/L1/OPCMStandardValidator.sol";
 
 /// @title OPContractsManager_Harness
 /// @notice Exposes internal functions for testing.
@@ -81,7 +81,7 @@ contract OPContractsManager_Harness is OPContractsManager {
         OPContractsManagerDeployer _opcmDeployer,
         OPContractsManagerUpgrader _opcmUpgrader,
         OPContractsManagerInteropMigrator _opcmInteropMigrator,
-        OPContractsManagerValidator _opcmValidator,
+        OPContractsManagerStandardValidator _opcmValidator,
         ISuperchainConfig _superchainConfig,
         IProtocolVersions _protocolVersions,
         IProxyAdmin _superchainProxyAdmin,
@@ -620,7 +620,7 @@ contract OPContractsManager_TestInit is Test {
         );
 
         IOPContractsManager.Implementations memory __opcmImplementations = container.implementations();
-        IOPCMValidator.Implementations memory opcmImplementations;
+        IOPCMStandardValidator.Implementations memory opcmImplementations;
         assembly {
             opcmImplementations := __opcmImplementations
         }
@@ -668,12 +668,12 @@ contract OPContractsManager_TestInit is Test {
                                     _salt: DeployUtils.DEFAULT_SALT
                                 })
                             ),
-                            IOPContractsManagerValidator(
+                            IOPContractsManagerStandardValidator(
                                 DeployUtils.createDeterministic({
                                     _name: "OPContractsManagerValidator",
                                     _args: DeployUtils.encodeConstructor(
                                         abi.encodeCall(
-                                            IOPContractsManagerValidator.__constructor__,
+                                            IOPContractsManagerStandardValidator.__constructor__,
                                             (
                                                 opcmImplementations,
                                                 superchainConfigProxy,
@@ -771,7 +771,7 @@ contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test {
             new OPContractsManagerContractsContainer(emptyBlueprints, emptyImpls);
 
         OPContractsManager.Implementations memory __opcmImplementations = container.implementations();
-        OPCMValidator.Implementations memory opcmImplementations;
+        OPCMStandardValidator.Implementations memory opcmImplementations;
         assembly {
             opcmImplementations := __opcmImplementations
         }
@@ -781,7 +781,7 @@ contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test {
             _opcmDeployer: new OPContractsManagerDeployer(container),
             _opcmUpgrader: new OPContractsManagerUpgrader(container),
             _opcmInteropMigrator: new OPContractsManagerInteropMigrator(container),
-            _opcmValidator: new OPContractsManagerValidator(
+            _opcmValidator: new OPContractsManagerStandardValidator(
                 opcmImplementations, superchainConfigProxy, address(superchainProxyAdmin), challenger, 100
             ),
             _superchainConfig: superchainConfigProxy,

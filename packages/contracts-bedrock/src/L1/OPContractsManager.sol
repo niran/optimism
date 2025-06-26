@@ -32,7 +32,7 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IHasSuperchainConfig } from "interfaces/L1/IHasSuperchainConfig.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { OPCMValidator } from "src/L1/OPCMValidator.sol";
+import { OPCMStandardValidator } from "src/L1/OPCMStandardValidator.sol";
 
 contract OPContractsManagerContractsContainer {
     /// @notice Addresses of the Blueprint contracts.
@@ -60,7 +60,7 @@ contract OPContractsManagerContractsContainer {
     }
 }
 
-contract OPContractsManagerValidator is OPCMValidator {
+contract OPContractsManagerStandardValidator is OPCMStandardValidator {
     constructor(
         Implementations memory _implementations,
         ISuperchainConfig _superchainConfig,
@@ -68,7 +68,7 @@ contract OPContractsManagerValidator is OPCMValidator {
         address _challenger,
         uint256 _withdrawalDelaySeconds
     )
-        OPCMValidator(_implementations, _superchainConfig, _l1PAOMultisig, _challenger, _withdrawalDelaySeconds)
+        OPCMStandardValidator(_implementations, _superchainConfig, _l1PAOMultisig, _challenger, _withdrawalDelaySeconds)
     { }
 }
 
@@ -1785,7 +1785,7 @@ contract OPContractsManager is ISemver {
 
     OPContractsManagerInteropMigrator public immutable opcmInteropMigrator;
 
-    OPContractsManagerValidator public immutable opcmValidator;
+    OPContractsManagerStandardValidator public immutable opcmStandardValidator;
 
     /// @notice Address of the SuperchainConfig contract shared by all chains.
     ISuperchainConfig public immutable superchainConfig;
@@ -1866,7 +1866,7 @@ contract OPContractsManager is ISemver {
         OPContractsManagerDeployer _opcmDeployer,
         OPContractsManagerUpgrader _opcmUpgrader,
         OPContractsManagerInteropMigrator _opcmInteropMigrator,
-        OPContractsManagerValidator _opcmValidator,
+        OPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig,
         IProtocolVersions _protocolVersions,
         IProxyAdmin _superchainProxyAdmin,
@@ -1879,12 +1879,12 @@ contract OPContractsManager is ISemver {
         _opcmDeployer.assertValidContractAddress(address(_opcmDeployer));
         _opcmDeployer.assertValidContractAddress(address(_opcmUpgrader));
         _opcmDeployer.assertValidContractAddress(address(_opcmInteropMigrator));
-        _opcmDeployer.assertValidContractAddress(address(_opcmValidator));
+        _opcmDeployer.assertValidContractAddress(address(_opcmStandardValidator));
         opcmGameTypeAdder = _opcmGameTypeAdder;
         opcmDeployer = _opcmDeployer;
         opcmUpgrader = _opcmUpgrader;
         opcmInteropMigrator = _opcmInteropMigrator;
-        opcmValidator = _opcmValidator;
+        opcmStandardValidator = _opcmStandardValidator;
         superchainConfig = _superchainConfig;
         protocolVersions = _protocolVersions;
         superchainProxyAdmin = _superchainProxyAdmin;
@@ -1894,26 +1894,26 @@ contract OPContractsManager is ISemver {
     }
 
     function validate(
-        OPCMValidator.ValidationInput memory _input,
+        OPCMStandardValidator.ValidationInput memory _input,
         bool _allowFailure
     )
         public
         view
         returns (string memory)
     {
-        return opcmValidator.validate(_input, _allowFailure);
+        return opcmStandardValidator.validate(_input, _allowFailure);
     }
 
     function validateWithOverrides(
-        OPCMValidator.ValidationInput memory _input,
+        OPCMStandardValidator.ValidationInput memory _input,
         bool _allowFailure,
-        OPCMValidator.ValidationOverrides memory _overrides
+        OPCMStandardValidator.ValidationOverrides memory _overrides
     )
         public
         view
         returns (string memory)
     {
-        return opcmValidator.validateWithOverrides(_input, _allowFailure, _overrides);
+        return opcmStandardValidator.validateWithOverrides(_input, _allowFailure, _overrides);
     }
 
     function deploy(DeployInput calldata _input) external virtual returns (DeployOutput memory) {

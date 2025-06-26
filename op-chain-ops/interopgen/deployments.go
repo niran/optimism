@@ -15,7 +15,7 @@ type Implementations struct {
 	OpcmDeployer                     common.Address `json:"OPCMDeployer"`
 	OpcmUpgrader                     common.Address `json:"OPCMUpgrader"`
 	OpcmInteropMigrator              common.Address `json:"OPCMInteropMigrator"`
-	OpcmValidator                    common.Address `json:"OPCMValidator"`
+	OpcmValidator                    common.Address `json:"OPCMStandardValidator"`
 	DelayedWETHImpl                  common.Address `json:"DelayedWETHImpl"`
 	OptimismPortalImpl               common.Address `json:"OptimismPortalImpl"`
 	ETHLockboxImpl                   common.Address `json:"ETHLockboxImpl"`

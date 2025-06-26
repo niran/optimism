@@ -359,7 +359,7 @@ var excludedPaths = []string{
 	"test/L1/L1CrossDomainMessenger.t.sol",      // Contains contracts not matching L1CrossDomainMessenger base name
 	"test/L1/L1ERC721Bridge.t.sol",              // Contains contracts not matching L1ERC721Bridge base name
 	"test/L1/ResourceMetering.t.sol",            // Contains contracts not matching ResourceMetering base name
-	"test/L1/OPCMValidator.t.sol",               // Contains contracts not matching OPCMValidator base name
+	"test/L1/OPCMStandardValidator.t.sol",       // Contains contracts not matching OPCMStandardValidator base name
 	"test/L2/CrossDomainOwnable.t.sol",          // Contains contracts not matching CrossDomainOwnable base name
 	"test/L2/CrossDomainOwnable2.t.sol",         // Contains contracts not matching CrossDomainOwnable2 base name
 	"test/L2/CrossDomainOwnable3.t.sol",         // Contains contracts not matching CrossDomainOwnable3 base name

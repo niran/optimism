@@ -22,8 +22,8 @@
         "type": "address"
       },
       {
-        "internalType": "contract OPContractsManagerValidator",
-        "name": "_opcmValidator",
+        "internalType": "contract OPContractsManagerStandardValidator",
+        "name": "_opcmStandardValidator",
         "type": "address"
       },
       {
@@ -695,10 +695,10 @@
   },
   {
     "inputs": [],
-    "name": "opcmUpgrader",
+    "name": "opcmStandardValidator",
     "outputs": [
       {
-        "internalType": "contract OPContractsManagerUpgrader",
+        "internalType": "contract OPContractsManagerStandardValidator",
         "name": "",
         "type": "address"
       }
@@ -708,10 +708,10 @@
   },
   {
     "inputs": [],
-    "name": "opcmValidator",
+    "name": "opcmUpgrader",
     "outputs": [
       {
-        "internalType": "contract OPContractsManagerValidator",
+        "internalType": "contract OPContractsManagerUpgrader",
         "name": "",
         "type": "address"
       }
@@ -869,7 +869,7 @@
             "type": "uint256"
           }
         ],
-        "internalType": "struct OPCMValidator.ValidationInput",
+        "internalType": "struct OPCMStandardValidator.ValidationInput",
         "name": "_input",
         "type": "tuple"
       },
@@ -915,7 +915,7 @@
             "type": "uint256"
           }
         ],
-        "internalType": "struct OPCMValidator.ValidationInput",
+        "internalType": "struct OPCMStandardValidator.ValidationInput",
         "name": "_input",
         "type": "tuple"
       },
@@ -937,7 +937,7 @@
             "type": "address"
           }
         ],
-        "internalType": "struct OPCMValidator.ValidationOverrides",
+        "internalType": "struct OPCMStandardValidator.ValidationOverrides",
         "name": "_overrides",
         "type": "tuple"
       }

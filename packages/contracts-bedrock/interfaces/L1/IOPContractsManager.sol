@@ -23,7 +23,7 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IOPCMValidator } from "interfaces/L1/IOPCMValidator.sol";
+import { IOPCMStandardValidator } from "interfaces/L1/IOPCMStandardValidator.sol";
 
 interface IOPContractsManagerContractsContainer {
     function __constructor__(
@@ -36,9 +36,9 @@ interface IOPContractsManagerContractsContainer {
     function implementations() external view returns (IOPContractsManager.Implementations memory);
 }
 
-interface IOPContractsManagerValidator is IOPCMValidator {
+interface IOPContractsManagerStandardValidator is IOPCMStandardValidator {
     function __constructor__(
-        IOPCMValidator.Implementations memory _implementations,
+        IOPCMStandardValidator.Implementations memory _implementations,
         ISuperchainConfig _superchainConfig,
         address _l1PAOMultisig,
         address _challenger,
@@ -314,7 +314,7 @@ interface IOPContractsManager {
         IOPContractsManagerDeployer _opcmDeployer,
         IOPContractsManagerUpgrader _opcmUpgrader,
         IOPContractsManagerInteropMigrator _opcmInteropMigrator,
-        IOPContractsManagerValidator _opcmValidator,
+        IOPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig,
         IProtocolVersions _protocolVersions,
         IProxyAdmin _superchainProxyAdmin,
@@ -324,16 +324,16 @@ interface IOPContractsManager {
         external;
 
     function validateWithOverrides(
-        IOPCMValidator.ValidationInput calldata _input,
+        IOPCMStandardValidator.ValidationInput calldata _input,
         bool _allowFailure,
-        IOPCMValidator.ValidationOverrides calldata _overrides
+        IOPCMStandardValidator.ValidationOverrides calldata _overrides
     )
         external
         view
         returns (string memory);
 
     function validate(
-        IOPCMValidator.ValidationInput calldata _input,
+        IOPCMStandardValidator.ValidationInput calldata _input,
         bool _allowFailure
     )
         external
@@ -376,7 +376,7 @@ interface IOPContractsManager {
 
     function opcmInteropMigrator() external view returns (IOPContractsManagerInteropMigrator);
 
-    function opcmValidator() external view returns (IOPContractsManagerValidator);
+    function opcmStandardValidator() external view returns (IOPContractsManagerStandardValidator);
 
     /// @notice Returns the implementation contract addresses.
     function implementations() external view returns (Implementations memory);
