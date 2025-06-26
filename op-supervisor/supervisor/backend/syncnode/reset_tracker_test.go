@@ -17,30 +17,27 @@ import (
 // mockResetBackend implements the resetBackend interface for testing
 type mockResetBackend struct {
 	// nodeBlocks represents blocks known to the node
-	nodeBlocks map[uint64]eth.BlockID
+	nodeBlocks map[uint64]eth.L2BlockRef
 	// safeBlocks represents blocks marked as safe in the local DB
 	safeBlocks map[uint64]eth.BlockID
 
-	// unsafeBlocks represents L2BlockRefs known to the node
-	unsafeBlocks map[uint64]eth.L2BlockRef
-	// l1Blocks represents L1 origins known to the node
+	// l1Blocks represents L1 origins known to the local DB
 	l1Blocks map[uint64]eth.BlockID
 	// unsafeHead represents unsafe head known to the node
 	unsafeHead eth.BlockID
 }
 
 func (m *mockResetBackend) reset() {
-	m.nodeBlocks = make(map[uint64]eth.BlockID)
+	m.nodeBlocks = make(map[uint64]eth.L2BlockRef)
 	m.safeBlocks = make(map[uint64]eth.BlockID)
 
-	m.unsafeBlocks = make(map[uint64]eth.L2BlockRef)
 	m.l1Blocks = make(map[uint64]eth.BlockID)
 	m.unsafeHead = eth.BlockID{}
 }
 
 func (m *mockResetBackend) BlockIDByNumber(ctx context.Context, n uint64) (eth.BlockID, error) {
 	if block, ok := m.nodeBlocks[n]; ok {
-		return block, nil
+		return block.ID(), nil
 	}
 	return eth.BlockID{}, ethereum.NotFound
 }
@@ -56,8 +53,8 @@ func (m *mockResetBackend) IsLocalSafe(ctx context.Context, block eth.BlockID) e
 }
 
 func (m *mockResetBackend) L2BlockRefByNumber(ctx context.Context, n uint64) (eth.L2BlockRef, error) {
-	if unsafeBlock, ok := m.unsafeBlocks[n]; ok {
-		return unsafeBlock, nil
+	if blockRef, ok := m.nodeBlocks[n]; ok {
+		return blockRef, nil
 	}
 	return eth.L2BlockRef{}, ethereum.NotFound
 }
@@ -91,6 +88,12 @@ func TestResetTracker(t *testing.T) {
 		return eth.BlockID{Number: n, Hash: hash}
 	}
 
+	// Helper to create a block ref with a specific hash
+	mkBlockRef := func(n uint64, nodeDivHash bool) eth.L2BlockRef {
+		block := mkBlock(n, nodeDivHash)
+		return eth.L2BlockRef{Number: block.Number, Hash: block.Hash}
+	}
+
 	// Helper to set up a range of blocks
 	// start: first block number in range
 	// endNode: last block number in node
@@ -98,7 +101,7 @@ func TestResetTracker(t *testing.T) {
 	// divergence: block number at which node and safe DB hashes start to differ
 	setupRange := func(start, endNode, endLocal, divergence uint64) {
 		for i := start; i <= endNode; i++ {
-			backend.nodeBlocks[i] = mkBlock(i, i >= divergence)
+			backend.nodeBlocks[i] = mkBlockRef(i, i >= divergence)
 		}
 
 		for i := start; i <= endLocal; i++ {
@@ -295,7 +298,7 @@ func TestResetTrackerLocalUnsafe(t *testing.T) {
 			l1OriginNum := l1ToL2BlockNum(blockNum)
 			l1Origin := mkL1Block(l1OriginNum)
 			l2Block := mkL2BlockRef(blockNum, l1OriginNum, blockNum > tt.validUntil)
-			backend.unsafeBlocks[blockNum] = l2Block
+			backend.nodeBlocks[blockNum] = l2Block
 			backend.l1Blocks[l1OriginNum] = l1Origin
 		}
 	}
