@@ -18,6 +18,8 @@ interface IL1Block {
     function number() external view returns (uint64);
     function operatorFeeScalar() external view returns (uint32);
     function operatorFeeConstant() external view returns (uint64);
+    function eip7623StandardTokenCost() external view returns (uint8);
+    function eip7623TotalCostFloorPerToken() external view returns (uint24);
     function sequenceNumber() external view returns (uint64);
     function setL1BlockValues(
         uint64 _number,
@@ -32,6 +34,7 @@ interface IL1Block {
         external;
     function setL1BlockValuesEcotone() external;
     function setL1BlockValuesIsthmus() external;
+    function setL1BlockValuesJovian() external;
     function timestamp() external view returns (uint64);
     function version() external pure returns (string memory);
 

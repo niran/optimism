@@ -34,7 +34,8 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         GAS_LIMIT,
         UNSAFE_BLOCK_SIGNER,
         EIP_1559_PARAMS,
-        OPERATOR_FEE_PARAMS
+        OPERATOR_FEE_PARAMS,
+        EIP7623_PARAMS
     }
 
     /// @notice Struct representing the addresses of L1 system contracts. These should be the
@@ -135,6 +136,12 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @notice The SuperchainConfig contract that manages the pause state.
     ISuperchainConfig public superchainConfig;
 
+    /// @notice The ratio of non-zero to zero byte calldata cost (EIP-7623).
+    uint8 public eip7623StandardTokenCost;
+
+    /// @notice The cost floor per zero byte in calldata (EIP-7623).
+    uint24 public eip7623TotalCostFloorPerToken;
+
     /// @notice Emitted when configuration is updated.
     /// @param version    SystemConfig version.
     /// @param updateType Type of update.
@@ -196,6 +203,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         _setBatcherHash(_batcherHash);
         _setGasConfigEcotone({ _basefeeScalar: _basefeeScalar, _blobbasefeeScalar: _blobbasefeeScalar });
         _setGasLimit(_gasLimit);
+        _setEIP7623Params({ _standardTokenCost: 4, _totalCostFloorPerToken: 10 });
 
         Storage.setAddress(UNSAFE_BLOCK_SIGNER_SLOT, _unsafeBlockSigner);
         Storage.setAddress(BATCH_INBOX_SLOT, _batchInbox);
@@ -433,6 +441,27 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
 
         bytes memory data = abi.encode(uint256(_operatorFeeScalar) << 64 | _operatorFeeConstant);
         emit ConfigUpdate(VERSION, UpdateType.OPERATOR_FEE_PARAMS, data);
+    }
+
+    /// @notice Updates the EIP-7623 parameters. Can only be called by the owner.
+    /// @param _standardTokenCost The ratio of non-zero to zero byte calldata cost.
+    /// @param _totalCostFloorPerToken The cost floor per zero byte in calldata.
+    function setEIP7623Params(uint8 _standardTokenCost, uint24 _totalCostFloorPerToken) external onlyOwner {
+        _setEIP7623Params(_standardTokenCost, _totalCostFloorPerToken);
+    }
+
+    /// @notice Internal function for updating the EIP-7623 parameters.
+    /// @param _standardTokenCost The ratio of non-zero to zero byte calldata cost.
+    /// @param _totalCostFloorPerToken The cost floor per zero byte in calldata.
+    function _setEIP7623Params(uint8 _standardTokenCost, uint24 _totalCostFloorPerToken) internal {
+        require(_standardTokenCost >= 1, "SystemConfig: standard token cost must be >= 1");
+        require(_totalCostFloorPerToken >= 1, "SystemConfig: cost floor must be >= 1");
+
+        eip7623StandardTokenCost = _standardTokenCost;
+        eip7623TotalCostFloorPerToken = _totalCostFloorPerToken;
+
+        bytes memory data = abi.encode(uint256(_standardTokenCost) << 24 | _totalCostFloorPerToken);
+        emit ConfigUpdate(VERSION, UpdateType.EIP7623_PARAMS, data);
     }
 
     /// @notice Sets the start block in a backwards compatible way. Proxies

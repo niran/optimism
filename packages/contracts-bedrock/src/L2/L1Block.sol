@@ -62,6 +62,12 @@ contract L1Block is ISemver {
     /// @notice The scalar value applied to the operator fee.
     uint32 public operatorFeeScalar;
 
+    /// @notice The ratio of non-zero to zero byte calldata cost (EIP-7623).
+    uint8 public eip7623StandardTokenCost;
+
+    /// @notice The cost floor per zero byte in calldata (EIP-7623).
+    uint24 public eip7623TotalCostFloorPerToken;
+
     /// @custom:semver 1.6.0
     function version() public pure virtual returns (string memory) {
         return "1.6.0";
@@ -211,6 +217,50 @@ contract L1Block is ISemver {
         assembly {
             // operatorFeeScalar (uint32), operatorFeeConstant (uint64)
             sstore(operatorFeeConstant.slot, shr(160, calldataload(164)))
+        }
+    }
+
+    /// @notice Updates the L1 block values for a Jovian upgraded chain.
+    /// Params are packed and passed in as raw msg.data instead of ABI to reduce calldata size.
+    /// Params are expected to be in the following order:
+    ///   1. _baseFeeScalar              L1 base fee scalar
+    ///   2. _blobBaseFeeScalar          L1 blob base fee scalar
+    ///   3. _sequenceNumber             Number of L2 blocks since epoch start.
+    ///   4. _timestamp                  L1 timestamp.
+    ///   5. _number                     L1 blocknumber.
+    ///   6. _basefee                    L1 base fee.
+    ///   7. _blobBaseFee                L1 blob base fee.
+    ///   8. _hash                       L1 blockhash.
+    ///   9. _batcherHash                Versioned hash to authenticate batcher by.
+    ///   10. _operatorFeeScalar         Operator fee scalar.
+    ///   11. _operatorFeeConstant       Operator fee constant.
+    ///   12. _eip7623TotalCostFloorPerToken EIP-7623 total cost floor per token.
+    ///   13. _eip7623StandardTokenCost  EIP-7623 standard token cost ratio.
+    function setL1BlockValuesJovian() public {
+        _setL1BlockValuesJovian();
+    }
+
+    /// @notice Updates the L1 block values for a Jovian upgraded chain.
+    /// Params are packed and passed in as raw msg.data instead of ABI to reduce calldata size.
+    /// Params are expected to be in the following order:
+    ///   1. _baseFeeScalar              L1 base fee scalar
+    ///   2. _blobBaseFeeScalar          L1 blob base fee scalar
+    ///   3. _sequenceNumber             Number of L2 blocks since epoch start.
+    ///   4. _timestamp                  L1 timestamp.
+    ///   5. _number                     L1 blocknumber.
+    ///   6. _basefee                    L1 base fee.
+    ///   7. _blobBaseFee                L1 blob base fee.
+    ///   8. _hash                       L1 blockhash.
+    ///   9. _batcherHash                Versioned hash to authenticate batcher by.
+    ///   10. _operatorFeeScalar         Operator fee scalar.
+    ///   11. _operatorFeeConstant       Operator fee constant.
+    ///   12. _eip7623TotalCostFloorPerToken EIP-7623 total cost floor per token.
+    ///   13. _eip7623StandardTokenCost  EIP-7623 standard token cost ratio.
+    function _setL1BlockValuesJovian() internal {
+        _setL1BlockValuesIsthmus();
+        assembly {
+            // eip7623TotalCostFloorPerToken (uint24), eip7623StandardTokenCost (uint8)
+            sstore(eip7623StandardTokenCost.slot, shr(224, calldataload(196)))
         }
     }
 }
