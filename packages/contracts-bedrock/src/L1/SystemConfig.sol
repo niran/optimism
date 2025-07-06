@@ -176,6 +176,8 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @param _addresses         Set of L1 contract addresses. These should be the proxies.
     /// @param _l2ChainId         The L2 chain ID that this SystemConfig configures.
     /// @param _superchainConfig  The SuperchainConfig contract address.
+    /// @param _eip7623StandardTokenCost The ratio of non-zero to zero byte calldata cost.
+    /// @param _eip7623TotalCostFloorPerToken The cost floor per zero byte in calldata.
     function initialize(
         address _owner,
         uint32 _basefeeScalar,
@@ -187,7 +189,9 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         address _batchInbox,
         SystemConfig.Addresses memory _addresses,
         uint256 _l2ChainId,
-        ISuperchainConfig _superchainConfig
+        ISuperchainConfig _superchainConfig,
+        uint8 _eip7623StandardTokenCost,
+        uint24 _eip7623TotalCostFloorPerToken
     )
         public
         reinitializer(initVersion())
@@ -203,7 +207,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         _setBatcherHash(_batcherHash);
         _setGasConfigEcotone({ _basefeeScalar: _basefeeScalar, _blobbasefeeScalar: _blobbasefeeScalar });
         _setGasLimit(_gasLimit);
-        _setEIP7623Params({ _standardTokenCost: 4, _totalCostFloorPerToken: 10 });
+        _setEIP7623Params({ _standardTokenCost: _eip7623StandardTokenCost, _totalCostFloorPerToken: _eip7623TotalCostFloorPerToken });
 
         Storage.setAddress(UNSAFE_BLOCK_SIGNER_SLOT, _unsafeBlockSigner);
         Storage.setAddress(BATCH_INBOX_SLOT, _batchInbox);

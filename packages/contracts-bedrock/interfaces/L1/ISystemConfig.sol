@@ -59,7 +59,9 @@ interface ISystemConfig is IProxyAdminOwnedBase {
         address _batchInbox,
         Addresses memory _addresses,
         uint256 _l2ChainId,
-        ISuperchainConfig _superchainConfig
+        ISuperchainConfig _superchainConfig,
+        uint8 _eip7623StandardTokenCost,
+        uint24 _eip7623TotalCostFloorPerToken
     )
         external;
     function initVersion() external view returns (uint8);
