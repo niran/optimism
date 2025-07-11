@@ -91,7 +91,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
     function startBlock() external view returns (uint256 startBlock_);
     function transferOwnership(address newOwner) external; // nosemgrep
     function unsafeBlockSigner() external view returns (address addr_);
-    function upgrade(uint256 _l2ChainId, ISuperchainConfig _superchainConfig, uint32 _calldataGasPerCompressedByte) external;
+    function upgrade(uint256 _l2ChainId, ISuperchainConfig _superchainConfig) external;
     function version() external pure returns (string memory);
     function paused() external view returns (bool);
     function superchainConfig() external view returns (ISuperchainConfig);

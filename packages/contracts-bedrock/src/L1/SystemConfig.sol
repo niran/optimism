@@ -223,8 +223,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @notice Upgrades the SystemConfig by adding a reference to the SuperchainConfig.
     /// @param _l2ChainId The L2 chain ID that this SystemConfig configures.
     /// @param _superchainConfig The SuperchainConfig contract address.
-    /// @param _calldataGasPerCompressedByte The cost per estimated compressed byte of calldata.
-    function upgrade(uint256 _l2ChainId, ISuperchainConfig _superchainConfig, uint32 _calldataGasPerCompressedByte) external reinitializer(initVersion()) {
+    function upgrade(uint256 _l2ChainId, ISuperchainConfig _superchainConfig) external reinitializer(initVersion()) {
         // Upgrade transactions must come from the ProxyAdmin or its owner.
         _assertOnlyProxyAdminOrProxyAdminOwner();
 
@@ -234,9 +233,6 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
 
         // Set the SuperchainConfig contract.
         superchainConfig = _superchainConfig;
-
-        // Initialize calldata gas per compressed byte parameter for existing deployments.
-        _setCalldataGasPerCompressedByte(_calldataGasPerCompressedByte);
 
         // Clear out the old dispute game factory address, it's derived now. We get rid of this
         // storage slot because it doesn't use structured storage and we can't use a spacer
