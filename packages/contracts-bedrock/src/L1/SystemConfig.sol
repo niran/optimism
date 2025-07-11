@@ -35,7 +35,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         UNSAFE_BLOCK_SIGNER,
         EIP_1559_PARAMS,
         OPERATOR_FEE_PARAMS,
-        EIP7623_PARAMS
+        CALLDATA_GAS_PER_COMPRESSED_BYTE
     }
 
     /// @notice Struct representing the addresses of L1 system contracts. These should be the
@@ -136,11 +136,8 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @notice The SuperchainConfig contract that manages the pause state.
     ISuperchainConfig public superchainConfig;
 
-    /// @notice The ratio of non-zero to zero byte calldata cost (EIP-7623).
-    uint8 public eip7623StandardTokenCost;
-
-    /// @notice The cost floor per zero byte in calldata (EIP-7623).
-    uint24 public eip7623TotalCostFloorPerToken;
+    /// @notice The cost per estimated compressed byte of calldata.
+    uint32 public calldataGasPerCompressedByte;
 
     /// @notice Emitted when configuration is updated.
     /// @param version    SystemConfig version.
@@ -149,9 +146,9 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     event ConfigUpdate(uint256 indexed version, UpdateType indexed updateType, bytes data);
 
     /// @notice Semantic version.
-    /// @custom:semver 3.4.0
+    /// @custom:semver 3.5.0
     function version() public pure virtual returns (string memory) {
-        return "3.4.0";
+        return "3.5.0";
     }
 
     /// @notice Constructs the SystemConfig contract.
@@ -176,8 +173,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @param _addresses         Set of L1 contract addresses. These should be the proxies.
     /// @param _l2ChainId         The L2 chain ID that this SystemConfig configures.
     /// @param _superchainConfig  The SuperchainConfig contract address.
-    /// @param _eip7623StandardTokenCost The ratio of non-zero to zero byte calldata cost.
-    /// @param _eip7623TotalCostFloorPerToken The cost floor per zero byte in calldata.
+    /// @param _calldataGasPerCompressedByte The cost per estimated compressed byte of calldata.
     function initialize(
         address _owner,
         uint32 _basefeeScalar,
@@ -190,8 +186,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         SystemConfig.Addresses memory _addresses,
         uint256 _l2ChainId,
         ISuperchainConfig _superchainConfig,
-        uint8 _eip7623StandardTokenCost,
-        uint24 _eip7623TotalCostFloorPerToken
+        uint32 _calldataGasPerCompressedByte
     )
         public
         reinitializer(initVersion())
@@ -207,7 +202,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         _setBatcherHash(_batcherHash);
         _setGasConfigEcotone({ _basefeeScalar: _basefeeScalar, _blobbasefeeScalar: _blobbasefeeScalar });
         _setGasLimit(_gasLimit);
-        _setEIP7623Params({ _standardTokenCost: _eip7623StandardTokenCost, _totalCostFloorPerToken: _eip7623TotalCostFloorPerToken });
+        _setCalldataGasPerCompressedByte(_calldataGasPerCompressedByte);
 
         Storage.setAddress(UNSAFE_BLOCK_SIGNER_SLOT, _unsafeBlockSigner);
         Storage.setAddress(BATCH_INBOX_SLOT, _batchInbox);
@@ -228,7 +223,8 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @notice Upgrades the SystemConfig by adding a reference to the SuperchainConfig.
     /// @param _l2ChainId The L2 chain ID that this SystemConfig configures.
     /// @param _superchainConfig The SuperchainConfig contract address.
-    function upgrade(uint256 _l2ChainId, ISuperchainConfig _superchainConfig) external reinitializer(initVersion()) {
+    /// @param _calldataGasPerCompressedByte The cost per estimated compressed byte of calldata.
+    function upgrade(uint256 _l2ChainId, ISuperchainConfig _superchainConfig, uint32 _calldataGasPerCompressedByte) external reinitializer(initVersion()) {
         // Upgrade transactions must come from the ProxyAdmin or its owner.
         _assertOnlyProxyAdminOrProxyAdminOwner();
 
@@ -238,6 +234,9 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
 
         // Set the SuperchainConfig contract.
         superchainConfig = _superchainConfig;
+
+        // Initialize calldata gas per compressed byte parameter for existing deployments.
+        _setCalldataGasPerCompressedByte(_calldataGasPerCompressedByte);
 
         // Clear out the old dispute game factory address, it's derived now. We get rid of this
         // storage slot because it doesn't use structured storage and we can't use a spacer
@@ -447,25 +446,21 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         emit ConfigUpdate(VERSION, UpdateType.OPERATOR_FEE_PARAMS, data);
     }
 
-    /// @notice Updates the EIP-7623 parameters. Can only be called by the owner.
-    /// @param _standardTokenCost The ratio of non-zero to zero byte calldata cost.
-    /// @param _totalCostFloorPerToken The cost floor per zero byte in calldata.
-    function setEIP7623Params(uint8 _standardTokenCost, uint24 _totalCostFloorPerToken) external onlyOwner {
-        _setEIP7623Params(_standardTokenCost, _totalCostFloorPerToken);
+    /// @notice Updates the calldata gas per compressed byte parameter. Can only be called by the owner.
+    /// @param _calldataGasPerCompressedByte The cost per estimated compressed byte of calldata.
+    function setCalldataGasPerCompressedByte(uint32 _calldataGasPerCompressedByte) external onlyOwner {
+        _setCalldataGasPerCompressedByte(_calldataGasPerCompressedByte);
     }
 
-    /// @notice Internal function for updating the EIP-7623 parameters.
-    /// @param _standardTokenCost The ratio of non-zero to zero byte calldata cost.
-    /// @param _totalCostFloorPerToken The cost floor per zero byte in calldata.
-    function _setEIP7623Params(uint8 _standardTokenCost, uint24 _totalCostFloorPerToken) internal {
-        require(_standardTokenCost >= 1, "SystemConfig: standard token cost must be >= 1");
-        require(_totalCostFloorPerToken >= 1, "SystemConfig: cost floor must be >= 1");
+    /// @notice Internal function for updating the calldata gas per compressed byte parameter.
+    /// @param _calldataGasPerCompressedByte The cost per estimated compressed byte of calldata.
+    function _setCalldataGasPerCompressedByte(uint32 _calldataGasPerCompressedByte) internal {
+        require(_calldataGasPerCompressedByte >= 1, "SystemConfig: calldata gas per compressed byte must be >= 1");
 
-        eip7623StandardTokenCost = _standardTokenCost;
-        eip7623TotalCostFloorPerToken = _totalCostFloorPerToken;
+        calldataGasPerCompressedByte = _calldataGasPerCompressedByte;
 
-        bytes memory data = abi.encode(uint256(_standardTokenCost) << 24 | _totalCostFloorPerToken);
-        emit ConfigUpdate(VERSION, UpdateType.EIP7623_PARAMS, data);
+        bytes memory data = abi.encode(_calldataGasPerCompressedByte);
+        emit ConfigUpdate(VERSION, UpdateType.CALLDATA_GAS_PER_COMPRESSED_BYTE, data);
     }
 
     /// @notice Sets the start block in a backwards compatible way. Proxies

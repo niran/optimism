@@ -62,15 +62,12 @@ contract L1Block is ISemver {
     /// @notice The scalar value applied to the operator fee.
     uint32 public operatorFeeScalar;
 
-    /// @notice The ratio of non-zero to zero byte calldata cost (EIP-7623).
-    uint8 public eip7623StandardTokenCost;
+    /// @notice The cost per estimated compressed byte of calldata.
+    uint32 public calldataGasPerCompressedByte;
 
-    /// @notice The cost floor per zero byte in calldata (EIP-7623).
-    uint24 public eip7623TotalCostFloorPerToken;
-
-    /// @custom:semver 1.6.0
+    /// @custom:semver 1.7.0
     function version() public pure virtual returns (string memory) {
-        return "1.6.0";
+        return "1.7.0";
     }
 
     /// @notice Returns the gas paying token, its decimals, name and symbol.
@@ -234,8 +231,7 @@ contract L1Block is ISemver {
     ///   9. _batcherHash                Versioned hash to authenticate batcher by.
     ///   10. _operatorFeeScalar         Operator fee scalar.
     ///   11. _operatorFeeConstant       Operator fee constant.
-    ///   12. _eip7623TotalCostFloorPerToken EIP-7623 total cost floor per token.
-    ///   13. _eip7623StandardTokenCost  EIP-7623 standard token cost ratio.
+    ///   12. _calldataGasPerCompressedByte Calldata gas per compressed byte.
     function setL1BlockValuesJovian() public {
         _setL1BlockValuesJovian();
     }
@@ -254,13 +250,12 @@ contract L1Block is ISemver {
     ///   9. _batcherHash                Versioned hash to authenticate batcher by.
     ///   10. _operatorFeeScalar         Operator fee scalar.
     ///   11. _operatorFeeConstant       Operator fee constant.
-    ///   12. _eip7623TotalCostFloorPerToken EIP-7623 total cost floor per token.
-    ///   13. _eip7623StandardTokenCost  EIP-7623 standard token cost ratio.
+    ///   12. _calldataGasPerCompressedByte Calldata gas per compressed byte.
     function _setL1BlockValuesJovian() internal {
         _setL1BlockValuesIsthmus();
         assembly {
-            // eip7623TotalCostFloorPerToken (uint24), eip7623StandardTokenCost (uint8)
-            sstore(eip7623StandardTokenCost.slot, shr(224, calldataload(196)))
+            // calldataGasPerCompressedByte (uint32)
+            sstore(calldataGasPerCompressedByte.slot, shr(224, calldataload(196)))
         }
     }
 }

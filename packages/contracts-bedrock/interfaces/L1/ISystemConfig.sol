@@ -13,7 +13,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
         UNSAFE_BLOCK_SIGNER,
         EIP_1559_PARAMS,
         OPERATOR_FEE_PARAMS,
-        EIP7623_PARAMS
+        CALLDATA_GAS_PER_COMPRESSED_BYTE
     }
 
     struct Addresses {
@@ -60,8 +60,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
         Addresses memory _addresses,
         uint256 _l2ChainId,
         ISuperchainConfig _superchainConfig,
-        uint8 _eip7623StandardTokenCost,
-        uint24 _eip7623TotalCostFloorPerToken
+        uint32 _calldataGasPerCompressedByte
     )
         external;
     function initVersion() external view returns (uint8);
@@ -73,8 +72,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
     function minimumGasLimit() external view returns (uint64);
     function operatorFeeConstant() external view returns (uint64);
     function operatorFeeScalar() external view returns (uint32);
-    function eip7623StandardTokenCost() external view returns (uint8);
-    function eip7623TotalCostFloorPerToken() external view returns (uint24);
+    function calldataGasPerCompressedByte() external view returns (uint32);
     function optimismMintableERC20Factory() external view returns (address addr_);
     function optimismPortal() external view returns (address addr_);
     function overhead() external view returns (uint256);
@@ -89,11 +87,11 @@ interface ISystemConfig is IProxyAdminOwnedBase {
     function setOperatorFeeScalars(uint32 _operatorFeeScalar, uint64 _operatorFeeConstant) external;
     function setUnsafeBlockSigner(address _unsafeBlockSigner) external;
     function setEIP1559Params(uint32 _denominator, uint32 _elasticity) external;
-    function setEIP7623Params(uint8 _standardTokenCost, uint24 _totalCostFloorPerToken) external;
+    function setCalldataGasPerCompressedByte(uint32 _calldataGasPerCompressedByte) external;
     function startBlock() external view returns (uint256 startBlock_);
     function transferOwnership(address newOwner) external; // nosemgrep
     function unsafeBlockSigner() external view returns (address addr_);
-    function upgrade(uint256 _l2ChainId, ISuperchainConfig _superchainConfig) external;
+    function upgrade(uint256 _l2ChainId, ISuperchainConfig _superchainConfig, uint32 _calldataGasPerCompressedByte) external;
     function version() external pure returns (string memory);
     function paused() external view returns (bool);
     function superchainConfig() external view returns (ISuperchainConfig);
