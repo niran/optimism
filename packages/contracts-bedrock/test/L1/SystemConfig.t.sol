@@ -159,7 +159,8 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
                 optimismMintableERC20Factory: address(0)
             }),
             _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
+            _superchainConfig: ISuperchainConfig(address(0)),
+            _calldataGasPerCompressedByte: 200
         });
     }
 
@@ -215,7 +216,8 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
                 optimismMintableERC20Factory: address(0)
             }),
             _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
+            _superchainConfig: ISuperchainConfig(address(0)),
+            _calldataGasPerCompressedByte: 200
         });
     }
 }
@@ -342,7 +344,8 @@ contract SystemConfig_StartBlock_Test is SystemConfig_TestInit {
                 optimismMintableERC20Factory: address(0)
             }),
             _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
+            _superchainConfig: ISuperchainConfig(address(0)),
+            _calldataGasPerCompressedByte: 200
         });
         assertEq(systemConfig.startBlock(), block.number);
     }
@@ -373,7 +376,8 @@ contract SystemConfig_StartBlock_Test is SystemConfig_TestInit {
                 optimismMintableERC20Factory: address(0)
             }),
             _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
+            _superchainConfig: ISuperchainConfig(address(0)),
+            _calldataGasPerCompressedByte: 200
         });
         assertEq(systemConfig.startBlock(), 1);
     }
@@ -670,7 +674,8 @@ contract SystemConfig_SetResourceConfig_Test is SystemConfig_TestInit {
                 optimismMintableERC20Factory: address(0)
             }),
             _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
+            _superchainConfig: ISuperchainConfig(address(0)),
+            _calldataGasPerCompressedByte: 200
         });
     }
 }
