@@ -41,8 +41,9 @@ type DeployOPChainInput struct {
 	DisputeMaxClockDuration      uint64
 	AllowCustomDisputeParameters bool
 
-	OperatorFeeScalar   uint32
-	OperatorFeeConstant uint64
+	OperatorFeeScalar           uint32
+	OperatorFeeConstant         uint64
+	CalldataGasPerCompressedByte uint32
 }
 
 func (input *DeployOPChainInput) InputSet() bool {
