@@ -62,8 +62,8 @@ contract L1Block is ISemver {
     /// @notice The scalar value applied to the operator fee.
     uint32 public operatorFeeScalar;
 
-    /// @notice The cost per estimated compressed byte of calldata.
-    uint32 public calldataGasPerCompressedByte;
+    /// @notice The cost per token for data gas.
+    uint32 public dataGasPerToken;
 
     /// @custom:semver 1.7.0
     function version() public pure virtual returns (string memory) {
@@ -231,7 +231,7 @@ contract L1Block is ISemver {
     ///   9. _batcherHash                Versioned hash to authenticate batcher by.
     ///   10. _operatorFeeScalar         Operator fee scalar.
     ///   11. _operatorFeeConstant       Operator fee constant.
-    ///   12. _calldataGasPerCompressedByte Calldata gas per compressed byte.
+    ///   12. _dataGasPerToken           Data gas per token.
     function setL1BlockValuesJovian() public {
         _setL1BlockValuesJovian();
     }
@@ -250,12 +250,12 @@ contract L1Block is ISemver {
     ///   9. _batcherHash                Versioned hash to authenticate batcher by.
     ///   10. _operatorFeeScalar         Operator fee scalar.
     ///   11. _operatorFeeConstant       Operator fee constant.
-    ///   12. _calldataGasPerCompressedByte Calldata gas per compressed byte.
+    ///   12. _dataGasPerToken           Data gas per token.
     function _setL1BlockValuesJovian() internal {
         _setL1BlockValuesIsthmus();
         assembly {
-            // calldataGasPerCompressedByte (uint32)
-            sstore(calldataGasPerCompressedByte.slot, shr(224, calldataload(196)))
+            // dataGasPerToken (uint32)
+            sstore(dataGasPerToken.slot, shr(224, calldataload(196)))
         }
     }
 }

@@ -48,7 +48,7 @@ contract SystemConfig_GasLimitBoundaries_Invariant is Test {
                     }),
                     1234, // _l2ChainId
                     ISuperchainConfig(address(0)), // _superchainConfig
-                    200 // _calldataGasPerCompressedByte
+                    200 // _dataGasPerToken
                 )
             )
         );

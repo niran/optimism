@@ -1276,7 +1276,7 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
                 opChainAddrs,
                 _input.l2ChainId,
                 _superchainConfig,
-                _input.calldataGasPerCompressedByte
+                _input.dataGasPerToken
             )
         );
     }
@@ -1670,7 +1670,7 @@ contract OPContractsManager is ISemver {
         uint256 disputeSplitDepth;
         Duration disputeClockExtension;
         Duration disputeMaxClockDuration;
-        uint32 calldataGasPerCompressedByte;
+        uint32 dataGasPerToken;
     }
 
     /// @notice The full set of outputs from deploying a new OP Stack chain.

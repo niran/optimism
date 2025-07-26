@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_ProgramAction_CalldataGasPerCompressedByteConsistency(gt *testing.T) {
+func Test_ProgramAction_DataGasPerTokenConsistency(gt *testing.T) {
 	type testCase int64
 
 	const (
@@ -26,7 +26,7 @@ func Test_ProgramAction_CalldataGasPerCompressedByteConsistency(gt *testing.T) {
 		t := actionsHelpers.NewDefaultTesting(gt)
 		deployConfigOverrides := func(dp *genesis.DeployConfig) {}
 
-		var testCalldataGasPerCompressedByte uint32 = 16 // Default value
+		var testDataGasPerToken uint32 = 16 // Default value
 
 		if testCfg.Custom == JovianTransitionBlock {
 			deployConfigOverrides = func(dp *genesis.DeployConfig) {
@@ -44,8 +44,8 @@ func Test_ProgramAction_CalldataGasPerCompressedByteConsistency(gt *testing.T) {
 		require.NoError(t, err)
 
 		// Update the calldata gas per compressed byte parameter
-		testCalldataGasPerCompressedByte = 32 // Update to new value
-		_, err = sysCfgContract.SetCalldataGasPerCompressedByte(sysCfgOwner, testCalldataGasPerCompressedByte)
+		testDataGasPerToken = 32 // Update to new value
+		_, err = sysCfgContract.SetDataGasPerToken(sysCfgOwner, testDataGasPerToken)
 		require.NoError(t, err)
 
 		env.Miner.ActL1StartBlock(12)(t)
@@ -63,7 +63,7 @@ func Test_ProgramAction_CalldataGasPerCompressedByteConsistency(gt *testing.T) {
 		l1BlockContract, err := bindings.NewL1Block(predeploys.L1BlockAddr, env.Engine.EthClient())
 		require.NoError(t, err)
 
-		initialCalldataGas, err := l1BlockContract.CalldataGasPerCompressedByte(nil)
+		initialDataGas, err := l1BlockContract.DataGasPerToken(nil)
 		require.NoError(t, err)
 
 		switch testCfg.Custom {
@@ -90,15 +90,15 @@ func Test_ProgramAction_CalldataGasPerCompressedByteConsistency(gt *testing.T) {
 		l2UnsafeHead := env.Engine.L2Chain().CurrentHeader()
 
 		// Verify that the parameter was properly updated in L1Block after sequencing
-		finalCalldataGas, err := l1BlockContract.CalldataGasPerCompressedByte(nil)
+		finalDataGas, err := l1BlockContract.DataGasPerToken(nil)
 		require.NoError(t, err)
 
 		if env.Sd.RollupCfg.IsJovian(l2UnsafeHead.Time) {
 			// After Jovian activation, the parameter should be updated
-			require.Equal(t, testCalldataGasPerCompressedByte, finalCalldataGas)
+			require.Equal(t, testDataGasPerToken, finalDataGas)
 		} else {
 			// Before Jovian activation, the parameter might still be the initial value
-			require.Equal(t, initialCalldataGas, finalCalldataGas)
+			require.Equal(t, initialDataGas, finalDataGas)
 		}
 
 		require.Equal(t, eth.HeaderBlockID(l2SafeHead), eth.HeaderBlockID(l2UnsafeHead), "derivation leads to the same block")

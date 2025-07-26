@@ -13,7 +13,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
         UNSAFE_BLOCK_SIGNER,
         EIP_1559_PARAMS,
         OPERATOR_FEE_PARAMS,
-        CALLDATA_GAS_PER_COMPRESSED_BYTE
+        DATA_GAS_PER_TOKEN
     }
 
     struct Addresses {
@@ -60,7 +60,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
         Addresses memory _addresses,
         uint256 _l2ChainId,
         ISuperchainConfig _superchainConfig,
-        uint32 _calldataGasPerCompressedByte
+        uint32 _dataGasPerToken
     )
         external;
     function initVersion() external view returns (uint8);
@@ -72,7 +72,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
     function minimumGasLimit() external view returns (uint64);
     function operatorFeeConstant() external view returns (uint64);
     function operatorFeeScalar() external view returns (uint32);
-    function calldataGasPerCompressedByte() external view returns (uint32);
+    function dataGasPerToken() external view returns (uint32);
     function optimismMintableERC20Factory() external view returns (address addr_);
     function optimismPortal() external view returns (address addr_);
     function overhead() external view returns (uint256);
@@ -87,7 +87,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
     function setOperatorFeeScalars(uint32 _operatorFeeScalar, uint64 _operatorFeeConstant) external;
     function setUnsafeBlockSigner(address _unsafeBlockSigner) external;
     function setEIP1559Params(uint32 _denominator, uint32 _elasticity) external;
-    function setCalldataGasPerCompressedByte(uint32 _calldataGasPerCompressedByte) external;
+    function setDataGasPerToken(uint32 _dataGasPerToken) external;
     function startBlock() external view returns (uint256 startBlock_);
     function transferOwnership(address newOwner) external; // nosemgrep
     function unsafeBlockSigner() external view returns (address addr_);

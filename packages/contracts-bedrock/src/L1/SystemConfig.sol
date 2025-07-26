@@ -35,7 +35,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         UNSAFE_BLOCK_SIGNER,
         EIP_1559_PARAMS,
         OPERATOR_FEE_PARAMS,
-        CALLDATA_GAS_PER_COMPRESSED_BYTE
+        DATA_GAS_PER_TOKEN
     }
 
     /// @notice Struct representing the addresses of L1 system contracts. These should be the
@@ -136,8 +136,8 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @notice The SuperchainConfig contract that manages the pause state.
     ISuperchainConfig public superchainConfig;
 
-    /// @notice The cost per estimated compressed byte of calldata.
-    uint32 public calldataGasPerCompressedByte;
+    /// @notice The cost per token for data gas.
+    uint32 public dataGasPerToken;
 
     /// @notice Emitted when configuration is updated.
     /// @param version    SystemConfig version.
@@ -173,7 +173,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @param _addresses         Set of L1 contract addresses. These should be the proxies.
     /// @param _l2ChainId         The L2 chain ID that this SystemConfig configures.
     /// @param _superchainConfig  The SuperchainConfig contract address.
-    /// @param _calldataGasPerCompressedByte The cost per estimated compressed byte of calldata.
+    /// @param _dataGasPerToken The cost per token for data gas.
     function initialize(
         address _owner,
         uint32 _basefeeScalar,
@@ -186,7 +186,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         SystemConfig.Addresses memory _addresses,
         uint256 _l2ChainId,
         ISuperchainConfig _superchainConfig,
-        uint32 _calldataGasPerCompressedByte
+        uint32 _dataGasPerToken
     )
         public
         reinitializer(initVersion())
@@ -202,7 +202,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         _setBatcherHash(_batcherHash);
         _setGasConfigEcotone({ _basefeeScalar: _basefeeScalar, _blobbasefeeScalar: _blobbasefeeScalar });
         _setGasLimit(_gasLimit);
-        _setCalldataGasPerCompressedByte(_calldataGasPerCompressedByte);
+        _setDataGasPerToken(_dataGasPerToken);
 
         Storage.setAddress(UNSAFE_BLOCK_SIGNER_SLOT, _unsafeBlockSigner);
         Storage.setAddress(BATCH_INBOX_SLOT, _batchInbox);
@@ -442,21 +442,21 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         emit ConfigUpdate(VERSION, UpdateType.OPERATOR_FEE_PARAMS, data);
     }
 
-    /// @notice Updates the calldata gas per compressed byte parameter. Can only be called by the owner.
-    /// @param _calldataGasPerCompressedByte The cost per estimated compressed byte of calldata.
-    function setCalldataGasPerCompressedByte(uint32 _calldataGasPerCompressedByte) external onlyOwner {
-        _setCalldataGasPerCompressedByte(_calldataGasPerCompressedByte);
+    /// @notice Updates the data gas per token parameter. Can only be called by the owner.
+    /// @param _dataGasPerToken The cost per token for data gas.
+    function setDataGasPerToken(uint32 _dataGasPerToken) external onlyOwner {
+        _setDataGasPerToken(_dataGasPerToken);
     }
 
-    /// @notice Internal function for updating the calldata gas per compressed byte parameter.
-    /// @param _calldataGasPerCompressedByte The cost per estimated compressed byte of calldata.
-    function _setCalldataGasPerCompressedByte(uint32 _calldataGasPerCompressedByte) internal {
-        require(_calldataGasPerCompressedByte >= 1, "SystemConfig: calldata gas per compressed byte must be >= 1");
+    /// @notice Internal function for updating the data gas per token parameter.
+    /// @param _dataGasPerToken The cost per token for data gas.
+    function _setDataGasPerToken(uint32 _dataGasPerToken) internal {
+        require(_dataGasPerToken >= 1, "SystemConfig: data gas per token must be >= 1");
 
-        calldataGasPerCompressedByte = _calldataGasPerCompressedByte;
+        dataGasPerToken = _dataGasPerToken;
 
-        bytes memory data = abi.encode(_calldataGasPerCompressedByte);
-        emit ConfigUpdate(VERSION, UpdateType.CALLDATA_GAS_PER_COMPRESSED_BYTE, data);
+        bytes memory data = abi.encode(_dataGasPerToken);
+        emit ConfigUpdate(VERSION, UpdateType.DATA_GAS_PER_TOKEN, data);
     }
 
     /// @notice Sets the start block in a backwards compatible way. Proxies

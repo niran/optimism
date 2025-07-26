@@ -43,7 +43,7 @@ type DeployOPChainInput struct {
 
 	OperatorFeeScalar           uint32
 	OperatorFeeConstant         uint64
-	CalldataGasPerCompressedByte uint32
+	DataGasPerToken uint32
 }
 
 func (input *DeployOPChainInput) InputSet() bool {

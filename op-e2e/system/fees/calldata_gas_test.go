@@ -20,17 +20,17 @@ import (
 )
 
 
-// TestCalldataGasPerCompressedByteChange tests that the calldata gas per compressed byte 
+// TestDataGasPerTokenChange tests that the data gas per token 
 // parameter can be updated via SystemConfig and is properly reflected in the L1Block contract
-func TestCalldataGasPerCompressedByteChange(t *testing.T) {
+func TestDataGasPerTokenChange(t *testing.T) {
 	t.Run("jovian", func(t *testing.T) {
 		op_e2e.InitParallel(t)
 		cfg := e2esys.JovianSystemConfig(t, nil)
-		testCalldataGasPerCompressedByteChange(t, &cfg)
+		testDataGasPerTokenChange(t, &cfg)
 	})
 }
 
-func testCalldataGasPerCompressedByteChange(t *testing.T, cfg *e2esys.SystemConfig) {
+func testDataGasPerTokenChange(t *testing.T, cfg *e2esys.SystemConfig) {
 	ctx := context.Background()
 
 	sys, err := cfg.Start(t)
@@ -56,13 +56,13 @@ func testCalldataGasPerCompressedByteChange(t *testing.T, cfg *e2esys.SystemConf
 	require.NoError(t, err)
 
 	// Get initial calldata gas per compressed byte value
-	initialCalldataGas, err := l1BlockContract.CalldataGasPerCompressedByte(nil)
+	initialDataGas, err := l1BlockContract.DataGasPerToken(nil)
 	require.NoError(t, err)
-	t.Logf("Initial calldata gas per compressed byte: %d", initialCalldataGas)
+	t.Logf("Initial data gas per token: %d", initialDataGas)
 
 	// Update the parameter to a new value
-	newCalldataGas := uint32(32)
-	tx, err := sysCfgContract.SetCalldataGasPerCompressedByte(sysCfgOwner, newCalldataGas)
+	newDataGas := uint32(32)
+	tx, err := sysCfgContract.SetDataGasPerToken(sysCfgOwner, newDataGas)
 	require.NoError(t, err)
 	t.Logf("Sent SystemConfig update tx: %s", tx.Hash())
 
@@ -76,17 +76,17 @@ func testCalldataGasPerCompressedByteChange(t *testing.T, cfg *e2esys.SystemConf
 	require.NoError(t, err)
 
 	// Verify the parameter was updated in L1Block
-	updatedCalldataGas, err := l1BlockContract.CalldataGasPerCompressedByte(nil)
+	updatedDataGas, err := l1BlockContract.DataGasPerToken(nil)
 	require.NoError(t, err)
-	require.Equal(t, newCalldataGas, updatedCalldataGas, "Calldata gas per compressed byte should be updated")
+	require.Equal(t, newDataGas, updatedDataGas, "Data gas per token should be updated")
 
 	// Verify that the verifier also sees the update
 	l1BlockContractVerif, err := bindings.NewL1Block(predeploys.L1BlockAddr, l2Verif)
 	require.NoError(t, err)
 
-	verifCalldataGas, err := l1BlockContractVerif.CalldataGasPerCompressedByte(nil)
+	verifDataGas, err := l1BlockContractVerif.DataGasPerToken(nil)
 	require.NoError(t, err)
-	require.Equal(t, newCalldataGas, verifCalldataGas, "Verifier should see the same updated value")
+	require.Equal(t, newDataGas, verifDataGas, "Verifier should see the same updated value")
 
 	// Send a transaction to make sure the system is still working
 	fromAddr := crypto.PubkeyToAddress(ethPrivKey.PublicKey)
@@ -111,5 +111,5 @@ func testCalldataGasPerCompressedByteChange(t *testing.T, cfg *e2esys.SystemConf
 	require.NoError(t, err)
 	require.Equal(t, types.ReceiptStatusSuccessful, receipt.Status, "test tx should succeed after parameter update")
 
-	t.Logf("Test transaction succeeded with updated calldata gas parameter")
+	t.Logf("Test transaction succeeded with updated data gas parameter")
 }
