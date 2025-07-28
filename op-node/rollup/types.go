@@ -475,6 +475,11 @@ func (c *Config) IsInterop(timestamp uint64) bool {
 	return c.InteropTime != nil && timestamp >= *c.InteropTime
 }
 
+// IsConfigurableMinBaseFeeEnabled returns true if the configurable minBaseFee feature is enabled.
+func (c *Config) IsConfigurableMinBaseFeeEnabled(timestamp uint64) bool {
+	return c.IsJovian(timestamp)
+}
+
 func (c *Config) IsRegolithActivationBlock(l2BlockTime uint64) bool {
 	return c.IsRegolith(l2BlockTime) &&
 		l2BlockTime >= c.BlockTime &&
