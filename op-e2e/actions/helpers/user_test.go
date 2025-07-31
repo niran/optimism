@@ -156,6 +156,8 @@ func runCrossLayerUserTest(gt *testing.T, test hardforkScheduledTest) {
 	dp.DeployConfig.L2GenesisGraniteTimeOffset = test.graniteTime
 	dp.DeployConfig.L2GenesisHoloceneTimeOffset = test.holoceneTime
 	dp.DeployConfig.L2GenesisIsthmusTimeOffset = test.isthmusTime
+	dp.DeployConfig.L2GenesisInteropTimeOffset = test.interopTime
+	dp.DeployConfig.L2GenesisJovianTimeOffset = test.jovianTime
 
 	if test.canyonTime != nil {
 		require.Zero(t, uint64(*test.canyonTime)%uint64(dp.DeployConfig.L2BlockTime), "canyon fork must be aligned")
