@@ -557,6 +557,9 @@ func (c *Config) IsInteropActivationBlock(l2BlockTime uint64) bool {
 // those timestamps. It can be used for both, L1 and L2 blocks.
 // TODO(12490): Currently only supports Holocene. Will be modularized in a follow-up.
 func (c *Config) IsActivationBlock(oldTime, newTime uint64) ForkName {
+	if c.IsJovian(newTime) && !c.IsJovian(oldTime) {
+		return Jovian
+	}
 	if c.IsInterop(newTime) && !c.IsInterop(oldTime) {
 		return Interop
 	}
