@@ -95,8 +95,8 @@ func testCrossLayerUser(t *testing.T, allocType config.AllocType) {
 		"granite",
 		"holocene",
 		"isthmus",
-		"jovian",
 		"interop",
+		"jovian",
 	}
 	for i, fork := range forks {
 		i := i
