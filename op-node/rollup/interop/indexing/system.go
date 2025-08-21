@@ -328,7 +328,7 @@ func (m *IndexingMode) InvalidateBlock(ctx context.Context, seal supervisortypes
 	ref := block.ExecutionPayload.BlockRef()
 
 	// Create the attributes that we build the replacement block with.
-	attributes := AttributesToReplaceInvalidBlock(block)
+	attributes := AttributesToReplaceInvalidBlock(block, m.cfg)
 	annotated := &derive.AttributesWithParent{
 		Attributes:  attributes,
 		Parent:      parentRef,

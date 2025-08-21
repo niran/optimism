@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/testutils"
 )
@@ -74,7 +75,9 @@ func TestAttributesToReplaceInvalidBlock(t *testing.T) {
 			WithdrawalsRoot: &withdrawalsRoot,
 		},
 	}
-	attrs := AttributesToReplaceInvalidBlock(invalidatedBlock)
+	holoceneTime := uint64(0)
+	cfg := &rollup.Config{HoloceneTime: &holoceneTime}
+	attrs := AttributesToReplaceInvalidBlock(invalidatedBlock, cfg)
 	require.Equal(t, invalidatedBlock.ExecutionPayload.Timestamp, attrs.Timestamp)
 	require.Equal(t, invalidatedBlock.ExecutionPayload.PrevRandao, attrs.PrevRandao)
 	require.Equal(t, invalidatedBlock.ExecutionPayload.FeeRecipient, attrs.SuggestedFeeRecipient)
@@ -93,6 +96,49 @@ func TestAttributesToReplaceInvalidBlock(t *testing.T) {
 	require.Equal(t, invalidatedBlock.ExecutionPayload.BlockHash, result.BlockHash)
 	require.Equal(t, invalidatedBlock.ExecutionPayload.StateRoot, result.StateRoot)
 	require.Equal(t, withdrawalsRoot[:], result.MessagePasserStorageRoot[:])
+}
+
+func TestAttributesToReplaceInvalidBlock_ConfigurableMinBaseFee(t *testing.T) {
+	rng := rand.New(rand.NewSource(4321))
+	denominator := uint64(200)
+	elasticity := uint64(8)
+	minBaseFee := uint64(7_000_000_000)
+	extraData := eip1559.EncodeMinBaseFeeExtraData(denominator, elasticity, minBaseFee)
+	withdrawalsRoot := testutils.RandomHash(rng)
+	beaconRoot := testutils.RandomHash(rng)
+
+	invalidatedBlock := &eth.ExecutionPayloadEnvelope{
+		ParentBeaconBlockRoot: &beaconRoot,
+		ExecutionPayload: &eth.ExecutionPayload{
+			ParentHash:      testutils.RandomHash(rng),
+			FeeRecipient:    common.Address{},
+			StateRoot:       eth.Bytes32(testutils.RandomHash(rng)),
+			ReceiptsRoot:    eth.Bytes32(testutils.RandomHash(rng)),
+			LogsBloom:       eth.Bytes256{},
+			PrevRandao:      eth.Bytes32(testutils.RandomHash(rng)),
+			BlockNumber:     eth.Uint64Quantity(rng.Uint64()),
+			GasLimit:        eth.Uint64Quantity(30_000_000),
+			GasUsed:         eth.Uint64Quantity(1_000_000),
+			Timestamp:       eth.Uint64Quantity(123456789),
+			ExtraData:       extraData,
+			BaseFeePerGas:   eth.Uint256Quantity(*uint256.NewInt(7)),
+			BlockHash:       testutils.RandomHash(rng),
+			Transactions:    []eth.Data{},
+			Withdrawals:     &types.Withdrawals{},
+			BlobGasUsed:     new(eth.Uint64Quantity),
+			ExcessBlobGas:   new(eth.Uint64Quantity),
+			WithdrawalsRoot: &withdrawalsRoot,
+		},
+	}
+
+	jovianTime := uint64(0)
+	cfg := &rollup.Config{JovianTime: &jovianTime}
+	attrs := AttributesToReplaceInvalidBlock(invalidatedBlock, cfg)
+
+	d, e := eip1559.DecodeHolocene1559Params(attrs.EIP1559Params[:])
+	require.Equal(t, denominator, d)
+	require.Equal(t, elasticity, e)
+	require.Equal(t, minBaseFee, attrs.MinBaseFee)
 }
 
 // TestInvalidatedBlockTx tests we can encode/decode the system tx that represents the invalidated block

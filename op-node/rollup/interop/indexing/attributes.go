@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 )
@@ -22,7 +23,7 @@ var (
 
 // AttributesToReplaceInvalidBlock builds the payload-attributes to replace an invalidated block.
 // See https://github.com/ethereum-optimism/specs/blob/main/specs/interop/derivation.md#replacing-invalid-blocks
-func AttributesToReplaceInvalidBlock(invalidatedBlock *eth.ExecutionPayloadEnvelope) *eth.PayloadAttributes {
+func AttributesToReplaceInvalidBlock(invalidatedBlock *eth.ExecutionPayloadEnvelope, cfg *rollup.Config) *eth.PayloadAttributes {
 	var replaceTxs []eth.Data
 
 	// Collect all deposit transactions
@@ -54,8 +55,19 @@ func AttributesToReplaceInvalidBlock(invalidatedBlock *eth.ExecutionPayloadEnvel
 	// unfortunately, the engine API needs the inner value, not the extra-data.
 	// So we translate it here.
 	extraData := invalidatedBlock.ExecutionPayload.ExtraData
-	denominator, elasticity, minBaseFee := eip1559.DecodeMinBaseFeeExtraData(extraData)
-	eip1559Params := eth.Bytes8(eip1559.EncodeHolocene1559Params(denominator, elasticity))
+	var eip1559Params *eth.Bytes8
+	var minBaseFee uint64
+	ts := uint64(invalidatedBlock.ExecutionPayload.Timestamp)
+	if cfg != nil && cfg.IsConfigurableMinBaseFee(ts) {
+		denominator, elasticity, m := eip1559.DecodeMinBaseFeeExtraData(extraData)
+		params := eth.Bytes8(eip1559.EncodeHolocene1559Params(denominator, elasticity))
+		eip1559Params = &params
+		minBaseFee = m
+	} else if cfg != nil && cfg.IsHolocene(ts) {
+		denominator, elasticity := eip1559.DecodeHoloceneExtraData(extraData)
+		params := eth.Bytes8(eip1559.EncodeHolocene1559Params(denominator, elasticity))
+		eip1559Params = &params
+	}
 
 	attrs := &eth.PayloadAttributes{
 		Timestamp:             invalidatedBlock.ExecutionPayload.Timestamp,
@@ -66,7 +78,7 @@ func AttributesToReplaceInvalidBlock(invalidatedBlock *eth.ExecutionPayloadEnvel
 		Transactions:          replaceTxs,
 		NoTxPool:              true,
 		GasLimit:              &gasLimit,
-		EIP1559Params:         &eip1559Params,
+		EIP1559Params:         eip1559Params,
 		MinBaseFee:            minBaseFee,
 	}
 	return attrs
