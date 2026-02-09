@@ -45,10 +45,13 @@ mod sequencer;
 
 pub use sequencer::{
     Conductor, ConductorClient, ConductorError, DelayedL1OriginSelectorProvider, L1OriginSelector,
-    L1OriginSelectorError, L1OriginSelectorProvider, OriginSelector, QueuedSequencerEngineClient,
-    SequencerActor, SequencerActorError, SequencerAdminQuery, SequencerConfig,
-    SequencerEngineClient,
+    L1OriginSelectorError, L1OriginSelectorProvider, OriginSelector, PreconfirmationConfig,
+    QueuedSequencerEngineClient, SequencerActor, SequencerActorError, SequencerAdminQuery,
+    SequencerConfig, SequencerEngineClient,
 };
+pub(crate) use sequencer::PreconfirmationTracker;
+#[cfg(feature = "preconfirmations")]
+pub(crate) use sequencer::FlashblocksSubscriber;
 
 #[cfg(test)]
 pub use network::MockUnsafePayloadGossipClient;

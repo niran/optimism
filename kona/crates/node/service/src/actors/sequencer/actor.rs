@@ -6,6 +6,7 @@ use crate::{
         SequencerEngineClient,
         engine::EngineClientError,
         sequencer::{
+            PreconfirmationTracker,
             conductor::Conductor,
             error::SequencerActorError,
             metrics::{
@@ -87,6 +88,8 @@ pub struct SequencerActor<
     pub rollup_config: Arc<RollupConfig>,
     /// A client to asynchronously sign and gossip built payloads to the network actor.
     pub unsafe_payload_gossip_client: UnsafePayloadGossipClient_,
+    /// Optional preconfirmation tracker for injecting previously preconfirmed transactions.
+    pub(crate) preconfirmation_tracker: Option<Arc<PreconfirmationTracker>>,
 }
 
 impl<
@@ -253,7 +256,7 @@ where
 
     /// Builds the OpAttributesWithParent for the next block to build. If None is returned, it
     /// indicates that no attributes could be built at this time but future attempts may be made.
-    async fn build_attributes(
+    pub(super) async fn build_attributes(
         &mut self,
         unsafe_head: L2BlockInfo,
         l1_origin: BlockInfo,
@@ -287,6 +290,20 @@ where
         };
 
         attributes.no_tx_pool = Some(!self.should_use_tx_pool(l1_origin, &attributes));
+
+        // Inject preconfirmed transaction ordering from the previous leader's flashblocks.
+        if let Some(tracker) = &self.preconfirmation_tracker {
+            let preconfirmed = tracker.take_transactions(unsafe_head.block_info.hash).await;
+            if !preconfirmed.is_empty() {
+                info!(
+                    target: "sequencer",
+                    count = preconfirmed.len(),
+                    parent = %unsafe_head.block_info.hash,
+                    "Injecting preconfirmed transaction ordering"
+                );
+                attributes.transactions.get_or_insert_with(Vec::new).extend(preconfirmed);
+            }
+        }
 
         let attrs_with_parent = OpAttributesWithParent::new(attributes, unsafe_head, None, false);
         Ok(Some(attrs_with_parent))

@@ -5,7 +5,7 @@
 //! [op-node]: https://github.com/ethereum-optimism/optimism/blob/develop/op-node/flags/flags.go#L233-L265
 
 use clap::Parser;
-use kona_node_service::SequencerConfig;
+use kona_node_service::{PreconfirmationConfig, SequencerConfig};
 use std::{num::ParseIntError, time::Duration};
 use url::Url;
 
@@ -55,6 +55,30 @@ pub struct SequencerArgs {
         value_parser = |arg: &str| -> Result<Duration, ParseIntError> {Ok(Duration::from_secs(arg.parse()?))}
     )]
     pub conductor_rpc_timeout: Duration,
+
+    /// Enable preconfirmation tracking. When enabled, the sequencer subscribes to upstream
+    /// flashblocks and injects previously preconfirmed transactions on leadership transfer.
+    #[arg(
+        long = "sequencer.preconfirmations",
+        default_value = "false",
+        env = "KONA_NODE_PRECONFIRMATIONS"
+    )]
+    pub preconfirmations: bool,
+
+    /// WebSocket URL for upstream flashblocks subscription used by preconfirmation tracking.
+    #[arg(
+        long = "sequencer.preconfirmation-flashblocks-url",
+        env = "KONA_NODE_PRECONFIRMATION_FLASHBLOCKS_URL"
+    )]
+    pub preconfirmation_flashblocks_url: Option<Url>,
+
+    /// TTL in seconds for preconfirmation entries before eviction.
+    #[arg(
+        long = "sequencer.preconfirmation-ttl",
+        default_value = "60",
+        env = "KONA_NODE_PRECONFIRMATION_TTL"
+    )]
+    pub preconfirmation_ttl: u64,
 }
 
 impl Default for SequencerArgs {
@@ -73,6 +97,11 @@ impl SequencerArgs {
             sequencer_recovery_mode: self.recover,
             conductor_rpc_url: self.conductor_rpc.clone(),
             l1_conf_delay: self.l1_confs,
+            preconfirmation: PreconfirmationConfig {
+                enabled: self.preconfirmations,
+                flashblocks_url: self.preconfirmation_flashblocks_url.clone(),
+                ttl: Duration::from_secs(self.preconfirmation_ttl),
+            },
         }
     }
 }

@@ -2,6 +2,7 @@
 //!
 //! [`SequencerActor`]: super::SequencerActor
 
+use super::preconfirmation::PreconfirmationConfig;
 use url::Url;
 
 /// Configuration for the [`SequencerActor`].
@@ -17,4 +18,6 @@ pub struct SequencerConfig {
     pub conductor_rpc_url: Option<Url>,
     /// The confirmation delay for the sequencer.
     pub l1_conf_delay: u64,
+    /// Configuration for preconfirmation tracking.
+    pub preconfirmation: PreconfirmationConfig,
 }

@@ -3,6 +3,12 @@
 mod config;
 pub use config::SequencerConfig;
 
+pub(super) mod preconfirmation;
+pub use preconfirmation::PreconfirmationConfig;
+#[cfg(feature = "preconfirmations")]
+pub(crate) use preconfirmation::FlashblocksSubscriber;
+pub(crate) use preconfirmation::PreconfirmationTracker;
+
 mod origin_selector;
 pub use origin_selector::{
     DelayedL1OriginSelectorProvider, L1OriginSelector, L1OriginSelectorError,

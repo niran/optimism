@@ -8,7 +8,10 @@ use crate::{
     QueuedNetworkEngineClient, QueuedSequencerAdminAPIClient, QueuedSequencerEngineClient,
     RollupBoostAdminApiClient, RollupBoostHealthRpcClient, RpcActor, RpcContext, SequencerActor,
     SequencerConfig,
-    actors::{BlockStream, NetworkInboundData, QueuedUnsafePayloadGossipClient},
+    actors::{
+        BlockStream, NetworkInboundData, PreconfirmationTracker,
+        QueuedUnsafePayloadGossipClient,
+    },
 };
 use alloy_eips::BlockNumberOrTag;
 use alloy_provider::RootProvider;
@@ -232,6 +235,55 @@ impl RollupNode {
         ))
     }
 
+    /// Creates a preconfirmation tracker and spawns a flashblocks subscriber if configured.
+    ///
+    /// Returns `None` if preconfirmation tracking is disabled, no flashblocks URL is configured,
+    /// or no conductor is configured (preconfirmation tracking is only useful with conductor-based
+    /// leadership transfer).
+    fn create_preconfirmation_tracker(
+        sequencer_config: &SequencerConfig,
+        _cancellation: &CancellationToken,
+    ) -> Option<Arc<PreconfirmationTracker>> {
+        if !sequencer_config.preconfirmation.enabled {
+            return None;
+        }
+
+        if sequencer_config.conductor_rpc_url.is_none() {
+            warn!(
+                target: "service",
+                "Preconfirmation tracking is enabled but no conductor is configured. \
+                 Preconfirmation tracking requires conductor for leadership transfer. Disabling."
+            );
+            return None;
+        }
+
+        let _url = sequencer_config.preconfirmation.flashblocks_url.as_ref()?;
+
+        let tracker = Arc::new(PreconfirmationTracker::new(sequencer_config.preconfirmation.ttl));
+
+        #[cfg(feature = "preconfirmations")]
+        {
+            use crate::actors::FlashblocksSubscriber;
+            let subscriber = FlashblocksSubscriber::new(
+                _url.clone(),
+                tracker.clone(),
+                _cancellation.clone(),
+            );
+            tokio::spawn(subscriber.run());
+        }
+
+        #[cfg(not(feature = "preconfirmations"))]
+        {
+            warn!(
+                target: "service",
+                "Preconfirmation tracking is enabled but the 'preconfirmations' feature is not compiled in. \
+                 The tracker will be created but no flashblocks subscriber will run."
+            );
+        }
+
+        Some(tracker)
+    }
+
     /// Starts the rollup node service.
     ///
     /// The rollup node, in validator mode, listens to two sources of information to sync the L2
@@ -367,6 +419,10 @@ impl RollupNode {
             let queued_gossip_client =
                 QueuedUnsafePayloadGossipClient::new(gossip_payload_tx.clone());
 
+            // Create preconfirmation tracker and subscriber if configured.
+            let preconfirmation_tracker =
+                Self::create_preconfirmation_tracker(&self.sequencer_config, &cancellation);
+
             (
                 Some(SequencerActor {
                     admin_api_rx: sequencer_admin_api_rx,
@@ -379,6 +435,7 @@ impl RollupNode {
                     origin_selector: delayed_origin_selector,
                     rollup_config: self.config.clone(),
                     unsafe_payload_gossip_client: queued_gossip_client,
+                    preconfirmation_tracker,
                 }),
                 Some(QueuedSequencerAdminAPIClient::new(sequencer_admin_api_tx)),
             )

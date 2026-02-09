@@ -33,8 +33,9 @@ pub use actors::{
     QueuedL1WatcherDerivationClient, QueuedNetworkEngineClient, QueuedSequencerAdminAPIClient,
     QueuedSequencerEngineClient, QueuedUnsafePayloadGossipClient, ResetRequest,
     RollupBoostAdminApiClient, RollupBoostHealthRpcClient, RpcActor, RpcActorError, RpcContext,
-    SealRequest, SequencerActor, SequencerActorError, SequencerAdminQuery, SequencerConfig,
-    SequencerEngineClient, UnsafePayloadGossipClient, UnsafePayloadGossipClientError,
+    PreconfirmationConfig, SealRequest, SequencerActor, SequencerActorError,
+    SequencerAdminQuery, SequencerConfig, SequencerEngineClient, UnsafePayloadGossipClient,
+    UnsafePayloadGossipClientError,
 };
 
 mod metrics;
